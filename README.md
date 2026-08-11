@@ -19,21 +19,23 @@ En desarrollo. Actualmente implementado:
 - **Autenticación:** JWT (tokens) + contraseñas hasheadas con bcrypt
 
 ## Estructura del repositorio
-synap/
-├── backend/
-│ ├── app/
-│ │ ├── main.py # Enciende el backend y conecta los routers
-│ │ ├── config.py # Configuración (lee variables del .env)
-│ │ ├── database.py # Conexión a la base de datos (Supabase)
-│ │ ├── models.py # Tablas traducidas a Python (ORM)
-│ │ ├── schemas.py # Contratos de entrada/salida de la API
-│ │ ├── security.py # Hasheo de contraseñas y tokens
-│ │ └── routers/
-│ │ └── auth.py # Endpoints de login y activación
-│ ├── .env # Variables sensibles (NO se sube a GitHub)
-│ └── .env.example # Plantilla del .env
-├── requirements.txt # Librerías de Python que usa el proyecto
-└── README.md
+
+    synap/
+    ├── backend/
+    │   ├── app/
+    │   │   ├── main.py          # Enciende el backend y conecta los routers
+    │   │   ├── config.py        # Configuración (lee variables del .env)
+    │   │   ├── database.py      # Conexión a la base de datos (Supabase)
+    │   │   ├── models.py        # Tablas traducidas a Python (ORM)
+    │   │   ├── schemas.py       # Contratos de entrada/salida de la API
+    │   │   ├── security.py      # Hasheo de contraseñas y tokens
+    │   │   └── routers/
+    │   │       └── auth.py      # Endpoints de login y activación
+    │   ├── .env                 # Variables sensibles (NO se sube a GitHub)
+    │   └── .env.example         # Plantilla del .env
+    ├── requirements.txt         # Librerías de Python que usa el proyecto
+    └── README.md
+
 
 ## Cómo levantar el proyecto localmente
 
@@ -90,4 +92,3 @@ La documentación interactiva de la API está en `http://localhost:8000/docs`.
 - Las tablas de la base ya existen en Supabase; el backend se conecta a ellas
   (no las crea).
 
-  
