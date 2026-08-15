@@ -65,3 +65,19 @@ class Token(BaseModel):
     """Lo que devuelve el login: el token que la app guarda para pedidos futuros."""
     access_token: str
     token_type: str = "bearer"
+    
+# ─── Activos ───
+class ActivoOut(BaseModel):
+    """Datos de un activo que devolvemos al frontend."""
+    codigo: str
+    codigo_qr: str | None = None
+    tipo_equipo_id: str
+    sector_id: str
+    descripcion: str
+    ubicacion: str | None = None
+    marca: str | None = None
+    modelo: str | None = None
+    numero_serie: str | None = None
+    estado: str
+
+    model_config = ConfigDict(from_attributes=True)

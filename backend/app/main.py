@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import auth
+from .routers import auth, activos
 
 
 app = FastAPI(
@@ -39,6 +39,7 @@ app.add_middleware(
 
 # Conectar los endpoints de autenticación (login, activar, estado).
 app.include_router(auth.router)
+app.include_router(activos.router)
 
 
 @app.get("/health", tags=["health"])
