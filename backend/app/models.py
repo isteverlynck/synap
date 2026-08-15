@@ -13,7 +13,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -126,6 +126,7 @@ class Activo(Base):
     ordenes_de_trabajo: Mapped[list["OrdenTrabajo"]] = relationship(back_populates="activo")
     fallas: Mapped[list["Falla"]] = relationship(back_populates="activo")
     mantenimientos: Mapped[list["MantenimientoPreventivo"]] = relationship(back_populates="activo")
+    movimientos: Mapped[list["MovimientoActivo"]] = relationship(back_populates="activo")
     
 
 class OrdenTrabajo(Base):
@@ -156,6 +157,7 @@ class OrdenTrabajo(Base):
     fallas: Mapped[list["Falla"]] = relationship(back_populates="orden")
     mantenimientos: Mapped[list["MantenimientoPreventivo"]] = relationship(back_populates="orden")
     consumos: Mapped[list["ConsumoInsumo"]] = relationship(back_populates="orden")
+    adjuntos: Mapped[list["Adjunto"]] = relationship(back_populates="orden")
 
 
 class Falla(Base):
@@ -195,6 +197,7 @@ class MantenimientoPreventivo(Base):
     # ─── Relaciones ───
     activo: Mapped["Activo"] = relationship(back_populates="mantenimientos")
     orden: Mapped["OrdenTrabajo | None"] = relationship(back_populates="mantenimientos")
+    respuestas: Mapped[list["ChecklistRespuesta"]] = relationship(back_populates="mantenimiento")
     
     
 class Insumo(Base):
@@ -251,3 +254,143 @@ class ConsumoInsumo(Base):
     # ─── Relaciones ───
     insumo: Mapped["Insumo"] = relationship(back_populates="consumos")
     orden: Mapped["OrdenTrabajo"] = relationship(back_populates="consumos")
+    
+
+class PlantillaMP(Base):
+    """Plantilla de mantenimiento preventivo: define qué se revisa para un tipo
+    de equipo y cada cuántos días. Tiene muchos ítems de checklist."""
+    __tablename__ = "plantillas_mp"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tipo_equipo_id: Mapped[str] = mapped_column(String, ForeignKey("tipos_equipo.id"), nullable=False)
+    nombre: Mapped[str] = mapped_column(String, nullable=False)
+    frecuencia_dias: Mapped[int] = mapped_column(Integer, nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # ─── Relaciones ───
+    items: Mapped[list["ChecklistItem"]] = relationship(back_populates="plantilla")
+
+
+class ChecklistItem(Base):
+    """Un punto a revisar dentro de una plantilla de MP (ej: 'verificar batería')."""
+    __tablename__ = "checklist_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plantilla_mp_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("plantillas_mp.id"), nullable=False)
+    orden: Mapped[int] = mapped_column(Integer, nullable=False)   # número de paso en el checklist
+    descripcion: Mapped[str] = mapped_column(String, nullable=False)
+    obligatorio: Mapped[bool | None] = mapped_column(default=True, nullable=True)
+
+    # ─── Relaciones ───
+    plantilla: Mapped["PlantillaMP"] = relationship(back_populates="items")
+    respuestas: Mapped[list["ChecklistRespuesta"]] = relationship(back_populates="item")
+
+
+class ChecklistRespuesta(Base):
+    """La respuesta a un ítem del checklist en un mantenimiento concreto.
+
+    Conecta un mantenimiento (mp_id) con un ítem del checklist (checklist_item_id)
+    y registra si se completó."""
+    __tablename__ = "checklist_respuestas"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mp_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("mantenimientos_preventivos.id"), nullable=False)
+    checklist_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("checklist_items.id"), nullable=False)
+    completado: Mapped[bool | None] = mapped_column(default=False, nullable=True)
+    observacion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    completado_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+    # ─── Relaciones ───
+    item: Mapped["ChecklistItem"] = relationship(back_populates="respuestas")
+    mantenimiento: Mapped["MantenimientoPreventivo"] = relationship(back_populates="respuestas")
+    
+class MovimientoActivo(Base):
+    """Registro de un movimiento de un activo entre sectores (trazabilidad).
+
+    Guarda de dónde a dónde se movió, cuándo, y si es un préstamo temporal,
+    la fecha estimada y real de devolución."""
+    __tablename__ = "movimientos_activos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    activo_codigo_actual: Mapped[str] = mapped_column(String, ForeignKey("activos.codigo"), nullable=False)
+    activo_codigo_anterior: Mapped[str | None] = mapped_column(String, nullable=True)
+    tipo: Mapped[str] = mapped_column(String, nullable=False)
+    sector_origen_id: Mapped[str] = mapped_column(String, ForeignKey("servicios.id"), nullable=False)
+    sector_destino_id: Mapped[str] = mapped_column(String, ForeignKey("servicios.id"), nullable=False)
+    ubicacion_destino: Mapped[str | None] = mapped_column(String, nullable=True)
+    grupo_origen_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    grupo_destino_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    fecha_movimiento: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    fecha_devolucion_estimada: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fecha_devolucion_real: Mapped[date | None] = mapped_column(Date, nullable=True)
+    registrado_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)
+    estado: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # ─── Relaciones ───
+    activo: Mapped["Activo"] = relationship(back_populates="movimientos")
+
+
+class Adjunto(Base):
+    """Un archivo (imagen, PDF) adjunto a una orden de trabajo."""
+    __tablename__ = "adjuntos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=False)
+    nombre_archivo: Mapped[str] = mapped_column(String, nullable=False)
+    url: Mapped[str] = mapped_column(String, nullable=False)
+    tipo: Mapped[str | None] = mapped_column(String, nullable=True)
+    subido_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # ─── Relaciones ───
+    orden: Mapped["OrdenTrabajo"] = relationship(back_populates="adjuntos")
+
+class GrupoTecnico(Base):
+    """Catálogo de grupos técnicos (equipos de trabajo de Bioingeniería)."""
+    __tablename__ = "grupos_tecnicos"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    descripcion: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class GrupoTipoEquipo(Base):
+    """Tabla de enlace: qué tipos de equipo maneja cada grupo técnico.
+
+    No tiene id propio; su clave primaria son las dos columnas juntas
+    (grupo_id + tipo_equipo_id)."""
+    __tablename__ = "grupo_tipo_equipo"
+
+    grupo_id: Mapped[str] = mapped_column(String, ForeignKey("grupos_tecnicos.id"), primary_key=True)
+    tipo_equipo_id: Mapped[str] = mapped_column(String, ForeignKey("tipos_equipo.id"), primary_key=True)
+
+
+class Notificacion(Base):
+    """Notificación del sistema para un usuario (ej: OT correctiva asignada)."""
+    __tablename__ = "notificaciones"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    usuario_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    tipo: Mapped[str] = mapped_column(String, nullable=False)
+    titulo: Mapped[str] = mapped_column(String, nullable=False)
+    mensaje: Mapped[str] = mapped_column(Text, nullable=False)
+    leida: Mapped[bool | None] = mapped_column(default=False, nullable=True)
+    referencia_tipo: Mapped[str | None] = mapped_column(String, nullable=True)
+    referencia_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Auditoria(Base):
+    """Registro de auditoría: quién cambió qué y cuándo. Guarda los datos
+    anteriores y nuevos en formato JSON."""
+    __tablename__ = "auditoria"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    usuario_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)
+    tabla: Mapped[str] = mapped_column(String, nullable=False)
+    registro_id: Mapped[str] = mapped_column(String, nullable=False)
+    accion: Mapped[str] = mapped_column(String, nullable=False)
+    datos_anteriores: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    datos_nuevos: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
