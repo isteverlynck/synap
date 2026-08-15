@@ -12,9 +12,9 @@ reflejar el cambio acá también.
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 
@@ -121,3 +121,133 @@ class Activo(Base):
     grupo_original_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # ─── Relaciones (navegar desde el activo hacia lo que le pertenece) ───
+    ordenes_de_trabajo: Mapped[list["OrdenTrabajo"]] = relationship(back_populates="activo")
+    fallas: Mapped[list["Falla"]] = relationship(back_populates="activo")
+    mantenimientos: Mapped[list["MantenimientoPreventivo"]] = relationship(back_populates="activo")
+    
+
+class OrdenTrabajo(Base):
+    """Orden de trabajo: el corazón operativo del sistema.
+
+    Puede ser correctiva (por una falla) o preventiva. Se abre, se asigna a un
+    técnico, se sigue y se cierra. Pertenece a un activo (activo_codigo).
+    """
+    __tablename__ = "ordenes_de_trabajo"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    numero_ot: Mapped[int] = mapped_column(Integer, nullable=False)
+    activo_codigo: Mapped[str] = mapped_column(String, ForeignKey("activos.codigo"), nullable=False)
+    tipo: Mapped[str] = mapped_column(String, nullable=False)          # correctiva / preventiva
+    estado: Mapped[str] = mapped_column(String, nullable=False)        # abierta / en curso / cerrada
+    prioridad: Mapped[str | None] = mapped_column(String, nullable=True)
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tecnico_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    grupo_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    sector_solicitante_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    fecha_apertura: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # ─── Relaciones ───
+    activo: Mapped["Activo"] = relationship(back_populates="ordenes_de_trabajo")
+    fallas: Mapped[list["Falla"]] = relationship(back_populates="orden")
+    mantenimientos: Mapped[list["MantenimientoPreventivo"]] = relationship(back_populates="orden")
+    consumos: Mapped[list["ConsumoInsumo"]] = relationship(back_populates="orden")
+
+
+class Falla(Base):
+    """Una falla reportada sobre un activo. Puede derivar en una orden de trabajo."""
+    __tablename__ = "fallas"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    activo_codigo: Mapped[str] = mapped_column(String, ForeignKey("activos.codigo"), nullable=False)
+    ot_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=True)
+    reportado_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    tipo_falla: Mapped[str | None] = mapped_column(String, nullable=True)
+    severidad: Mapped[str | None] = mapped_column(String, nullable=True)
+    descripcion: Mapped[str] = mapped_column(Text, nullable=False)
+    estado: Mapped[str] = mapped_column(String, nullable=False)
+    fecha_reporte: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    
+    # ─── Relaciones ───
+    activo: Mapped["Activo"] = relationship(back_populates="fallas")
+    orden: Mapped["OrdenTrabajo | None"] = relationship(back_populates="fallas")
+
+
+class MantenimientoPreventivo(Base):
+    """Un mantenimiento preventivo programado (o realizado) sobre un activo."""
+    __tablename__ = "mantenimientos_preventivos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    activo_codigo: Mapped[str] = mapped_column(String, ForeignKey("activos.codigo"), nullable=False)
+    plantilla_mp_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    ot_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=True)
+    fecha_programada: Mapped[date] = mapped_column(Date, nullable=False)
+    fecha_realizada: Mapped[date | None] = mapped_column(Date, nullable=True)
+    tecnico_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    estado: Mapped[str] = mapped_column(String, nullable=False)
+    generado_automaticamente: Mapped[bool | None] = mapped_column(default=False, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # ─── Relaciones ───
+    activo: Mapped["Activo"] = relationship(back_populates="mantenimientos")
+    orden: Mapped["OrdenTrabajo | None"] = relationship(back_populates="mantenimientos")
+    
+    
+class Insumo(Base):
+    """Un insumo o repuesto del stock. Tiene compras (entradas) y consumos (salidas)."""
+    __tablename__ = "insumos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    nombre: Mapped[str] = mapped_column(String, nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unidad: Mapped[str | None] = mapped_column(String, nullable=True)
+    stock_actual: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
+    stock_minimo: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
+    tipo_equipo_id: Mapped[str | None] = mapped_column(String, ForeignKey("tipos_equipo.id"), nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # ─── Relaciones ───
+    compras: Mapped[list["Compra"]] = relationship(back_populates="insumo")
+    consumos: Mapped[list["ConsumoInsumo"]] = relationship(back_populates="insumo")
+
+
+class Compra(Base):
+    """Una compra de insumos (entrada de stock)."""
+    __tablename__ = "compras"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    insumo_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("insumos.id"), nullable=False)
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    proveedor: Mapped[str | None] = mapped_column(String, nullable=True)
+    numero_orden: Mapped[str | None] = mapped_column(String, nullable=True)
+    observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)
+    registrado_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # ─── Relaciones ───
+    insumo: Mapped["Insumo"] = relationship(back_populates="compras")
+
+
+class ConsumoInsumo(Base):
+    """Un consumo de insumo (salida de stock), vinculado a una orden de trabajo.
+
+    Este es el 'descuento automático de stock al usar un repuesto en una OT' que
+    menciona el anteproyecto: cada consumo apunta a la OT donde se usó.
+    """
+    __tablename__ = "consumos_insumos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=False)
+    insumo_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("insumos.id"), nullable=False)
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
+    fecha: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tecnico_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+    # ─── Relaciones ───
+    insumo: Mapped["Insumo"] = relationship(back_populates="consumos")
+    orden: Mapped["OrdenTrabajo"] = relationship(back_populates="consumos")

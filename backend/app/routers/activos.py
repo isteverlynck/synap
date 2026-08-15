@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Activo
-from ..schemas import ActivoOut
+from ..schemas import ActivoOut, ActivoDetalle
 
 router = APIRouter(prefix="/activos", tags=["activos"])
 
@@ -19,6 +19,14 @@ def listar_activos(limit: int = 50, db: Session = Depends(get_db)):
 @router.get("/{codigo}", response_model=ActivoOut)
 def ver_activo(codigo: str, db: Session = Depends(get_db)):
     """Ver un activo puntual por su código (ej: B-ANES-AGME-001)."""
+    activo = db.query(Activo).filter(Activo.codigo == codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+    return activo
+
+@router.get("/{codigo}/detalle", response_model=ActivoDetalle)
+def ver_activo_detalle(codigo: str, db: Session = Depends(get_db)):
+    """Ficha completa del activo: sus datos + órdenes, fallas y mantenimientos."""
     activo = db.query(Activo).filter(Activo.codigo == codigo).first()
     if activo is None:
         raise HTTPException(status_code=404, detail="Activo no encontrado")

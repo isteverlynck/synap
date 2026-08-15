@@ -11,7 +11,7 @@ que controla qué se expone.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 
 from pydantic import BaseModel, ConfigDict
 
@@ -81,3 +81,35 @@ class ActivoOut(BaseModel):
     estado: str
 
     model_config = ConfigDict(from_attributes=True)
+    
+# ─── Schemas resumidos para anidar en la ficha del activo ───
+class OrdenTrabajoResumen(BaseModel):
+    id: uuid.UUID
+    numero_ot: int
+    tipo: str
+    estado: str
+    prioridad: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FallaResumen(BaseModel):
+    id: uuid.UUID
+    tipo_falla: str | None = None
+    severidad: str | None = None
+    estado: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MantenimientoResumen(BaseModel):
+    id: uuid.UUID
+    fecha_programada: date
+    fecha_realizada: date | None = None
+    estado: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ActivoDetalle(ActivoOut):
+    """La ficha completa del activo: sus datos + su historial relacionado."""
+    ordenes_de_trabajo: list[OrdenTrabajoResumen] = []
+    fallas: list[FallaResumen] = []
+    mantenimientos: list[MantenimientoResumen] = []
