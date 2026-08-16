@@ -210,6 +210,7 @@ class Insumo(Base):
     unidad: Mapped[str | None] = mapped_column(String, nullable=True)
     stock_actual: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
     stock_minimo: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
+    punto_reorden: Mapped[int | None] = mapped_column(Integer, default=0, nullable=True)
     tipo_equipo_id: Mapped[str | None] = mapped_column(String, ForeignKey("tipos_equipo.id"), nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -226,6 +227,8 @@ class Compra(Base):
     insumo_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("insumos.id"), nullable=False)
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
     fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    estado: Mapped[str | None] = mapped_column(String, default="pedida", nullable=True)
+    fecha_recepcion: Mapped[date | None] = mapped_column(Date, nullable=True)
     proveedor: Mapped[str | None] = mapped_column(String, nullable=True)
     numero_orden: Mapped[str | None] = mapped_column(String, nullable=True)
     observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)

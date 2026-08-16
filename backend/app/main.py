@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import auth, activos
+from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock
 
 
 app = FastAPI(
@@ -40,6 +40,10 @@ app.add_middleware(
 # Conectar los endpoints de autenticación (login, activar, estado).
 app.include_router(auth.router)
 app.include_router(activos.router)
+app.include_router(ordenes_trabajo.router)
+app.include_router(fallas.router)
+app.include_router(mantenimientos.router)  
+app.include_router(stock.router)
 
 
 @app.get("/health", tags=["health"])
