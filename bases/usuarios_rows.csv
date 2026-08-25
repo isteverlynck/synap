@@ -1,0 +1,8 @@
+id,nombre,apellido,email,rol,grupo,created_at,numero_identificacion,hashed_password
+15486687-02cd-4379-801a-cd546ccf223d,Laura,Martínez,lmartinez@hospitalaleman.com,tecnico,G3,2026-08-17 23:31:20.968053,,
+1e32758a-aecb-4467-9ec4-f780fa59a844,Roberto,Méndez,rmendez@hospitalaleman.com,jefatura,,2026-08-17 23:31:20.968053,,
+251def17-826a-4692-9914-ecb15fa594e6,Lucía,García,lgarcia@hospitalaleman.com,enfermeria,,2026-08-17 23:31:20.968053,,
+3f56b50c-56a3-4b47-9595-4df60f2a6ef0,Carlos,Rodríguez,crodriguez@hospitalaleman.com,tecnico,G2,2026-08-17 23:31:20.968053,,
+a2f194bf-9643-4669-8215-65795b0da93c,Ana,López,alopez@hospitalaleman.com,tecnico,G5,2026-08-17 23:31:20.968053,,
+b994ab55-c78a-450a-8195-7ec8d1c024b1,María,González,mgonzalez@hospitalaleman.com,tecnico,G1,2026-08-17 23:31:20.968053,,
+e9825ec5-5e51-48de-9b58-3d115b58f6a7,Diego,Fernández,dfernandez@hospitalaleman.com,tecnico,G4,2026-08-17 23:31:20.968053,,

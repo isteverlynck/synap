@@ -1,0 +1,21 @@
+id,nombre,centro_costos,descripcion,created_at
+ANES,Anestesia,CC-001,Servicio de Anestesiología,2026-08-17 23:31:20.968053
+CARDIO,Cardiología,CC-012,Servicio de Cardiología,2026-08-17 23:31:20.968053
+CITO,Citología,CC-015,Servicio de Citología,2026-08-17 23:31:20.968053
+EMER,Emergencias,CC-009,Guardia y Emergencias,2026-08-17 23:31:20.968053
+ENF,Enfermería,CC-017,Servicio de Enfermería,2026-08-17 23:31:20.968053
+FARM,Farmacia,CC-016,Servicio de Farmacia,2026-08-17 23:31:20.968053
+HEMOD,Hemodinamia,CC-010,Servicio de Hemodinamia,2026-08-17 23:31:20.968053
+HEMOS,Hemostasia,CC-014,Servicio de Hemostasia,2026-08-17 23:31:20.968053
+HEMOT,Hemoterapia,CC-013,Servicio de Hemoterapia,2026-08-17 23:31:20.968053
+NEO,Neonatología,CC-007,Servicio de Neonatología,2026-08-17 23:31:20.968053
+NURSE,Enfermería Neonatología,CC-008,Área de enfermería neonatal,2026-08-17 23:31:20.968053
+ONCO,Oncología,CC-019,Servicio de Oncología,2026-08-17 23:31:20.968053
+OPGIN,Quirófano Ginecología,CC-002,Quirófano del Centro Materno Infantil,2026-08-17 23:31:20.968053
+PAB11,Pabellón 11,CC-018,Pabellón 11,2026-08-17 23:31:20.968053
+QUIR,Quirófano Central,CC-003,Quirófano Central del hospital,2026-08-17 23:31:20.968053
+RMN,Resonancia Magnética,CC-011,Servicio de Resonancia Magnética,2026-08-17 23:31:20.968053
+UCO,Unidad Coronaria,CC-020,Unidad de Cuidados Coronarios,2026-08-17 23:31:20.968053
+URO,Urología,CC-004,Servicio de Urología,2026-08-17 23:31:20.968053
+UTI,Terapia Intensiva,CC-005,Unidad de Terapia Intensiva,2026-08-17 23:31:20.968053
+UTIP,Terapia Intensiva Ped.,CC-006,Unidad de Terapia Intensiva Pediátrica,2026-08-17 23:31:20.968053

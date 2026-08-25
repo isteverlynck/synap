@@ -1,0 +1,19 @@
+id,tipo_equipo_id,nombre,frecuencia_dias,descripcion,created_at
+03be42d8-f9b8-4b5d-9371-9074f49ba3f9,LACA,MP Anual Lavadora de Catéteres,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+0f41cbea-a285-460a-a8b7-3fe317a32fda,MOMU,MP Anual Monitor Multiparamétrico,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+1f2b5ec5-3bcd-4239-b4c4-d63373007878,SATD,MP Bianual Oxímetro de Dedo,730,Mantenimiento preventivo bianual,2026-08-17 23:31:20.968053
+2779cb0a-db18-455d-9931-faeade9b61a1,RESP,MP Anual Respirador,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+3498b69a-4453-4970-aa8c-1dd5d9aa6847,TEAM,MP Anual Tensiómetro Aneroide,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+50d8c00c-bc6c-4063-a879-2e2c689b53af,INCU,MP Anual Incubadora,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+5b2a74bb-c194-438d-86ca-d68fd56d5ba0,ELEC,MP Anual Electrobisturí,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+62b4b9a4-97c6-4ba4-bbc0-8acf243ff9a9,MPIP,MP Anual Micropipeta,365,Calibración y mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+897b2a83-af29-4c2e-8f1b-830acee20d98,ECOG,MP Anual Ecógrafo,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+8a3d8c6a-0b88-4ae5-b1ab-c976d9dd3667,CASB,MP Anual Cabina de Seguridad Biológica,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+8e425359-661b-4329-be8d-05fc93a78cb3,MAAN,MP Anual Máquina de Anestesia,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+a3b0750d-a018-459f-be18-b62917236204,INYE,MP Anual Inyectora de Contraste,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+acd6c49a-1af0-4cfc-bcd0-0064da2db8b5,CENT,MP Anual Centrífuga,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+b163a0e5-b7e4-477c-bec1-0528d687cc3c,MICR,MP Anual Microscopio,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+c868aecb-edd0-4d11-972b-77e4c2a4aaef,BOMJ,MP Bianual Bomba de Infusión a Jeringa,730,Mantenimiento preventivo bianual,2026-08-17 23:31:20.968053
+ca2ebd87-b73f-44f3-a218-e4380bb947b4,CAMA,MP Anual Cámara Laparoscópica,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+f0f6c0e9-0492-40a5-875e-d40ff5dc9411,DESF,MP Anual Cardiodesfibrilador,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
+fa1560da-07de-459c-90e7-1dff109369bb,AGIT,MP Anual Agitador,365,Mantenimiento preventivo anual,2026-08-17 23:31:20.968053
