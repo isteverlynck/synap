@@ -1,4 +1,0 @@
-id,insumo_id,cantidad,fecha,proveedor,numero_orden,observaciones,registrado_por,created_at,estado,fecha_recepcion
-7d0d9d85-fc55-4ef7-9724-b2c74e32e946,8500c628-16ef-4e24-9ea7-8679f0af0c72,12,2025-06-15,Philips Argentina,OC-2025-0158,Reposición trimestral,1e32758a-aecb-4467-9ec4-f780fa59a844,2026-08-17 23:31:20.968053,pedida,
-af0eacbc-2f14-47a3-9748-040d3967f252,def4feb8-1d6a-4a7c-a8cc-cdb3c93fb5cc,20,2025-05-15,Distribuidora Médica SA,OC-2025-0128,Reposición mensual,1e32758a-aecb-4467-9ec4-f780fa59a844,2026-08-17 23:31:20.968053,pedida,
-b277e737-e0b1-4c42-81c3-af7a1563bb71,5bc3cafc-2309-4ea2-b1c6-36bc68b8fe84,10,2025-06-01,Dräger Argentina,OC-2025-0142,Reposición semestral de cal sodada,1e32758a-aecb-4467-9ec4-f780fa59a844,2026-08-17 23:31:20.968053,pedida,

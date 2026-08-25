@@ -1,8 +1,0 @@
-id,mp_id,checklist_item_id,completado,observacion,completado_por
-356792c3-d3ca-4fea-9b93-be10a3c2df97,fdaaf1d9-59dd-432e-84ad-0001479a3c05,942f088a-e074-45ed-b9cf-b4d19355bf80,true,Válvulas inspiratoria y espiratoria verificadas. Funcionan correctamente.,b994ab55-c78a-450a-8195-7ec8d1c024b1
-5c238592-8a82-4b7f-b832-5fc23909e35d,fdaaf1d9-59dd-432e-84ad-0001479a3c05,320b5d31-5def-46d3-bd06-1a87f9acc733,true,Prueba funcional con pulmón de prueba superada. Volúmenes correctos.,b994ab55-c78a-450a-8195-7ec8d1c024b1
-858dee85-d4ca-496d-af63-f457b6c3439d,fdaaf1d9-59dd-432e-84ad-0001479a3c05,f947af1f-a733-47a7-801c-5a780fbfb44a,true,Sensores de flujo y presión calibrados. Valores dentro de rango.,b994ab55-c78a-450a-8195-7ec8d1c024b1
-ba82cfda-be16-4ac3-b5e3-d6f72b14f439,fdaaf1d9-59dd-432e-84ad-0001479a3c05,86140ba9-d511-4e98-95da-b6a15857620d,true,"Cal sodada reemplazada. Filtros en buen estado, no se reemplazaron.",b994ab55-c78a-450a-8195-7ec8d1c024b1
-c25ff67a-728d-42e3-a54d-53a30249dbb1,fdaaf1d9-59dd-432e-84ad-0001479a3c05,a5eb8cb6-7d6e-4c70-b288-440a30f1eafd,true,Prueba de estanqueidad superada. Sin fugas detectadas.,b994ab55-c78a-450a-8195-7ec8d1c024b1
-d5d63846-e366-4af6-9675-3a33c24e77f1,fdaaf1d9-59dd-432e-84ad-0001479a3c05,2620c740-1801-41f4-afb0-7c0493416767,true,Sin daños visibles. Circuito respiratorio en buen estado.,b994ab55-c78a-450a-8195-7ec8d1c024b1
-e88a1c6f-46a3-4a8c-978a-f141a02abf33,fdaaf1d9-59dd-432e-84ad-0001479a3c05,3970dceb-1913-488c-99c8-35487734544f,true,Todas las alarmas activas y dentro de parámetros.,b994ab55-c78a-450a-8195-7ec8d1c024b1
