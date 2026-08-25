@@ -426,3 +426,61 @@ class GenerarCorrectivaDesdeChecklist(BaseModel):
     descripcion: str
     prioridad: str | None = None
     tecnico_id: uuid.UUID | None = None
+    
+
+# ─── Dashboard / KPIs ───
+class FallasPorEquipo(BaseModel):
+    activo_codigo: str
+    cantidad: int
+
+
+class FallasPorTipo(BaseModel):
+    tipo_falla: str
+    cantidad: int
+
+
+class MTBFItem(BaseModel):
+    """Tiempo medio entre fallas de un equipo o tipo (en días).
+
+    clave = el equipo (código) o el tipo de equipo, según el listado.
+    Solo aparece si hay al menos 2 fallas (si no, no hay intervalo que medir).
+    """
+    clave: str
+    cantidad_fallas: int
+    mtbf_dias: float
+
+
+class DashboardKPIs(BaseModel):
+    """Todos los indicadores del panel de jefatura, en una sola respuesta.
+
+    Se calcula en el momento en que se pide (tiempo real). Los KPIs que dependen
+    de datos que pueden faltar devuelven None / lista vacía, para que el frontend
+    muestre 'sin datos' en vez de romperse.
+    """
+    # KPI 1 — cumplimiento de MP
+    mp_totales: int
+    mp_realizados: int
+    cumplimiento_mp_pct: float | None = None
+
+    # KPI 2 — tiempo de inactividad (cierre - notificacion) de correctivas
+    inactividad_promedio_dias: float | None = None
+    correctivas_evaluadas: int = 0
+
+    # KPI 3 — fallas
+    fallas_totales: int
+    fallas_por_equipo: list[FallasPorEquipo] = []
+    fallas_por_tipo: list[FallasPorTipo] = []
+
+    # KPI 4 — MTTR: tiempo medio de reparación (apertura - cierre)
+    mttr_dias: float | None = None
+    ot_cerradas: int = 0
+
+    # KPI 5 — MTBF: tiempo medio entre fallas (confiabilidad)
+    mtbf_por_equipo: list[MTBFItem] = []
+    mtbf_por_tipo: list[MTBFItem] = []
+
+    # extras de contexto para el panel
+    ot_totales: int = 0
+    ot_abiertas: int = 0
+    activos_totales: int = 0
+    activos_en_baja: int = 0
