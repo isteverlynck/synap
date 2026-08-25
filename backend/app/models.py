@@ -121,6 +121,7 @@ class Activo(Base):
     grupo_original_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    criticidad: Mapped[str | None] = mapped_column(String, nullable=True)
     
     # ─── Relaciones (navegar desde el activo hacia lo que le pertenece) ───
     ordenes_de_trabajo: Mapped[list["OrdenTrabajo"]] = relationship(back_populates="activo")
@@ -265,11 +266,13 @@ class PlantillaMP(Base):
     __tablename__ = "plantillas_mp"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tipo_equipo_id: Mapped[str] = mapped_column(String, ForeignKey("tipos_equipo.id"), nullable=False)
+    tipo_equipo_id: Mapped[str | None] = mapped_column(String, ForeignKey("tipos_equipo.id"), nullable=True)
     nombre: Mapped[str] = mapped_column(String, nullable=False)
     frecuencia_dias: Mapped[int] = mapped_column(Integer, nullable=False)
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    es_generica: Mapped[bool | None] = mapped_column(default=False, nullable=True)
+    
 
     # ─── Relaciones ───
     items: Mapped[list["ChecklistItem"]] = relationship(back_populates="plantilla")
@@ -303,6 +306,7 @@ class ChecklistRespuesta(Base):
     completado: Mapped[bool | None] = mapped_column(default=False, nullable=True)
     observacion: Mapped[str | None] = mapped_column(Text, nullable=True)
     completado_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    resultado: Mapped[str | None] = mapped_column(String, nullable=True)  # PASA / NO_PASA
 
     # ─── Relaciones ───
     item: Mapped["ChecklistItem"] = relationship(back_populates="respuestas")

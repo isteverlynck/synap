@@ -30,6 +30,7 @@ Estado:
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from ..database import get_db
 from ..models import Insumo, Compra, ConsumoInsumo, OrdenTrabajo, Usuario
@@ -259,8 +260,8 @@ def recibir_compra(
 # el nivel resultante. Si queda bajo el mínimo, se registra igual y avisa crítico.
 # Para activar: descomentá el bloque y probá con OT + insumo existentes.
 # ═══════════════════════════════════════════════════════════════════════════
-"""
-from datetime import datetime
+
+
 
 @router.post("/consumos", response_model=ConsumoResultado, status_code=201)
 def registrar_consumo(
@@ -310,4 +311,3 @@ def registrar_consumo(
         nivel=nivel,
         aviso=aviso,
     )
-"""

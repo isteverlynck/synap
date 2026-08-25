@@ -305,3 +305,90 @@ class ConsumoResultado(BaseModel):
     stock_resultante: int
     nivel: str
     aviso: str | None = None
+    
+
+class ChecklistItemOut(BaseModel):
+    """Un punto a revisar dentro de una plantilla de MP (ej: 'verificar batería').
+
+    Es la PLANTILLA: qué hay que revisar. Se muestra cuando el técnico va a hacer
+    un mantenimiento, como guía de los pasos.
+    """
+    id: uuid.UUID
+    plantilla_mp_id: uuid.UUID
+    orden: int
+    descripcion: str
+    obligatorio: bool | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ChecklistRespuestaOut(BaseModel):
+    """La respuesta a un ítem en un mantenimiento concreto (qué se cumplió)."""
+    id: uuid.UUID
+    mp_id: uuid.UUID
+    checklist_item_id: uuid.UUID
+    completado: bool | None = None
+    observacion: str | None = None
+    completado_por: uuid.UUID | None = None
+    resultado: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChecklistRespuestaCreate(BaseModel):
+    """Lo que el frontend manda para registrar la respuesta a UN ítem.
+
+    Cuando el técnico marca un punto del checklist como hecho (o no), manda esto.
+    """
+    mp_id: uuid.UUID
+    checklist_item_id: uuid.UUID
+    completado: bool = False
+    observacion: str | None = None
+    completado_por: uuid.UUID | None = None
+    resultado: str | None = None
+    
+
+class ChecklistItemCreate(BaseModel):
+    """Un ítem del checklist al crear un plan (ej: 'verificación funcional').
+
+    No lleva id ni plantilla_mp_id: el id lo genera la base, y el plantilla_mp_id
+    lo completa el backend al crear el plan (ver router).
+    """
+    orden: int
+    descripcion: str
+    obligatorio: bool = True
+
+
+class PlanMantenimientoCreate(BaseModel):
+    """Crear un plan de mantenimiento completo: la plantilla + todos sus ítems.
+
+    Si es_generica=True, es el plan base para equipos sin plan propio (el que
+    describió Cami: estado externo, verificación funcional, seguridad eléctrica).
+    Si es_generica=False, tipo_equipo_id dice para qué tipo de equipo es.
+    """
+    nombre: str
+    frecuencia_dias: int
+    descripcion: str | None = None
+    es_generica: bool = False
+    tipo_equipo_id: str | None = None      # obligatorio solo si NO es genérica
+    items: list[ChecklistItemCreate]        # los pasos del checklist
+
+
+class PlanMantenimientoOut(BaseModel):
+    """Un plan de mantenimiento con sus datos (sin los ítems, para listar)."""
+    id: uuid.UUID
+    nombre: str
+    frecuencia_dias: int
+    descripcion: str | None = None
+    es_generica: bool | None = None
+    tipo_equipo_id: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PlanMantenimientoDetalle(PlanMantenimientoOut):
+    """Un plan con TODOS sus ítems de checklist adentro (para ver el detalle)."""
+    items: list["ChecklistItemOut"] = []
+    
+
+PlanMantenimientoDetalle.model_rebuild()
