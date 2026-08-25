@@ -19,7 +19,10 @@ Estado:
   - POST: escrito y ACTIVO (ya hay datos para probarlo). Registra una respuesta.
 """
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -28,12 +31,16 @@ from ..models import (
     ChecklistRespuesta,
     PlantillaMP,
     MantenimientoPreventivo,
+    OrdenTrabajo,
+    Activo,
     Usuario,
 )
 from ..schemas import (
     ChecklistItemOut,
     ChecklistRespuestaOut,
     ChecklistRespuestaCreate,
+    GenerarCorrectivaDesdeChecklist,
+    OrdenTrabajoOut,
 )
 from ..security import get_current_user
 
@@ -127,3 +134,75 @@ def registrar_respuesta(
     db.commit()
     db.refresh(respuesta)
     return respuesta
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# COMBO: registrar NO_PASA + generar OT correctiva (opcional, elige la persona)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/generar-correctiva", response_model=OrdenTrabajoOut, status_code=201)
+def generar_correctiva_desde_checklist(
+    payload: GenerarCorrectivaDesdeChecklist,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Registra un ítem como NO_PASA y crea la OT correctiva para ese equipo.
+
+    Se usa SOLO cuando la persona elige generar la correctiva (ej: el equipo se
+    puede reparar). Si en cambio decide NO generarla (ej: se da de baja), el
+    frontend usa POST /checklists/respuestas y no llama a este endpoint.
+
+    Hace todo junto (una sola transacción):
+      1. Verifica que el mantenimiento y el ítem existan.
+      2. Registra la respuesta NO_PASA (con la descripción como observación).
+      3. Crea la OT correctiva enganchada al MISMO activo del mantenimiento.
+    """
+    # 1. El mantenimiento tiene que existir (de él sacamos el equipo).
+    mp = db.query(MantenimientoPreventivo).filter(
+        MantenimientoPreventivo.id == payload.mp_id
+    ).first()
+    if mp is None:
+        raise HTTPException(status_code=404, detail="El mantenimiento no existe.")
+
+    # 2. El ítem de checklist tiene que existir.
+    item = db.query(ChecklistItem).filter(
+        ChecklistItem.id == payload.checklist_item_id
+    ).first()
+    if item is None:
+        raise HTTPException(status_code=404, detail="El ítem de checklist no existe.")
+
+    # 3. El activo del mantenimiento (a él se le abre la correctiva).
+    activo = db.query(Activo).filter(Activo.codigo == mp.activo_codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="El activo del mantenimiento no existe.")
+
+    # 4. Registrar la respuesta NO_PASA.
+    respuesta = ChecklistRespuesta(
+        mp_id=payload.mp_id,
+        checklist_item_id=payload.checklist_item_id,
+        completado=True,
+        resultado="NO_PASA",
+        observacion=payload.descripcion,
+        completado_por=payload.tecnico_id,
+    )
+    db.add(respuesta)
+
+    # 5. Crear la OT correctiva para el mismo equipo.
+    ultimo = db.query(func.max(OrdenTrabajo.numero_ot)).scalar()
+    numero_ot = (ultimo or 0) + 1
+    orden = OrdenTrabajo(
+        numero_ot=numero_ot,
+        activo_codigo=mp.activo_codigo,
+        tipo="CORRECTIVA",
+        estado="ABIERTA",
+        prioridad=(payload.prioridad.upper() if payload.prioridad else None),
+        descripcion=f"[Generada desde checklist de MP] {payload.descripcion}",
+        tecnico_id=payload.tecnico_id,
+        fecha_apertura=datetime.utcnow(),
+    )
+    db.add(orden)
+
+    # 6. Un solo commit: la respuesta NO_PASA y la OT se guardan juntas.
+    db.commit()
+    db.refresh(orden)
+    return orden

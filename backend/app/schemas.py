@@ -408,3 +408,21 @@ class OrdenTrabajoCambioEstado(BaseModel):
 class OrdenTrabajoCierre(BaseModel):
     """Para cerrar una OT. observaciones es opcional (ej: qué se hizo)."""
     observaciones: str | None = None
+    
+class GenerarCorrectivaDesdeChecklist(BaseModel):
+    """Registrar un ítem NO_PASA y generar la OT correctiva asociada, de una.
+ 
+    Se usa SOLO cuando la persona elige 'generar correctiva'. Si elige NO
+    generarla, el frontend usa el registro simple de respuesta (no este).
+ 
+    - mp_id: el mantenimiento donde se detectó la falla (de ahí sacamos el equipo).
+    - checklist_item_id: el ítem que falló.
+    - descripcion: qué falló (va como descripción de la OT y como observación).
+    - prioridad: opcional, para que una falla grave nazca priorizada.
+    - tecnico_id: opcional, quién detectó / a quién se asigna.
+    """
+    mp_id: uuid.UUID
+    checklist_item_id: uuid.UUID
+    descripcion: str
+    prioridad: str | None = None
+    tecnico_id: uuid.UUID | None = None
