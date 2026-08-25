@@ -150,6 +150,8 @@ class OrdenTrabajo(Base):
     sector_solicitante_id: Mapped[str | None] = mapped_column(String, nullable=True)
     fecha_apertura: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    fecha_notificacion: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    notificado_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
     

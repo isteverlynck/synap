@@ -151,6 +151,7 @@ class OrdenTrabajoCreate(BaseModel):
     grupo_id: str | None = None
     sector_solicitante_id: str | None = None
     observaciones: str | None = None
+    fecha_notificacion: datetime | None = None   # cuándo avisó el servicio (opcional)
 
 # ─── Fallas ───
 class FallaOut(BaseModel):
@@ -392,3 +393,18 @@ class PlanMantenimientoDetalle(PlanMantenimientoOut):
     
 
 PlanMantenimientoDetalle.model_rebuild()
+
+# ─── Seguimiento y cierre de OT ───
+class OrdenTrabajoCambioEstado(BaseModel):
+    """Para cambiar el estado de una OT (seguimiento).
+
+    estado: ABIERTA / EN_PROGRESO / CERRADA
+    Si el nuevo estado es CERRADA, conviene usar el endpoint /cerrar en su lugar,
+    que además pone la fecha de cierre.
+    """
+    estado: str
+
+
+class OrdenTrabajoCierre(BaseModel):
+    """Para cerrar una OT. observaciones es opcional (ej: qué se hizo)."""
+    observaciones: str | None = None
