@@ -1,0 +1,19 @@
+id,nombre,descripcion
+AGIT,Agitador,Agitador de laboratorio para mezcla de muestras
+BOMJ,Bomba de Infusión a Jeringa,Bomba de infusión controlada por jeringa
+CAMA,Unidad de Cámara Laparoscópica,Sistema de cámara para cirugía laparoscópica
+CASB,Cabina de Seguridad Biológica,Cabina de flujo laminar para trabajo estéril
+CENT,Centrífuga,Centrífuga de laboratorio para separación de muestras
+DESF,Cardiodesfibrilador,Desfibrilador cardíaco externo
+ECOG,Ecógrafo,Equipo de diagnóstico por ultrasonido
+ELEC,Electrobisturí,Equipo de electrocirugía para corte y coagulación
+INCU,Incubadora,Incubadora neonatal para recién nacidos prematuros
+INYE,Inyectora de Contraste,Inyector de medio de contraste para diagnóstico
+LACA,Lavadora de Catéteres,Equipo para limpieza de catéteres reutilizables
+MAAN,Máquina de Anestesia,Equipo para administración de anestesia general
+MICR,Microscopio,Microscopio óptico para análisis de muestras
+MOMU,Monitor Multiparamétrico,Monitor de signos vitales multiparamétrico
+MPIP,Micropipeta,Micropipeta de laboratorio para manejo de volúmenes precisos
+RESP,Respirador,Ventilador mecánico para soporte respiratorio
+SATD,Oxímetro de Dedo,Pulsioxímetro portátil de dedo
+TEAM,Tensiómetro Aneroide,Tensiómetro aneroide de uso clínico

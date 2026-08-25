@@ -1,0 +1,60 @@
+id,plantilla_mp_id,orden,descripcion,obligatorio
+01a60898-9939-49ae-905e-eaf97b833bff,0f41cbea-a285-460a-a8b7-3fe317a32fda,1,"Inspección visual del equipo, cables y accesorios",true
+04270d8e-e344-47ba-84e4-ff0ad2efdf44,c868aecb-edd0-4d11-972b-77e4c2a4aaef,4,"Verificar alarmas de oclusión, jeringa vacía y fin de dosis",true
+0a6fc3ef-7691-425a-80bb-b6d1c455e810,f0f6c0e9-0492-40a5-875e-d40ff5dc9411,2,Verificar carga y descarga de energía a 200J y 360J,true
+1e267b91-2fe4-4d7f-a916-29dd3f40f207,897b2a83-af29-4c2e-8f1b-830acee20d98,4,Verificar todos los modos disponibles,true
+203bcf34-a979-44b8-b325-5acafcae1ca6,50d8c00c-bc6c-4063-a879-2e2c689b53af,4,Limpiar filtros y sistema de circulación de aire,true
+2620c740-1801-41f4-afb0-7c0493416767,8e425359-661b-4329-be8d-05fc93a78cb3,1,Inspección visual del equipo y circuito respiratorio,true
+2b271d62-f840-4e02-a6e8-109a4a62bc6a,0f41cbea-a285-460a-a8b7-3fe317a32fda,6,Prueba funcional con simulador de paciente,true
+2b296cec-faee-48e4-bc14-38591440a662,50d8c00c-bc6c-4063-a879-2e2c689b53af,2,Calibrar temperatura y humedad interior,true
+314c8756-8fe3-43a2-b894-19c0ff508422,f0f6c0e9-0492-40a5-875e-d40ff5dc9411,3,Verificar modo marcapasos externo,true
+31860c6b-bf46-46de-a13f-13cb134c4dca,50d8c00c-bc6c-4063-a879-2e2c689b53af,5,Prueba funcional completa,true
+320b5d31-5def-46d3-bd06-1a87f9acc733,8e425359-661b-4329-be8d-05fc93a78cb3,7,Prueba funcional completa con pulmón de prueba,true
+33dbeb83-d17b-4962-8aba-5b384e857732,62b4b9a4-97c6-4ba4-bbc0-8acf243ff9a9,4,Lubricar émbolo si corresponde,false
+38f5ca5f-afcf-4cec-90cd-00b017e961c2,ca2ebd87-b73f-44f3-a218-e4380bb947b4,5,Prueba funcional con monitor de video,true
+3970dceb-1913-488c-99c8-35487734544f,8e425359-661b-4329-be8d-05fc93a78cb3,6,"Verificar alarmas de presión, volumen y apnea",true
+461a28b3-b4b8-47df-aa2d-4f195311fdde,62b4b9a4-97c6-4ba4-bbc0-8acf243ff9a9,2,"Calibración gravimétrica en volumen nominal, 50% y 10%",true
+4941f750-7071-4189-a5e7-079a8934df4b,ca2ebd87-b73f-44f3-a218-e4380bb947b4,3,Limpiar óptica y conectores,true
+4df33428-8770-40ba-be9b-bbf8cde6d208,f0f6c0e9-0492-40a5-875e-d40ff5dc9411,6,Prueba funcional con analizador de desfibriladores,true
+4f683c26-2831-44f8-8aeb-f3392b4f2a6b,2779cb0a-db18-455d-9931-faeade9b61a1,2,Calibrar sensores de flujo y presión,true
+5609992d-cb8b-4f99-bfba-2bcd4d1c3cb6,b163a0e5-b7e4-477c-bec1-0528d687cc3c,5,Prueba funcional con preparado histológico de referencia,true
+62760518-5297-4b07-8200-98f6866fdcee,c868aecb-edd0-4d11-972b-77e4c2a4aaef,5,Prueba de batería y autonomía,true
+66a72981-199a-446a-863a-b71c20419c46,897b2a83-af29-4c2e-8f1b-830acee20d98,1,Inspección visual del equipo y transductores,true
+67334439-b974-4c68-9d7b-ba3c397094c2,f0f6c0e9-0492-40a5-875e-d40ff5dc9411,5,Verificar batería: carga completa y autonomía,true
+6e9c8468-7dd9-4b08-80df-899701b66ee5,5b2a74bb-c194-438d-86ca-d68fd56d5ba0,3,Verificar potencia de corte y coagulación,true
+76602d79-b63e-45d5-ae81-02a07f3af423,897b2a83-af29-4c2e-8f1b-830acee20d98,2,Verificar calidad de imagen en modo B y Doppler,true
+81d1a656-09d6-46b9-a4d8-4f74493e58c9,b163a0e5-b7e4-477c-bec1-0528d687cc3c,2,"Limpiar objetivos, oculares y condensador",true
+853d3e7a-58f3-40c5-9aea-0b1d580ad6dc,50d8c00c-bc6c-4063-a879-2e2c689b53af,3,Verificar alarmas de temperatura y humedad,true
+86140ba9-d511-4e98-95da-b6a15857620d,8e425359-661b-4329-be8d-05fc93a78cb3,5,Reemplazar cal sodada y filtros según estado,true
+88184fd2-dacf-49ed-8dc1-2bb2c7e0a9f4,ca2ebd87-b73f-44f3-a218-e4380bb947b4,2,Verificar calidad de imagen y balance de blancos,true
+893b4cd2-bf2e-4f7c-94c0-c4d31d56f1f7,897b2a83-af29-4c2e-8f1b-830acee20d98,3,Limpiar pantalla y conectores de transductores,true
+8a815476-acba-4b32-b525-e32994be4203,b163a0e5-b7e4-477c-bec1-0528d687cc3c,1,"Inspección visual de óptica, objetivos y oculares",true
+8fb6066a-a774-4c7d-8d77-4529353a0b32,5b2a74bb-c194-438d-86ca-d68fd56d5ba0,2,Medición de corriente de fuga,true
+942f088a-e074-45ed-b9cf-b4d19355bf80,8e425359-661b-4329-be8d-05fc93a78cb3,4,Verificar válvulas inspiratoria y espiratoria,true
+9655341b-b5a1-491b-841a-47c0a0df66f8,c868aecb-edd0-4d11-972b-77e4c2a4aaef,3,Revisar mecanismo de sujeción de jeringa,true
+987ed7bb-7b76-40b5-a9d7-a7cdeca6ddaf,5b2a74bb-c194-438d-86ca-d68fd56d5ba0,5,Prueba funcional completa,true
+9a1498e8-71bf-466b-b091-1eb2a18165c2,0f41cbea-a285-460a-a8b7-3fe317a32fda,2,"Verificar calibración: SpO2, NIBP, ECG, Temperatura",true
+9cf6aebe-aebb-4743-822e-23c3309aeded,0f41cbea-a285-460a-a8b7-3fe317a32fda,3,Verificar alarmas de límites por parámetro,true
+9d11173e-4771-4597-8c41-990a96d7d62a,ca2ebd87-b73f-44f3-a218-e4380bb947b4,4,Verificar funcionamiento de zoom y enfoque,true
+9da0e17e-7eca-4128-ba8c-aa8aeb547bf7,62b4b9a4-97c6-4ba4-bbc0-8acf243ff9a9,5,Emitir certificado de calibración,true
+a1109818-dc5a-4578-bbff-b4f4d4d46f9c,0f41cbea-a285-460a-a8b7-3fe317a32fda,5,Verificar batería interna y autonomía,true
+a43c7da1-b41c-4810-a4c8-74df3a901ca1,5b2a74bb-c194-438d-86ca-d68fd56d5ba0,4,Verificar alarmas y sistema de retorno de paciente,true
+a5eb8cb6-7d6e-4c70-b288-440a30f1eafd,8e425359-661b-4329-be8d-05fc93a78cb3,2,Verificar estanqueidad del circuito respiratorio,true
+a8a1e4e2-242a-4e6f-bb76-3d2100339b8d,b163a0e5-b7e4-477c-bec1-0528d687cc3c,4,Verificar platina y sistema de enfoque fino y grueso,true
+a9dcf1a2-03c7-492e-992a-9849d14e18af,c868aecb-edd0-4d11-972b-77e4c2a4aaef,1,Inspección visual del equipo,true
+b302085c-8139-42ef-99b9-147c96f2d1af,f0f6c0e9-0492-40a5-875e-d40ff5dc9411,4,Verificar alarmas y sincronismo (modo cardioversión),true
+ba91cc41-5d38-47ea-b80e-405d52662450,ca2ebd87-b73f-44f3-a218-e4380bb947b4,1,"Inspección visual de cámara, fuente de luz y cable",true
+bdc01ec0-021c-487a-af4a-126372f61840,0f41cbea-a285-460a-a8b7-3fe317a32fda,4,"Limpiar pantalla, carcasa y conectores",true
+c3297eac-7a18-4cb6-ac0e-eb399edf5de3,50d8c00c-bc6c-4063-a879-2e2c689b53af,1,Inspección visual del equipo y acrílico,true
+c6135713-669e-437a-97a5-283f98f79995,b163a0e5-b7e4-477c-bec1-0528d687cc3c,3,Verificar sistema de iluminación y diafragma,true
+cce9c2a0-05d8-4026-ab82-63434a1986f2,5b2a74bb-c194-438d-86ca-d68fd56d5ba0,1,"Inspección visual del equipo, cables y pedales",true
+cf756a75-3c4c-48df-ae59-0fed67d761bb,2779cb0a-db18-455d-9931-faeade9b61a1,3,Verificar estanqueidad del circuito,true
+d072d09b-ff6c-4fa1-82ef-ce9bcb5c260b,c868aecb-edd0-4d11-972b-77e4c2a4aaef,2,Verificar exactitud de caudal de infusión,true
+d11aa36d-b5cd-4593-9d73-7c8cdecf3356,62b4b9a4-97c6-4ba4-bbc0-8acf243ff9a9,3,Verificar exactitud e imprecisión según norma ISO 8655,true
+dff23705-4181-464a-bdc9-a536c123758a,897b2a83-af29-4c2e-8f1b-830acee20d98,5,Prueba funcional con phantom de ultrasonido,false
+e87b3c33-9c40-43db-b254-61b03446c90e,2779cb0a-db18-455d-9931-faeade9b61a1,1,Inspección visual del equipo y circuito paciente,true
+e9cec385-a4d5-44fc-9a2b-1bbf7bdffd1d,62b4b9a4-97c6-4ba4-bbc0-8acf243ff9a9,1,"Inspección visual del émbolo, punta y cuerpo",true
+f0cb9627-c0e4-43cd-bd50-e55bb09ce4e6,2779cb0a-db18-455d-9931-faeade9b61a1,4,"Verificar alarmas de apnea, presión y volumen",true
+f497421a-8cf9-44a4-a7e5-a44199ed1238,f0f6c0e9-0492-40a5-875e-d40ff5dc9411,1,"Inspección visual del equipo, paletas y cables ECG",true
+f947af1f-a733-47a7-801c-5a780fbfb44a,8e425359-661b-4329-be8d-05fc93a78cb3,3,Calibrar sensores de flujo y presión,true
+ffa7b4f5-5e18-4e74-9b2d-9f00da8273df,2779cb0a-db18-455d-9931-faeade9b61a1,5,Prueba funcional con pulmón de prueba,true
