@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SYNAP — Prueba de escáner QR</title>
+  <!-- Librería probada para leer QR desde la cámara del navegador -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f7;
+      color: #1d1d1f;
+    }
+    h1 { font-size: 1.3rem; }
+    #reader { width: 100%; border-radius: 12px; overflow: hidden; }
+    #resultado {
+      margin-top: 20px;
+      padding: 16px;
+      background: white;
+      border-radius: 12px;
+      min-height: 40px;
+      border: 2px solid #ddd;
+    }
+    #resultado.exito { border-color: #34c759; background: #f0fff4; }
+    .codigo { font-size: 1.4rem; font-weight: 600; color: #34c759; word-break: break-all; }
+    .instruccion { color: #666; font-size: 0.9rem; }
+    button {
+      background: #0071e3; color: white; border: none;
+      padding: 12px 20px; border-radius: 10px; font-size: 1rem;
+      cursor: pointer; margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>SYNAP — Prueba de escáner QR</h1>
+  <p class="instruccion">Apuntá la cámara a un código QR. Si lee, aparece el contenido abajo.</p>
+
+  <div id="reader"></div>
+
+  <div id="resultado">
+    <span class="instruccion">Esperando lectura…</span>
+  </div>
+
+  <button id="reiniciar" style="display:none;">Escanear otro</button>
+
+  <script>
+    const resultado = document.getElementById("resultado");
+    const btnReiniciar = document.getElementById("reiniciar");
+    let scanner = null;
+
+    // Qué hacer cuando lee un QR con éxito
+    function alLeer(textoDecodificado) {
+      resultado.className = "exito";
+      resultado.innerHTML = `
+        <div class="instruccion">✓ Código leído:</div>
+        <div class="codigo">${textoDecodificado}</div>
+      `;
+      // Frenar el escáner después de leer
+      if (scanner) scanner.clear();
+      btnReiniciar.style.display = "inline-block";
+    }
+
+    // Arrancar el escáner
+    function iniciar() {
+      resultado.className = "";
+      resultado.innerHTML = '<span class="instruccion">Esperando lectura…</span>';
+      btnReiniciar.style.display = "none";
+      scanner = new Html5QrcodeScanner("reader", {
+        fps: 10,
+        qrbox: { width: 250, height: 250 }
+      });
+      scanner.render(alLeer);
+    }
+
+    btnReiniciar.addEventListener("click", iniciar);
+    iniciar();
+  </script>
+</body>
+</html>
