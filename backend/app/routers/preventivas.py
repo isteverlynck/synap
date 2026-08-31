@@ -71,13 +71,23 @@ def generar_preventivas(
 
     for activo in equipos:
         # ¿ya hay una OT preventiva para este equipo en ese mes? (no duplicar)
+        # existente = (
+        #     db.query(OrdenTrabajo)
+        #     .filter(
+        #         OrdenTrabajo.activo_codigo == activo.codigo,
+        #         OrdenTrabajo.tipo == "PREVENTIVA",
+        #         extract("year", OrdenTrabajo.fecha_apertura) == anio,
+        #         extract("month", OrdenTrabajo.fecha_apertura) == mes,
+        #     )
+        #     .first()
+        # )
+        descripcion_mp = f"Mantenimiento preventivo programado ({anio}-{mes:02d})"
         existente = (
             db.query(OrdenTrabajo)
             .filter(
                 OrdenTrabajo.activo_codigo == activo.codigo,
                 OrdenTrabajo.tipo == "PREVENTIVA",
-                extract("year", OrdenTrabajo.fecha_apertura) == anio,
-                extract("month", OrdenTrabajo.fecha_apertura) == mes,
+                OrdenTrabajo.descripcion == descripcion_mp,
             )
             .first()
         )
@@ -95,7 +105,8 @@ def generar_preventivas(
             activo_codigo=activo.codigo,
             tipo="PREVENTIVA",
             estado="ABIERTA",   # las preventivas del grupo nacen abiertas (las toma el grupo)
-            descripcion=f"Mantenimiento preventivo programado ({anio}-{mes:02d})",
+            # descripcion=f"Mantenimiento preventivo programado ({anio}-{mes:02d})",
+            descripcion=descripcion_mp,
             grupo_id=grupo,
             fecha_apertura=datetime.utcnow(),
         )
