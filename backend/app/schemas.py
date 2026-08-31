@@ -519,3 +519,33 @@ class SolicitudOut(BaseModel):
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+    
+
+# ─── Acciones del coordinador sobre solicitudes ───
+class SolicitudAceptar(BaseModel):
+    """Datos para aceptar una solicitud y convertirla en OT.
+
+    - asignar_a_id: la persona (técnico) a la que se asigna la OT. Debe ser de
+      un grupo que coordine el coordinador.
+    - grupo_id: solo necesario para solicitudes de 'cosa' (sin equipo), donde el
+      grupo no se puede deducir del activo. Para solicitudes de equipo se ignora
+      (el grupo sale del equipo).
+    - prioridad: opcional, para la OT que se genera.
+    """
+    asignar_a_id: uuid.UUID
+    grupo_id: str | None = None
+    prioridad: str | None = None
+
+
+class SolicitudRechazar(BaseModel):
+    """Datos para rechazar una solicitud."""
+    motivo_rechazo: str
+
+
+class SolicitudModificar(BaseModel):
+    """Campos que el coordinador puede corregir antes de aceptar (si estaba mal
+    hecha). Todos opcionales: solo se cambia lo que se manda."""
+    titulo: str | None = None
+    descripcion_problema: str | None = None
+    activo_codigo: str | None = None
+    descripcion_cosa: str | None = None
