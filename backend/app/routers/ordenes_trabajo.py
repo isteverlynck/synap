@@ -62,6 +62,28 @@ def listar_ordenes(
     return q.limit(limit).all()
 
 
+@router.get("/mias", response_model=list[OrdenTrabajoOut])
+def mis_ordenes(
+    estado: str | None = None,
+    tipo: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Las OT asignadas al técnico logueado ("Mis OT asignadas").
+
+    Filtros opcionales:
+      - tipo: CORRECTIVA / PREVENTIVA (para separar las secciones del panel del
+        técnico: "OT asignadas" vs "OT preventivas").
+      - estado: ASIGNADA / EN_PROGRESO / CERRADA.
+    """
+    q = db.query(OrdenTrabajo).filter(OrdenTrabajo.tecnico_id == current_user.id)
+    if estado is not None:
+        q = q.filter(OrdenTrabajo.estado == estado)
+    if tipo is not None:
+        q = q.filter(OrdenTrabajo.tipo == tipo.upper())
+    return q.order_by(OrdenTrabajo.fecha_apertura.desc()).all()
+
+
 @router.get("/{ot_id}", response_model=OrdenTrabajoOut)
 def ver_orden(
     ot_id: str,
