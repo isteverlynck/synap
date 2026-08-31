@@ -484,3 +484,38 @@ class DashboardKPIs(BaseModel):
     ot_abiertas: int = 0
     activos_totales: int = 0
     activos_en_baja: int = 0
+    
+# ─── Solicitudes de servicio ───
+class SolicitudCrear(BaseModel):
+    """Lo que manda un usuario (enfermería/médico) para crear una solicitud.
+
+    Regla (validada con Cami): tiene que venir activo_codigo O descripcion_cosa
+    (al menos uno). Si es sobre un equipo → activo_codigo. Si no es un equipo
+    (ej: una pinza) → descripcion_cosa, para que el coordinador sepa a qué grupo
+    asignarla. Esa validación la hace el endpoint.
+
+    NO se manda solicitante_id: lo pone el backend con el usuario logueado.
+    persona_afectada_id es opcional (si no viene, se asume que es el solicitante).
+    """
+    titulo: str
+    descripcion_problema: str
+    activo_codigo: str | None = None
+    descripcion_cosa: str | None = None
+    persona_afectada_id: uuid.UUID | None = None
+
+
+class SolicitudOut(BaseModel):
+    """Datos de una solicitud que devolvemos al frontend."""
+    id: uuid.UUID
+    solicitante_id: uuid.UUID | None = None
+    persona_afectada_id: uuid.UUID | None = None
+    activo_codigo: str | None = None
+    descripcion_cosa: str | None = None
+    titulo: str
+    descripcion_problema: str
+    estado: str
+    ot_id: uuid.UUID | None = None
+    motivo_rechazo: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)

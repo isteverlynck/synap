@@ -356,12 +356,16 @@ class Adjunto(Base):
     # ─── Relaciones ───
     orden: Mapped["OrdenTrabajo"] = relationship(back_populates="adjuntos")
 
+    
 class GrupoTecnico(Base):
     """Catálogo de grupos técnicos (equipos de trabajo de Bioingeniería)."""
     __tablename__ = "grupos_tecnicos"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     descripcion: Mapped[str | None] = mapped_column(String, nullable=True)
+    coordinador_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
 
 
 class GrupoTipoEquipo(Base):
@@ -402,4 +406,31 @@ class Auditoria(Base):
     accion: Mapped[str] = mapped_column(String, nullable=False)
     datos_anteriores: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     datos_nuevos: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    
+class SolicitudServicio(Base):
+    """Solicitud de servicio: el pedido que hace un usuario (enfermería/médico)
+    antes de que se convierta en OT. Un coordinador la acepta o rechaza."""
+    __tablename__ = "solicitudes_servicio"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    solicitante_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
+    persona_afectada_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
+    activo_codigo: Mapped[str | None] = mapped_column(
+        String, ForeignKey("activos.codigo"), nullable=True
+    )
+    descripcion_cosa: Mapped[str | None] = mapped_column(String, nullable=True)
+    titulo: Mapped[str] = mapped_column(String, nullable=False)
+    descripcion_problema: Mapped[str] = mapped_column(Text, nullable=False)
+    estado: Mapped[str] = mapped_column(String, nullable=False, default="PENDIENTE")
+    ot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=True
+    )
+    motivo_rechazo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
