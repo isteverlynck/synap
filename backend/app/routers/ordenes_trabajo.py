@@ -26,7 +26,7 @@ from ..schemas import (
     OrdenTrabajoCambioEstado,
     OrdenTrabajoCierre,
 )
-from ..security import get_current_user
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 
@@ -105,7 +105,7 @@ def ver_orden(
 def crear_orden(
     payload: OrdenTrabajoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
     """Abrir una orden de trabajo nueva.
 
@@ -160,7 +160,7 @@ def cambiar_estado(
     ot_id: str,
     payload: OrdenTrabajoCambioEstado,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Cambiar el estado de una OT (parte del 'seguimiento').
 
@@ -197,7 +197,7 @@ def cerrar_orden(
     ot_id: str,
     payload: OrdenTrabajoCierre,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Cerrar una OT: la marca como CERRADA y le pone la fecha de cierre (ahora).
 

@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Activo, OrdenTrabajo, GrupoTipoEquipo, Usuario
 from ..schemas import GenerarPreventivasRequest, PreventivasGeneradas
-from ..security import get_current_user
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/preventivas", tags=["preventivas"])
 
@@ -43,7 +43,7 @@ def _grupo_de_activo(db, activo):
 def generar_preventivas(
     payload: GenerarPreventivasRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
     """Generar las OT preventivas de un mes.
 

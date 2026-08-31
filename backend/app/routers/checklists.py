@@ -42,7 +42,8 @@ from ..schemas import (
     GenerarCorrectivaDesdeChecklist,
     OrdenTrabajoOut,
 )
-from ..security import get_current_user
+
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/checklists", tags=["checklists"])
 
@@ -101,7 +102,7 @@ def ver_respuestas_de_mp(
 def registrar_respuesta(
     payload: ChecklistRespuestaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Registrar la respuesta a un ítem del checklist en un MP concreto.
 
@@ -144,7 +145,7 @@ def registrar_respuesta(
 def generar_correctiva_desde_checklist(
     payload: GenerarCorrectivaDesdeChecklist,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Registra un ítem como NO_PASA y crea la OT correctiva para ese equipo.
 

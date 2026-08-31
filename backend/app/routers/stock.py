@@ -43,7 +43,7 @@ from ..schemas import (
     ConsumoCreate,
     ConsumoResultado,
 )
-from ..security import get_current_user
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 
@@ -191,7 +191,7 @@ def listar_consumos(
 def registrar_pedido_compra(
     payload: CompraCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
     if insumo is None:
@@ -230,7 +230,7 @@ from datetime import date as _date
 def recibir_compra(
     compra_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     compra = db.query(Compra).filter(Compra.id == compra_id).first()
     if compra is None:
@@ -267,7 +267,7 @@ def recibir_compra(
 def registrar_consumo(
     payload: ConsumoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == payload.ot_id).first()
     if orden is None:

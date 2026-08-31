@@ -27,7 +27,7 @@ from ..schemas import (
     FallasPorTipo,
     MTBFItem,
 )
-from ..security import get_current_user
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -58,7 +58,7 @@ def _mtbf_de_fechas(fechas):
 @router.get("/kpis", response_model=DashboardKPIs)
 def obtener_kpis(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("jefatura")),
 ):
     """Devuelve todos los KPIs del panel de jefatura en una sola respuesta."""
 

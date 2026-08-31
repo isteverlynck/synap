@@ -25,7 +25,7 @@ from ..schemas import (
     PlanMantenimientoOut,
     PlanMantenimientoDetalle,
 )
-from ..security import get_current_user
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/planes-mantenimiento", tags=["planes_mantenimiento"])
 
@@ -109,7 +109,7 @@ def plan_para_activo(
 def crear_plan(
     payload: PlanMantenimientoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
     """Crear un plan de mantenimiento con todos sus ítems de checklist.
 

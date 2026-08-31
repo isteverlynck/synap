@@ -75,3 +75,24 @@ def get_current_user(
     if user is None:
         raise credentials_exc
     return user
+
+
+def requiere_rol(*roles_permitidos: str):
+    """Genera una dependencia que exige que el usuario tenga uno de los roles dados.
+
+    Uso en un endpoint:
+        current_user: Usuario = Depends(requiere_rol("coordinacion", "jefatura"))
+    Si el usuario logueado no tiene ninguno de esos roles, corta con 403.
+    Jefatura siempre pasa (tiene visión global de todo el sistema).
+    """
+    def verificar(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+        # Jefatura puede todo.
+        if current_user.rol == "jefatura":
+            return current_user
+        if current_user.rol not in roles_permitidos:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Esta acción requiere rol: {', '.join(roles_permitidos)}.",
+            )
+        return current_user
+    return verificar

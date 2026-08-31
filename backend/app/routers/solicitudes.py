@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import SolicitudServicio, Activo, Usuario
 from ..schemas import SolicitudCrear, SolicitudOut
-from ..security import get_current_user
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/solicitudes", tags=["solicitudes_servicio"])
 
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/solicitudes", tags=["solicitudes_servicio"])
 def crear_solicitud(
     payload: SolicitudCrear,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("usuario")),
 ):
     """Crear una solicitud de servicio.
 
@@ -83,7 +83,7 @@ def crear_solicitud(
 def mis_solicitudes(
     estado: str | None = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("usuario")),
 ):
     """Las solicitudes que creó el usuario logueado.
 
@@ -101,7 +101,7 @@ def mis_solicitudes(
 @router.get("/pendientes", response_model=list[SolicitudOut])
 def solicitudes_pendientes(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
     """Solicitudes PENDIENTES que le corresponden a este coordinador.
 
@@ -185,7 +185,7 @@ def aceptar_solicitud(
     solicitud_id: str,
     payload: SolicitudAceptar,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
     """Aceptar una solicitud: genera la OT y se la asigna a una persona.
 
@@ -264,7 +264,7 @@ def rechazar_solicitud(
     solicitud_id: str,
     payload: SolicitudRechazar,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
     """Rechazar una solicitud, con un motivo. Queda registrada como RECHAZADA."""
     sol = db.query(SolicitudServicio).filter(
@@ -287,7 +287,7 @@ def modificar_solicitud(
     solicitud_id: str,
     payload: SolicitudModificar,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
     """Corregir una solicitud mal hecha antes de aceptarla. Solo cambia los
     campos que se manden; los demás quedan igual."""
