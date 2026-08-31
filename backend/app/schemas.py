@@ -549,3 +549,21 @@ class SolicitudModificar(BaseModel):
     descripcion_problema: str | None = None
     activo_codigo: str | None = None
     descripcion_cosa: str | None = None
+    
+# ─── Generación de preventivas del mes ───
+class GenerarPreventivasRequest(BaseModel):
+    """Para disparar la generación de OT preventivas de un mes.
+ 
+    Si no se manda nada, usa el mes actual. Se puede especificar anio/mes para
+    generar las de un mes puntual (útil para la demo).
+    """
+    anio: int | None = None
+    mes: int | None = None
+ 
+ 
+class PreventivasGeneradas(BaseModel):
+    """Resultado de generar preventivas: cuántas se crearon y para qué equipos."""
+    mes: str
+    cantidad_generada: int
+    ya_existian: int
+    equipos: list[str]
