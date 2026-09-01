@@ -23,6 +23,7 @@ from ..models import Activo, OrdenTrabajo, Usuario
 from ..schemas import (
     OrdenTrabajoOut,
     OrdenTrabajoCreate,
+    OrdenTrabajoAsignar,
     OrdenTrabajoCambioEstado,
     OrdenTrabajoCierre,
 )
@@ -143,6 +144,42 @@ def crear_orden(
         fecha_apertura=datetime.utcnow(),                # ahora
     )
     db.add(orden)
+    db.commit()
+    db.refresh(orden)
+    return orden
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ASIGNACIÓN (PATCH) — asignar el técnico de una OT "sin asignar"
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.patch("/{ot_id}/asignar", response_model=OrdenTrabajoOut)
+def asignar_tecnico(
+    ot_id: str,
+    payload: OrdenTrabajoAsignar,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Asignar el técnico de una OT que nació sin técnico ('sin asignar').
+
+    Pasa esto, por ejemplo, cuando un coordinador aceptó una solicitud de
+    servicio sin decidir todavía a quién asignarla. El técnico tiene que ser
+    del mismo grupo que la OT.
+    """
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+
+    tecnico = db.query(Usuario).filter(Usuario.id == payload.tecnico_id).first()
+    if tecnico is None:
+        raise HTTPException(status_code=404, detail="La persona a asignar no existe.")
+    if orden.grupo_id and tecnico.grupo != orden.grupo_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La persona no pertenece al grupo {orden.grupo_id}.",
+        )
+
+    orden.tecnico_id = payload.tecnico_id
     db.commit()
     db.refresh(orden)
     return orden

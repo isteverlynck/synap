@@ -16,7 +16,13 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Usuario
-from ..schemas import ActivarCuentaRequest, EstadoUsuario, Token, UsuarioOut
+from ..schemas import (
+    ActivarCuentaRequest,
+    EstadoUsuario,
+    Token,
+    UsuarioOut,
+    validar_numero_identificacion,
+)
 from ..security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -29,6 +35,11 @@ def estado_usuario(numero: str, db: Session = Depends(get_db)):
     El frontend usa esto para decidir si mostrar 'creá tu contraseña' (activar)
     o 'poné tu contraseña' (login normal).
     """
+    try:
+        numero = validar_numero_identificacion(numero)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     user = db.query(Usuario).filter(Usuario.numero_identificacion == numero).first()
     if user is None:
         return EstadoUsuario(existe=False, activado=False)
@@ -78,10 +89,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     """Ingreso normal: número + contraseña → devuelve el token de sesión.
 
     OAuth2PasswordRequestForm usa un campo llamado 'username'; nosotras metemos
-    ahí el número de identificación.
+    ahí el número de identificación (normalizado a minúsculas: "U123" y "u123"
+    entran igual).
     """
+    numero = form_data.username.strip().lower()
     user = db.query(Usuario).filter(
-        Usuario.numero_identificacion == form_data.username
+        Usuario.numero_identificacion == numero
     ).first()
 
     # Usuario inexistente, o sin activar, o contraseña incorrecta → mismo error

@@ -10,10 +10,31 @@ loguea) pero NUNCA SALE (UsuarioOut no la incluye). Los schemas son el filtro
 que controla qué se expone.
 """
 
+import re
 import uuid
 from datetime import datetime, date
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+# ─── Número de identificación: siempre "u" + DNI (ej: DNI 44.324.107 → u44324107) ───
+NUMERO_IDENTIFICACION_REGEX = re.compile(r"^u\d{6,10}$")
+
+
+def validar_numero_identificacion(v: str) -> str:
+    """Normaliza (minúsculas, sin espacios) y valida el formato 'u' + DNI.
+
+    Lanza ValueError si no cumple el formato — lo usan tanto los schemas (donde
+    Pydantic lo convierte en un 422 automático) como el endpoint /auth/estado,
+    que lo captura a mano para devolver un 400 con el mismo mensaje.
+    """
+    v = v.strip().lower()
+    if not NUMERO_IDENTIFICACION_REGEX.match(v):
+        raise ValueError(
+            "El número de identificación debe ser 'u' seguido del DNI, sin "
+            "puntos ni espacios (ej: DNI 44.324.107 → u44324107)."
+        )
+    return v
 
 
 # ─── Login / activación ───
@@ -21,6 +42,11 @@ class LoginRequest(BaseModel):
     """Lo que manda la persona para entrar (ingresos normales)."""
     numero_identificacion: str
     password: str
+
+    @field_validator("numero_identificacion")
+    @classmethod
+    def _validar_numero(cls, v: str) -> str:
+        return validar_numero_identificacion(v)
 
 
 class ActivarCuentaRequest(BaseModel):
@@ -32,6 +58,11 @@ class ActivarCuentaRequest(BaseModel):
     numero_identificacion: str
     password: str
     password_confirmacion: str
+
+    @field_validator("numero_identificacion")
+    @classmethod
+    def _validar_numero(cls, v: str) -> str:
+        return validar_numero_identificacion(v)
 
 
 # ─── Respuestas ───
@@ -395,6 +426,12 @@ class PlanMantenimientoDetalle(PlanMantenimientoOut):
 PlanMantenimientoDetalle.model_rebuild()
 
 # ─── Seguimiento y cierre de OT ───
+class OrdenTrabajoAsignar(BaseModel):
+    """Asignar (o reasignar) el técnico de una OT que nació sin técnico
+    ('sin asignar'). El técnico debe pertenecer al grupo de la OT."""
+    tecnico_id: uuid.UUID
+
+
 class OrdenTrabajoCambioEstado(BaseModel):
     """Para cambiar el estado de una OT (seguimiento).
 
@@ -489,18 +526,26 @@ class DashboardKPIs(BaseModel):
 class SolicitudCrear(BaseModel):
     """Lo que manda un usuario (enfermería/médico) para crear una solicitud.
 
-    Regla (validada con Cami): tiene que venir activo_codigo O descripcion_cosa
-    (al menos uno). Si es sobre un equipo → activo_codigo. Si no es un equipo
-    (ej: una pinza) → descripcion_cosa, para que el coordinador sepa a qué grupo
-    asignarla. Esa validación la hace el endpoint.
+    Flujo del frontend: primero elige si es un equipo médico o no
+    (es_equipo_medico). Según eso:
+      - es_equipo_medico=True  → activo_codigo obligatorio (descripcion_cosa se
+        ignora si viene).
+      - es_equipo_medico=False → descripcion_cosa obligatoria (ej: "pinza de
+        oftalmología"; no es un equipo médico, así sabe el coordinador a qué
+        grupo asignarla). activo_codigo se ignora si viene.
+    descripcion_problema y ubicacion son obligatorias siempre. Esa validación
+    la hace el endpoint (acá solo se declara la forma de los datos).
 
     NO se manda solicitante_id: lo pone el backend con el usuario logueado.
     persona_afectada_id es opcional (si no viene, se asume que es el solicitante).
+    titulo es opcional: si no se manda, el backend genera uno automáticamente.
     """
-    titulo: str
+    es_equipo_medico: bool
     descripcion_problema: str
+    ubicacion: str
     activo_codigo: str | None = None
     descripcion_cosa: str | None = None
+    titulo: str | None = None
     persona_afectada_id: uuid.UUID | None = None
 
 
@@ -513,26 +558,29 @@ class SolicitudOut(BaseModel):
     descripcion_cosa: str | None = None
     titulo: str
     descripcion_problema: str
+    ubicacion: str
     estado: str
     ot_id: uuid.UUID | None = None
     motivo_rechazo: str | None = None
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
-    
+
 
 # ─── Acciones del coordinador sobre solicitudes ───
 class SolicitudAceptar(BaseModel):
     """Datos para aceptar una solicitud y convertirla en OT.
 
-    - asignar_a_id: la persona (técnico) a la que se asigna la OT. Debe ser de
-      un grupo que coordine el coordinador.
+    - asignar_a_id: opcional. La persona (técnico) a la que se asigna la OT de
+      una. Si no se manda, la OT nace ABIERTA sin técnico ("sin asignar"); se
+      asigna después con PATCH /ordenes-trabajo/{id}/asignar. Si se manda, debe
+      ser de un grupo que coordine el coordinador.
     - grupo_id: solo necesario para solicitudes de 'cosa' (sin equipo), donde el
       grupo no se puede deducir del activo. Para solicitudes de equipo se ignora
       (el grupo sale del equipo).
     - prioridad: opcional, para la OT que se genera.
     """
-    asignar_a_id: uuid.UUID
+    asignar_a_id: uuid.UUID | None = None
     grupo_id: str | None = None
     prioridad: str | None = None
 

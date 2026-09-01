@@ -6,8 +6,9 @@ Etapa 2 — lo que hace el USUARIO (enfermería/médico):
 
 (Los endpoints del coordinador —aceptar/rechazar/modificar— son la Etapa 3.)
 
-Protegido con login. Por ahora cualquier usuario logueado puede crear/ver sus
-solicitudes; los permisos finos por rol vienen en la etapa de permisos.
+Solo pueden crear y ver sus solicitudes los usuarios con rol "enfermeria"
+(el rol que agrupa a médicos y enfermeros de piso en este sistema — son
+quienes usan los equipos, a diferencia de "tecnico", que los repara).
 """
 
 from datetime import datetime
@@ -31,41 +32,59 @@ router = APIRouter(prefix="/solicitudes", tags=["solicitudes_servicio"])
 def crear_solicitud(
     payload: SolicitudCrear,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("usuario")),
+    current_user: Usuario = Depends(requiere_rol("enfermeria")),
 ):
     """Crear una solicitud de servicio.
 
     El solicitante es el usuario logueado (no se manda, se toma de current_user).
-    Regla: tiene que venir activo_codigo O descripcion_cosa (al menos uno).
-    """
-    # 1. Validar la regla "equipo o cosa": al menos uno de los dos.
-    if not payload.activo_codigo and not payload.descripcion_cosa:
-        raise HTTPException(
-            status_code=400,
-            detail="Indicá el equipo (activo_codigo) o, si no es un equipo, "
-                   "describí la cosa (descripcion_cosa).",
-        )
 
-    # 2. Si mandó un activo, verificar que exista (si no, cruz roja como en Máximo).
-    if payload.activo_codigo:
-        activo = db.query(Activo).filter(Activo.codigo == payload.activo_codigo).first()
+    Regla "equipo o cosa" (según es_equipo_medico):
+      - es_equipo_medico=True  → activo_codigo obligatorio.
+      - es_equipo_medico=False → descripcion_cosa obligatoria.
+    El campo que no corresponde se ignora aunque venga cargado, para que no
+    quede una solicitud ambigua (con los dos, o con ninguno).
+    """
+    # 1. Validar la regla "equipo o cosa" según lo que eligió el usuario.
+    if payload.es_equipo_medico:
+        if not payload.activo_codigo:
+            raise HTTPException(
+                status_code=400,
+                detail="Es un equipo médico: indicá el ID del equipo (activo_codigo).",
+            )
+        activo_codigo = payload.activo_codigo
+        descripcion_cosa = None
+
+        # Si mandó un activo, verificar que exista.
+        activo = db.query(Activo).filter(Activo.codigo == activo_codigo).first()
         if activo is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"No existe el activo {payload.activo_codigo}.",
+                detail=f"No existe el activo {activo_codigo}.",
             )
+    else:
+        if not payload.descripcion_cosa:
+            raise HTTPException(
+                status_code=400,
+                detail="No es un equipo médico: describí qué es (descripcion_cosa).",
+            )
+        activo_codigo = None
+        descripcion_cosa = payload.descripcion_cosa
 
-    # 3. La persona afectada: si no la indican, es el propio solicitante (como Máximo).
+    # 2. La persona afectada: si no la indican, es el propio solicitante.
     persona_afectada = payload.persona_afectada_id or current_user.id
+
+    # 3. Título: si no lo mandaron, se genera uno automático y legible.
+    titulo = payload.titulo or f"Solicitud de servicio — {activo_codigo or descripcion_cosa}"
 
     # 4. Crear la solicitud. Nace PENDIENTE, esperando que un coordinador la revise.
     solicitud = SolicitudServicio(
         solicitante_id=current_user.id,
         persona_afectada_id=persona_afectada,
-        activo_codigo=payload.activo_codigo,
-        descripcion_cosa=payload.descripcion_cosa,
-        titulo=payload.titulo,
+        activo_codigo=activo_codigo,
+        descripcion_cosa=descripcion_cosa,
+        titulo=titulo,
         descripcion_problema=payload.descripcion_problema,
+        ubicacion=payload.ubicacion,
         estado="PENDIENTE",
         created_at=datetime.utcnow(),
     )
@@ -83,7 +102,7 @@ def crear_solicitud(
 def mis_solicitudes(
     estado: str | None = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("usuario")),
+    current_user: Usuario = Depends(requiere_rol("enfermeria")),
 ):
     """Las solicitudes que creó el usuario logueado.
 
@@ -187,10 +206,12 @@ def aceptar_solicitud(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("coordinacion")),
 ):
-    """Aceptar una solicitud: genera la OT y se la asigna a una persona.
+    """Aceptar una solicitud: genera la OT, asignada a una persona o "sin asignar".
 
     Reglas:
-      - La persona asignada debe ser de un grupo que coordine el coordinador.
+      - Si se manda asignar_a_id, la persona debe ser de un grupo que coordine
+        el coordinador. Si no se manda, la OT nace ABIERTA sin técnico (se
+        asigna después con PATCH /ordenes-trabajo/{id}/asignar).
       - Para solicitudes de equipo, el grupo sale del equipo. Para las de 'cosa',
         el coordinador manda grupo_id.
     """
@@ -222,27 +243,32 @@ def aceptar_solicitud(
             detail="Solo podés aceptar solicitudes de los grupos que coordinás.",
         )
 
-    # Verificar que la persona asignada exista y sea del grupo destino.
-    persona = db.query(Usuario).filter(Usuario.id == payload.asignar_a_id).first()
-    if persona is None:
-        raise HTTPException(status_code=404, detail="La persona a asignar no existe.")
-    if persona.grupo != grupo_destino:
-        raise HTTPException(
-            status_code=400,
-            detail=f"La persona no pertenece al grupo {grupo_destino}.",
-        )
+    # Si se indicó a quién asignarla, verificar que exista y sea del grupo destino.
+    # Si no se indicó, la OT nace "sin asignar" (tecnico_id None) y se asigna después.
+    tecnico_id = None
+    if payload.asignar_a_id:
+        persona = db.query(Usuario).filter(Usuario.id == payload.asignar_a_id).first()
+        if persona is None:
+            raise HTTPException(status_code=404, detail="La persona a asignar no existe.")
+        if persona.grupo != grupo_destino:
+            raise HTTPException(
+                status_code=400,
+                detail=f"La persona no pertenece al grupo {grupo_destino}.",
+            )
+        tecnico_id = payload.asignar_a_id
 
-    # Crear la OT correctiva, ya asignada a esa persona.
+    # Crear la OT correctiva. ABIERTA es el estado de nacimiento de toda OT
+    # (igual que en /ordenes-trabajo); "sin asignar" se distingue por tecnico_id=None.
     ultimo = db.query(_func.max(OrdenTrabajo.numero_ot)).scalar()
     numero_ot = (ultimo or 0) + 1
     orden = OrdenTrabajo(
         numero_ot=numero_ot,
         activo_codigo=sol.activo_codigo,
         tipo="CORRECTIVA",
-        estado="ASIGNADA",
+        estado="ABIERTA",
         prioridad=(payload.prioridad.upper() if payload.prioridad else None),
         descripcion=f"{sol.titulo}: {sol.descripcion_problema}",
-        tecnico_id=payload.asignar_a_id,
+        tecnico_id=tecnico_id,
         grupo_id=grupo_destino,
         fecha_notificacion=sol.created_at,   # cuándo se avisó (creación de la solicitud)
         fecha_apertura=_dt.utcnow(),         # cuándo se abre la OT (ahora)
