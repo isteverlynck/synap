@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../api/auth";
+import { login, obtenerPerfil, pantallaInicioPorRol } from "../api/auth";
 
 function Login() {
   // "useState" = memoria de la pantalla. Guarda lo que la persona escribe.
@@ -19,8 +19,10 @@ function Login() {
     setError("");
     setCargando(true);
     try {
-      await login(numero, password);   // llama al backend
-      navegar("/activos");             // si anda, va a la lista de activos
+      await login(numero, password);         // llama al backend
+      const perfil = await obtenerPerfil();   // trae nombre, rol, etc.
+      localStorage.setItem("rol", perfil.rol);
+      navegar(pantallaInicioPorRol(perfil.rol)); // manda a la pantalla que le corresponde
     } catch (err) {
       // Si el backend rechaza (contraseña mal, etc.), mostramos el error.
       setError("Número o contraseña incorrectos.");

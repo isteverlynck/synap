@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { estaLogueado } from "./api/auth";
 import Login from "./pages/Login";
 import Activos from "./pages/Activos";
+import Solicitudes from "./pages/Solicitudes";
 
 // "Guardia": envuelve una pantalla protegida. Si no estás logueada, te manda
 // al login. Así ninguna pantalla protegida se ve sin haber entrado.
@@ -24,6 +25,7 @@ function App() {
 
         {/* Pantallas protegidas (requieren login) */}
         <Route path="/activos" element={<Protegida><Activos /></Protegida>} />
+        <Route path="/solicitudes" element={<Protegida><Solicitudes /></Protegida>} />
 
         {/* Acá van sumando: OT, stock, dashboard, ficha de activo, escaneo... */}
         {/* Ejemplo para cuando las hagan:

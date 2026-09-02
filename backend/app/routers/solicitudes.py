@@ -14,6 +14,7 @@ quienes usan los equipos, a diferencia de "tecnico", que los repara).
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -76,8 +77,13 @@ def crear_solicitud(
     # 3. Título: si no lo mandaron, se genera uno automático y legible.
     titulo = payload.titulo or f"Solicitud de servicio — {activo_codigo or descripcion_cosa}"
 
-    # 4. Crear la solicitud. Nace PENDIENTE, esperando que un coordinador la revise.
+    # 4. Número correlativo legible (#1, #2, #3...), igual que el de las OT.
+    ultimo = db.query(func.max(SolicitudServicio.numero_solicitud)).scalar()
+    numero_solicitud = (ultimo or 0) + 1
+
+    # 5. Crear la solicitud. Nace PENDIENTE, esperando que un coordinador la revise.
     solicitud = SolicitudServicio(
+        numero_solicitud=numero_solicitud,
         solicitante_id=current_user.id,
         persona_afectada_id=persona_afectada,
         activo_codigo=activo_codigo,
@@ -329,13 +335,51 @@ def modificar_solicitud(
         sol.titulo = payload.titulo
     if payload.descripcion_problema is not None:
         sol.descripcion_problema = payload.descripcion_problema
-    if payload.activo_codigo is not None:
-        # validar que el activo exista
-        if db.query(Activo).filter(Activo.codigo == payload.activo_codigo).first() is None:
-            raise HTTPException(status_code=404, detail=f"No existe el activo {payload.activo_codigo}.")
-        sol.activo_codigo = payload.activo_codigo
-    if payload.descripcion_cosa is not None:
-        sol.descripcion_cosa = payload.descripcion_cosa
+    if payload.ubicacion is not None:
+        sol.ubicacion = payload.ubicacion
+
+    if payload.es_equipo_medico is not None:
+        # Cambia el "tipo" de la solicitud: equipo médico ↔ otra cosa. Usa el
+        # valor nuevo si vino en el mismo pedido, o el que ya tenía si no.
+        if payload.es_equipo_medico:
+            nuevo_activo = payload.activo_codigo or sol.activo_codigo
+            if not nuevo_activo:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Para marcarla como equipo médico indicá activo_codigo.",
+                )
+            if db.query(Activo).filter(Activo.codigo == nuevo_activo).first() is None:
+                raise HTTPException(status_code=404, detail=f"No existe el activo {nuevo_activo}.")
+            sol.activo_codigo = nuevo_activo
+            sol.descripcion_cosa = None
+        else:
+            nueva_cosa = payload.descripcion_cosa or sol.descripcion_cosa
+            if not nueva_cosa:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Para marcarla como 'no es equipo médico' indicá descripcion_cosa.",
+                )
+            sol.descripcion_cosa = nueva_cosa
+            sol.activo_codigo = None
+    else:
+        # No cambia el tipo: cada campo se corrige de forma independiente,
+        # siempre que corresponda al tipo actual de la solicitud.
+        if payload.activo_codigo is not None:
+            if sol.activo_codigo is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Esta solicitud no es de un equipo médico (usá es_equipo_medico para cambiarlo).",
+                )
+            if db.query(Activo).filter(Activo.codigo == payload.activo_codigo).first() is None:
+                raise HTTPException(status_code=404, detail=f"No existe el activo {payload.activo_codigo}.")
+            sol.activo_codigo = payload.activo_codigo
+        if payload.descripcion_cosa is not None:
+            if sol.descripcion_cosa is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Esta solicitud es de un equipo médico (usá es_equipo_medico para cambiarlo).",
+                )
+            sol.descripcion_cosa = payload.descripcion_cosa
 
     db.commit()
     db.refresh(sol)

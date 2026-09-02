@@ -23,9 +23,16 @@ from ..schemas import (
     UsuarioOut,
     validar_numero_identificacion,
 )
-from ..security import create_access_token, hash_password, verify_password
+from ..security import create_access_token, get_current_user, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.get("/me", response_model=UsuarioOut)
+def mi_perfil(current_user: Usuario = Depends(get_current_user)):
+    """Datos del usuario logueado (según el token). El frontend lo usa justo
+    después del login para saber el rol y decidir a qué pantalla mandarlo."""
+    return current_user
 
 
 @router.get("/estado/{numero}", response_model=EstadoUsuario)

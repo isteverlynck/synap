@@ -416,6 +416,9 @@ class SolicitudServicio(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # Número correlativo legible (1, 2, 3...) para que la persona pueda
+    # identificar y buscar su solicitud sin usar el id (que es un UUID largo).
+    numero_solicitud: Mapped[int] = mapped_column(Integer, nullable=False)
     solicitante_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
     )

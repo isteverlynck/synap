@@ -23,12 +23,33 @@ export async function login(numero, password) {
   return res.data;
 }
 
-// Cerrar sesión: borrar el token guardado.
+// Perfil del usuario logueado (nombre, rol, etc). Se llama justo después del
+// login para saber a qué pantalla mandar a cada quien según su rol.
+export async function obtenerPerfil() {
+  const res = await cliente.get("/auth/me");
+  return res.data;
+}
+
+// Cerrar sesión: borrar el token guardado y el rol.
 export function logout() {
   localStorage.removeItem("token");
+  localStorage.removeItem("rol");
 }
 
 // ¿Hay alguien logueado? (¿existe token guardado?)
 export function estaLogueado() {
   return localStorage.getItem("token") !== null;
+}
+
+// Rol del usuario logueado, guardado en el login (null si no hay o no se guardó).
+export function rolActual() {
+  return localStorage.getItem("rol");
+}
+
+// A qué pantalla mandar a cada quien según su rol, justo después de loguearse.
+export function pantallaInicioPorRol(rol) {
+  if (rol === "enfermeria") return "/solicitudes";
+  // Coordinación, técnicos y jefatura todavía no tienen pantalla propia:
+  // por ahora van a Activos, como antes.
+  return "/activos";
 }

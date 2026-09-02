@@ -552,6 +552,7 @@ class SolicitudCrear(BaseModel):
 class SolicitudOut(BaseModel):
     """Datos de una solicitud que devolvemos al frontend."""
     id: uuid.UUID
+    numero_solicitud: int
     solicitante_id: uuid.UUID | None = None
     persona_afectada_id: uuid.UUID | None = None
     activo_codigo: str | None = None
@@ -592,11 +593,18 @@ class SolicitudRechazar(BaseModel):
 
 class SolicitudModificar(BaseModel):
     """Campos que el coordinador puede corregir antes de aceptar (si estaba mal
-    hecha). Todos opcionales: solo se cambia lo que se manda."""
+    hecha). Todos opcionales: solo se cambia lo que se manda.
+
+    es_equipo_medico es especial: si se manda, cambia el "tipo" de la
+    solicitud (equipo médico ↔ otra cosa) y limpia el campo que ya no
+    corresponde. Se puede mandar junto con activo_codigo/descripcion_cosa
+    (el valor nuevo) o dejar que tome el que ya tenía la solicitud."""
     titulo: str | None = None
     descripcion_problema: str | None = None
+    ubicacion: str | None = None
     activo_codigo: str | None = None
     descripcion_cosa: str | None = None
+    es_equipo_medico: bool | None = None
     
 # ─── Generación de preventivas del mes ───
 class GenerarPreventivasRequest(BaseModel):
