@@ -13,17 +13,25 @@ número, mail y rol). Nadie se auto-registra desde afuera.
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
+
 
 from ..database import get_db
-from ..models import Usuario
+from ..models import Usuario, PasswordResetToken
+from ..notificaciones import mail_recuperacion
 from ..schemas import (
     ActivarCuentaRequest,
     EstadoUsuario,
     Token,
     UsuarioOut,
     validar_numero_identificacion,
+    MensajeGenerico,
+    RecuperarPasswordRequest,
+    RestablecerPasswordRequest,
 )
-from ..security import create_access_token, get_current_user, hash_password, verify_password
+from ..security import create_access_token, get_current_user, hash_password, verify_password, buscar_usuario_por_numero
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,7 +55,7 @@ def estado_usuario(numero: str, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    user = db.query(Usuario).filter(Usuario.numero_identificacion == numero).first()
+    user = buscar_usuario_por_numero(db, numero)
     if user is None:
         return EstadoUsuario(existe=False, activado=False)
     return EstadoUsuario(existe=True, activado=user.hashed_password is not None)
@@ -56,9 +64,7 @@ def estado_usuario(numero: str, db: Session = Depends(get_db)):
 @router.post("/activar", response_model=UsuarioOut)
 def activar_cuenta(payload: ActivarCuentaRequest, db: Session = Depends(get_db)):
     """Primer ingreso: la persona crea su contraseña y activa la cuenta."""
-    user = db.query(Usuario).filter(
-        Usuario.numero_identificacion == payload.numero_identificacion
-    ).first()
+    user = buscar_usuario_por_numero(db, payload.numero_identificacion)
 
     # No está en el padrón del hospital.
     if user is None:
@@ -99,10 +105,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     ahí el número de identificación (normalizado a minúsculas: "U123" y "u123"
     entran igual).
     """
-    numero = form_data.username.strip().lower()
-    user = db.query(Usuario).filter(
-        Usuario.numero_identificacion == numero
-    ).first()
+    user = buscar_usuario_por_numero(db, form_data.username)
 
     # Usuario inexistente, o sin activar, o contraseña incorrecta → mismo error
     # genérico (no conviene revelar cuál de las tres falló, por seguridad).
@@ -119,3 +122,98 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # Emitir el token con el número de la persona adentro (campo 'sub').
     token = create_access_token({"sub": user.numero_identificacion})
     return Token(access_token=token)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RECUPERAR CONTRASEÑA
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Cuánto vive el enlace desde que se genera.
+DURACION_TOKEN = timedelta(hours=1)
+
+# Respuesta única del pedido de recuperación (ver comentario en el endpoint).
+RESPUESTA_NEUTRA = (
+    "Si el número corresponde a una cuenta activa, te enviamos un mail con "
+    "las instrucciones para restablecer tu contraseña."
+)
+
+
+def _hashear_token(token: str) -> str:
+    """Hash del token para guardar en la base.
+
+    Acá usamos SHA-256 y no bcrypt (como en las contraseñas) porque el token lo
+    generamos nosotras al azar y es largo: no hay nada que "adivinar" a fuerza
+    de probar, así que no hace falta un hash lento a propósito.
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+@router.post("/recuperar", response_model=MensajeGenerico)
+def recuperar_password(payload: RecuperarPasswordRequest, db: Session = Depends(get_db)):
+    """Genera un enlace de recuperación y lo manda por mail.
+
+    IMPORTANTE: la respuesta es SIEMPRE la misma, exista o no el usuario. Si
+    contestáramos distinto, cualquiera podría ir probando números para averiguar
+    quién trabaja en el hospital.
+    """
+    user = buscar_usuario_por_numero(db, payload.numero_identificacion)
+
+    # Solo tiene sentido para cuentas ya activadas: si nunca creó contraseña,
+    # el camino que le corresponde es /auth/activar.
+    if user is not None and user.hashed_password is not None:
+        # Invalidar los tokens anteriores sin usar: si pidió el enlace tres
+        # veces, que sirva solo el último.
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.usuario_id == user.id,
+            PasswordResetToken.usado_en.is_(None),
+        ).update({"usado_en": datetime.now(timezone.utc)})
+
+        # Token al azar, imposible de adivinar. Este valor solo viaja en el mail.
+        token = secrets.token_urlsafe(32)
+        db.add(PasswordResetToken(
+            usuario_id=user.id,
+            token_hash=_hashear_token(token),
+            expira_en=datetime.now(timezone.utc) + DURACION_TOKEN,
+            created_at=datetime.now(timezone.utc),
+        ))
+        db.commit()
+
+        mail_recuperacion(user, token)
+
+    return MensajeGenerico(mensaje=RESPUESTA_NEUTRA)
+
+
+@router.post("/restablecer", response_model=MensajeGenerico)
+def restablecer_password(payload: RestablecerPasswordRequest, db: Session = Depends(get_db)):
+    """Cambia la contraseña usando el token que llegó por mail."""
+    if payload.password != payload.password_confirmacion:
+        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden.")
+    if len(payload.password) < 8:
+        raise HTTPException(
+            status_code=400, detail="La contraseña debe tener al menos 8 caracteres."
+        )
+
+    # Buscamos por el hash: el token en limpio nunca estuvo guardado.
+    registro = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == _hashear_token(payload.token)
+    ).first()
+
+    # Token inexistente, ya usado o vencido → mismo error para los tres casos.
+    if (
+        registro is None
+        or registro.usado_en is not None
+        or registro.expira_en < datetime.now(timezone.utc)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="El enlace no es válido o ya venció. Pedí uno nuevo.",
+        )
+
+    user = db.query(Usuario).filter(Usuario.id == registro.usuario_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+
+    user.hashed_password = hash_password(payload.password)
+    registro.usado_en = datetime.now(timezone.utc)   # quemar el token
+    db.commit()
+
+    return MensajeGenerico(mensaje="Listo, ya podés entrar con tu contraseña nueva.")

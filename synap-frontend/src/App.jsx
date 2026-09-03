@@ -11,6 +11,8 @@ import Activos from "./pages/Activos";
 import Solicitudes from "./pages/Solicitudes";
 import EscanearQR from "./pages/EscanearQR";
 import FichaActivo from "./pages/FichaActivo";
+import RecuperarPassword from "./pages/RecuperarPassword";
+
 
 // "Guardia": envuelve una pantalla protegida. Si no estás logueada, te manda
 // al login. Así ninguna pantalla protegida se ve sin haber entrado.
@@ -33,6 +35,9 @@ function App() {
         la pantalla decide a dónde mandarlo (ver EscanearQR.jsx). */}
         <Route path="/escanear" element={<Protegida><EscanearQR /></Protegida>} />
         <Route path="/activos/:codigo" element={<Protegida><FichaActivo /></Protegida>} />
+
+        <Route path="/recuperar" element={<RecuperarPassword />} />
+        <Route path="/restablecer" element={<RecuperarPassword />} />
 
         {/* Acá van sumando: OT, stock, dashboard... */}
         {/* Ejemplo para cuando las hagan:

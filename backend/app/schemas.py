@@ -623,3 +623,19 @@ class PreventivasGeneradas(BaseModel):
     cantidad_generada: int
     ya_existian: int
     equipos: list[str]
+    
+class RecuperarPasswordRequest(BaseModel):
+    """Pedido de recuperación: solo el número de identificación."""
+    numero_identificacion: str
+
+
+class RestablecerPasswordRequest(BaseModel):
+    """Cambio efectivo: el token que llegó por mail + la contraseña nueva."""
+    token: str
+    password: str
+    password_confirmacion: str
+
+
+class MensajeGenerico(BaseModel):
+    """Respuesta neutra, sin datos del usuario."""
+    mensaje: str

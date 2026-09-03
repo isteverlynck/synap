@@ -14,6 +14,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from .config import settings
 from .database import get_db
@@ -71,7 +72,7 @@ def get_current_user(
     except JWTError:
         raise credentials_exc
 
-    user = db.query(Usuario).filter(Usuario.numero_identificacion == numero).first()
+    user = buscar_usuario_por_numero(db, numero)
     if user is None:
         raise credentials_exc
     return user
@@ -96,3 +97,21 @@ def requiere_rol(*roles_permitidos: str):
             )
         return current_user
     return verificar
+
+def buscar_usuario_por_numero(db: Session, numero: str) -> Usuario | None:
+    """Busca un usuario por su número de identificación, sin distinguir
+    mayúsculas de minúsculas.
+
+    El número entra normalizado a minúsculas, pero en la base puede estar
+    guardado de cualquier forma ("U30111111", "u30111111"): las filas cargadas
+    a mano en Supabase no pasan por la validación de la API. Comparamos ambos
+    lados en minúsculas para que coincidan igual.
+
+    Es la ÚNICA forma de buscar por número en todo el backend: si mañana cambia
+    el criterio, se cambia acá y vale para login, activación y recuperación.
+    """
+    if numero is None:
+        return None
+    return db.query(Usuario).filter(
+        func.lower(Usuario.numero_identificacion) == numero.strip().lower()
+    ).first()

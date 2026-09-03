@@ -440,3 +440,26 @@ class SolicitudServicio(Base):
     )
     motivo_rechazo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    
+class PasswordResetToken(Base):
+    """Un pedido de recuperación de contraseña.
+
+    Cada fila es un token de un solo uso y con vencimiento. Guardamos el HASH
+    del token, nunca el token en sí: el valor real solo viaja en el mail.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    usuario_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Después de esta fecha el token no sirve más.
+    expira_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Se completa al usarlo. Si tiene valor, el token ya se quemó.
+    usado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

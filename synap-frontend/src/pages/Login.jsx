@@ -66,6 +66,12 @@ function Login() {
         >
           {cargando ? "Ingresando..." : "Ingresar"}
         </button>
+        <button
+          style={{ ...boton("fantasma"), width: "100%", marginTop: 10 }}
+          onClick={() => navegar("/recuperar")}
+        >
+          Olvidé mi contraseña
+        </button>
       </div>
     </div>
   );

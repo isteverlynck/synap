@@ -53,3 +53,22 @@ export function pantallaInicioPorRol(rol) {
   // por ahora van a Activos, como antes.
   return "/activos";
 }
+
+// Pedir el mail de recuperación. Siempre devuelve el mismo mensaje, exista o
+// no la cuenta (el backend lo hace a propósito, por seguridad).
+export async function pedirRecuperacion(numero) {
+  const res = await cliente.post("/auth/recuperar", {
+    numero_identificacion: numero,
+  });
+  return res.data;
+}
+
+// Cambiar la contraseña con el token que llegó por mail.
+export async function restablecerPassword(token, password, confirmacion) {
+  const res = await cliente.post("/auth/restablecer", {
+    token,
+    password,
+    password_confirmacion: confirmacion,
+  });
+  return res.data;
+}
