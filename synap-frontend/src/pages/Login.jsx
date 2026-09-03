@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, obtenerPerfil, pantallaInicioPorRol } from "../api/auth";
+import { color, radio, sombra, fuente, cs, boton } from "../tema";
 
 function Login() {
   // "useState" = memoria de la pantalla. Guarda lo que la persona escribe.
@@ -23,7 +24,7 @@ function Login() {
       const perfil = await obtenerPerfil();   // trae nombre, rol, etc.
       localStorage.setItem("rol", perfil.rol);
       navegar(pantallaInicioPorRol(perfil.rol)); // manda a la pantalla que le corresponde
-    } catch (err) {
+    } catch {
       // Si el backend rechaza (contraseña mal, etc.), mostramos el error.
       setError("Número o contraseña incorrectos.");
     } finally {
@@ -34,19 +35,23 @@ function Login() {
   return (
     <div style={estilos.contenedor}>
       <div style={estilos.tarjeta}>
+        <div style={estilos.logo}>S</div>
         <h1 style={estilos.titulo}>SYNAP</h1>
         <p style={estilos.subtitulo}>Gestión de equipamiento médico</p>
 
+        <label style={cs.label}>Número de identificación</label>
         <input
-          style={estilos.input}
-          placeholder="Número de identificación"
+          style={{ ...cs.input, marginBottom: 14 }}
+          placeholder="Ej: u44111222"
           value={numero}
           onChange={(e) => setNumero(e.target.value)}
         />
+
+        <label style={cs.label}>Contraseña</label>
         <input
-          style={estilos.input}
+          style={{ ...cs.input, marginBottom: 22 }}
           type="password"
-          placeholder="Contraseña"
+          placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && manejarLogin()}
@@ -54,7 +59,11 @@ function Login() {
 
         {error && <p style={estilos.error}>{error}</p>}
 
-        <button style={estilos.boton} onClick={manejarLogin} disabled={cargando}>
+        <button
+          style={{ ...boton("primario"), width: "100%", padding: "12px" }}
+          onClick={manejarLogin}
+          disabled={cargando}
+        >
           {cargando ? "Ingresando..." : "Ingresar"}
         </button>
       </div>
@@ -62,27 +71,41 @@ function Login() {
   );
 }
 
-// Estilos simples en línea. Después se pueden mejorar / mover a CSS.
 const estilos = {
   contenedor: {
-    minHeight: "100vh", display: "flex", alignItems: "center",
-    justifyContent: "center", background: "#f5f5f7", fontFamily: "system-ui",
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: color.fondo,
+    fontFamily: fuente,
+    padding: 20,
   },
   tarjeta: {
-    background: "white", padding: "40px", borderRadius: "16px",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.08)", width: "320px",
+    background: color.tarjeta,
+    padding: "40px 36px",
+    borderRadius: radio.grande,
+    boxShadow: sombra.flotante,
+    border: `1px solid ${color.borde}`,
+    width: 340,
+    boxSizing: "border-box",
   },
-  titulo: { margin: "0 0 4px", fontSize: "2rem", color: "#0071e3", textAlign: "center" },
-  subtitulo: { margin: "0 0 24px", color: "#666", fontSize: "0.9rem", textAlign: "center" },
-  input: {
-    width: "100%", padding: "12px", marginBottom: "12px", borderRadius: "10px",
-    border: "1px solid #ddd", fontSize: "1rem", boxSizing: "border-box",
+  logo: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    background: color.primario,
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 700,
+    fontSize: "1.3rem",
+    margin: "0 auto 16px",
   },
-  boton: {
-    width: "100%", padding: "12px", background: "#0071e3", color: "white",
-    border: "none", borderRadius: "10px", fontSize: "1rem", cursor: "pointer",
-  },
-  error: { color: "#d70015", fontSize: "0.85rem", margin: "0 0 12px" },
+  titulo: { margin: "0 0 4px", fontSize: "1.5rem", color: color.texto, textAlign: "center", fontWeight: 700 },
+  subtitulo: { margin: "0 0 28px", color: color.textoSuave, fontSize: "0.88rem", textAlign: "center" },
+  error: { color: color.peligro, fontSize: "0.85rem", margin: "0 0 14px", textAlign: "center" },
 };
 
 export default Login;

@@ -8,10 +8,13 @@
 //   4. Rechazadas: las que el coordinador rechazó, con el motivo.
 
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import cliente from "../api/cliente";
 import { logout } from "../api/auth";
 import { crearSolicitud, misSolicitudes, verOrdenTrabajo } from "../api/solicitudes";
+import { verActivo } from "../api/activos";
+import Encabezado from "../componentes/Encabezado";
+import { color, cs, boton, insignia } from "../tema";
 
 const SOLAPAS = [
   { key: "crear", label: "Crear solicitud" },
@@ -58,6 +61,10 @@ function agruparPorFecha(lista, obtenerFecha) {
 function Solicitudes() {
   const [solapa, setSolapa] = useState("crear");
   const navegar = useNavigate();
+  const location = useLocation();
+  // Si llegamos acá después de escanear el QR de un equipo, viene el código
+  // en el estado de la navegación (ver EscanearQR.jsx).
+  const activoEscaneado = location.state?.activoCodigoEscaneado || null;
 
   function cerrarSesion() {
     logout();
@@ -65,31 +72,39 @@ function Solicitudes() {
   }
 
   return (
-    <div style={estilos.pagina}>
-      <div style={estilos.encabezado}>
-        <h1 style={estilos.titulo}>Solicitudes de servicio</h1>
-        <button style={estilos.botonSecundario} onClick={cerrarSesion}>
-          Cerrar sesión
-        </button>
-      </div>
-
-      <div style={estilos.solapas}>
-        {SOLAPAS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSolapa(s.key)}
-            style={solapa === s.key ? estilos.solapaActiva : estilos.solapa}
-          >
-            {s.label}
+    <div style={cs.pagina}>
+      <div style={cs.contenido}>
+        <Encabezado titulo="Solicitudes de servicio" subtitulo="Enfermería">
+          <button style={boton("secundario")} onClick={() => navegar("/escanear")}>
+            Escanear equipo (QR)
           </button>
-        ))}
-      </div>
+          <button style={boton("fantasma")} onClick={cerrarSesion}>
+            Cerrar sesión
+          </button>
+        </Encabezado>
 
-      <div style={estilos.contenido}>
-        {solapa === "crear" && <CrearSolicitud onCreada={() => setSolapa("enviadas")} />}
-        {solapa === "enviadas" && <ListaSolicitudes estado="PENDIENTE" vacio="No tenés solicitudes enviadas." />}
-        {solapa === "aceptadas" && <ListaAceptadas />}
-        {solapa === "rechazadas" && <ListaSolicitudes estado="RECHAZADA" vacio="No tenés solicitudes rechazadas." />}
+        <div style={estilos.solapas}>
+          {SOLAPAS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSolapa(s.key)}
+              style={solapa === s.key ? estilos.solapaActiva : estilos.solapa}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={estilos.contenidoSolapa}>
+          {solapa === "crear" && (
+            <div style={estilos.envoltorioForm}>
+              <CrearSolicitud activoInicial={activoEscaneado} onCreada={() => setSolapa("enviadas")} />
+            </div>
+          )}
+          {solapa === "enviadas" && <ListaSolicitudes estado="PENDIENTE" vacio="No tenés solicitudes enviadas." />}
+          {solapa === "aceptadas" && <ListaAceptadas />}
+          {solapa === "rechazadas" && <ListaSolicitudes estado="RECHAZADA" vacio="No tenés solicitudes rechazadas." />}
+        </div>
       </div>
     </div>
   );
@@ -99,12 +114,18 @@ function Solicitudes() {
 // SOLAPA 1 — Crear solicitud
 // ═══════════════════════════════════════════════════════════════════════════
 
-function CrearSolicitud({ onCreada }) {
+function CrearSolicitud({ onCreada, activoInicial }) {
   // null = todavía no eligió; true = equipo médico; false = no es equipo médico.
-  const [esEquipoMedico, setEsEquipoMedico] = useState(null);
+  // Si venimos de escanear un QR, ya sabemos que es un equipo médico y cuál.
+  const [esEquipoMedico, setEsEquipoMedico] = useState(activoInicial ? true : null);
   const [activos, setActivos] = useState([]);
-  const [activoCodigo, setActivoCodigo] = useState("");
-  const [busquedaActivo, setBusquedaActivo] = useState("");
+  // codigoTexto = lo que la persona va escribiendo. activoValidado = el
+  // equipo ya confirmado contra el backend (solo se puede enviar la
+  // solicitud si esto está cargado, así el ID siempre queda validado).
+  const [codigoTexto, setCodigoTexto] = useState(activoInicial || "");
+  const [activoValidado, setActivoValidado] = useState(null);
+  const [validandoCodigo, setValidandoCodigo] = useState(false);
+  const [errorCodigo, setErrorCodigo] = useState("");
   const [descripcionCosa, setDescripcionCosa] = useState("");
   const [descripcionProblema, setDescripcionProblema] = useState("");
   const [ubicacion, setUbicacion] = useState("");
@@ -112,18 +133,51 @@ function CrearSolicitud({ onCreada }) {
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
 
-  // Cuando elige "es equipo médico", traemos la lista de activos para poder
-  // filtrarla a medida que escribe.
+  // Traemos una lista de activos para mostrar sugerencias mientras escribe.
+  // No hace falta que esté completa: el ID que finalmente se manda siempre
+  // se valida contra el backend (ver validarCodigo), así que aunque el
+  // equipo no aparezca en esta lista corta igual funciona si se escribe el
+  // código exacto (por ejemplo, leyéndolo del cartelito QR pegado en el equipo).
   useEffect(() => {
     if (esEquipoMedico === true && activos.length === 0) {
       cliente.get("/activos").then((res) => setActivos(res.data)).catch(() => {});
     }
   }, [esEquipoMedico, activos.length]);
 
+  // Confirma contra el backend que el ID escrito corresponde a un equipo
+  // real. Se usa al elegir una sugerencia, al salir del campo (onBlur), al
+  // apretar Enter, y al mandar el formulario si todavía no se había validado.
+  // Devuelve el activo encontrado, o null si el ID no existe.
+  async function validarCodigo(codigo) {
+    const limpio = codigo.trim();
+    if (!limpio) return null;
+    setValidandoCodigo(true);
+    setErrorCodigo("");
+    try {
+      const activo = await verActivo(limpio);
+      setActivoValidado(activo);
+      setCodigoTexto(activo.codigo);
+      return activo;
+    } catch {
+      setActivoValidado(null);
+      setErrorCodigo(`No encontramos ningún equipo con el ID "${limpio}". Revisalo e intentá de nuevo.`);
+      return null;
+    } finally {
+      setValidandoCodigo(false);
+    }
+  }
+
+  // Si venimos de escanear un QR ya sabemos el código; lo validamos igual
+  // (para tener la descripción y confirmar que el equipo sigue existiendo).
+  useEffect(() => {
+    if (activoInicial) validarCodigo(activoInicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activoInicial]);
+
   // Filtra la lista de activos a medida que la persona escribe (por código o
   // por descripción), para no tener que buscar a mano en una lista larga.
-  const textoBusqueda = busquedaActivo.trim().toLowerCase();
-  const activosFiltrados = textoBusqueda
+  const textoBusqueda = codigoTexto.trim().toLowerCase();
+  const activosFiltrados = !activoValidado && textoBusqueda
     ? activos
         .filter(
           (a) =>
@@ -132,15 +186,21 @@ function CrearSolicitud({ onCreada }) {
         )
         .slice(0, 20)
     : [];
-  const activoElegido = activos.find((a) => a.codigo === activoCodigo);
 
   function elegirTipo(valor) {
     setEsEquipoMedico(valor);
-    setActivoCodigo("");
-    setBusquedaActivo("");
+    setCodigoTexto("");
+    setActivoValidado(null);
+    setErrorCodigo("");
     setDescripcionCosa("");
     setError("");
     setExito("");
+  }
+
+  function cambiarEquipo() {
+    setActivoValidado(null);
+    setCodigoTexto("");
+    setErrorCodigo("");
   }
 
   async function enviar() {
@@ -152,10 +212,20 @@ function CrearSolicitud({ onCreada }) {
       setError("Elegí si es un equipo médico o no.");
       return;
     }
-    if (esEquipoMedico && !activoCodigo) {
-      setError("Elegí el equipo.");
-      return;
+
+    // El ID del equipo es obligatorio y siempre tiene que estar validado
+    // contra el backend antes de poder enviar (así nunca se manda un ID
+    // que no exista).
+    let equipo = activoValidado;
+    if (esEquipoMedico && !equipo) {
+      if (!codigoTexto.trim()) {
+        setError("Ingresá el ID del equipo.");
+        return;
+      }
+      equipo = await validarCodigo(codigoTexto);
+      if (!equipo) return; // el error ya quedó mostrado debajo del campo
     }
+
     if (!esEquipoMedico && !descripcionCosa.trim()) {
       setError("Describí qué es (ej: pinza de oftalmología).");
       return;
@@ -173,7 +243,7 @@ function CrearSolicitud({ onCreada }) {
     try {
       await crearSolicitud({
         es_equipo_medico: esEquipoMedico,
-        activo_codigo: esEquipoMedico ? activoCodigo : undefined,
+        activo_codigo: esEquipoMedico ? equipo.codigo : undefined,
         descripcion_cosa: esEquipoMedico ? undefined : descripcionCosa.trim(),
         descripcion_problema: descripcionProblema.trim(),
         ubicacion: ubicacion.trim(),
@@ -181,8 +251,9 @@ function CrearSolicitud({ onCreada }) {
       setExito("Solicitud enviada correctamente.");
       // Limpiar el formulario para la próxima.
       setEsEquipoMedico(null);
-      setActivoCodigo("");
-      setBusquedaActivo("");
+      setCodigoTexto("");
+      setActivoValidado(null);
+      setErrorCodigo("");
       setDescripcionCosa("");
       setDescripcionProblema("");
       setUbicacion("");
@@ -197,7 +268,7 @@ function CrearSolicitud({ onCreada }) {
   return (
     <div style={estilos.tarjetaForm}>
       <p style={estilos.pregunta}>¿Es un equipo médico?</p>
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
         <button
           style={esEquipoMedico === true ? estilos.opcionActiva : estilos.opcion}
           onClick={() => elegirTipo(true)}
@@ -214,46 +285,35 @@ function CrearSolicitud({ onCreada }) {
 
       {esEquipoMedico === true && (
         <div style={estilos.campo}>
-          <label style={estilos.label}>Equipo</label>
-          {activoCodigo ? (
+          <label style={cs.label}>ID del equipo</label>
+          {activoValidado ? (
             <div style={estilos.equipoElegido}>
               <span>
-                <strong>{activoCodigo}</strong>
-                {activoElegido ? ` — ${activoElegido.descripcion}` : ""}
+                <strong>{activoValidado.codigo}</strong> — {activoValidado.descripcion}
               </span>
-              <button
-                type="button"
-                style={estilos.linkCambiar}
-                onClick={() => {
-                  setActivoCodigo("");
-                  setBusquedaActivo("");
-                }}
-              >
+              <button type="button" style={estilos.linkCambiar} onClick={cambiarEquipo}>
                 Cambiar
               </button>
             </div>
           ) : (
             <>
               <input
-                style={estilos.input}
-                placeholder="Escribí el código o la descripción del equipo…"
-                value={busquedaActivo}
-                onChange={(e) => setBusquedaActivo(e.target.value)}
+                style={cs.input}
+                placeholder="Ej: B-CIRU-MAAN-056"
+                value={codigoTexto}
+                onChange={(e) => {
+                  setCodigoTexto(e.target.value);
+                  setErrorCodigo("");
+                }}
+                onBlur={() => codigoTexto.trim() && validarCodigo(codigoTexto)}
+                onKeyDown={(e) => e.key === "Enter" && validarCodigo(codigoTexto)}
               />
-              {textoBusqueda && (
+              {validandoCodigo && <p style={estilos.ayudaCampo}>Verificando…</p>}
+              {errorCodigo && <p style={estilos.error}>{errorCodigo}</p>}
+              {!errorCodigo && !validandoCodigo && textoBusqueda && activosFiltrados.length > 0 && (
                 <div style={estilos.listaSugerencias}>
-                  {activosFiltrados.length === 0 && (
-                    <div style={estilos.sugerenciaVacia}>No se encontró ningún equipo.</div>
-                  )}
                   {activosFiltrados.map((a) => (
-                    <div
-                      key={a.codigo}
-                      style={estilos.sugerencia}
-                      onClick={() => {
-                        setActivoCodigo(a.codigo);
-                        setBusquedaActivo("");
-                      }}
-                    >
+                    <div key={a.codigo} style={estilos.sugerencia} onClick={() => validarCodigo(a.codigo)}>
                       <strong>{a.codigo}</strong> — {a.descripcion}
                     </div>
                   ))}
@@ -266,9 +326,9 @@ function CrearSolicitud({ onCreada }) {
 
       {esEquipoMedico === false && (
         <div style={estilos.campo}>
-          <label style={estilos.label}>¿Qué es?</label>
+          <label style={cs.label}>¿Qué es?</label>
           <input
-            style={estilos.input}
+            style={cs.input}
             placeholder="Ej: pinza de oftalmología"
             value={descripcionCosa}
             onChange={(e) => setDescripcionCosa(e.target.value)}
@@ -279,9 +339,9 @@ function CrearSolicitud({ onCreada }) {
       {esEquipoMedico !== null && (
         <>
           <div style={estilos.campo}>
-            <label style={estilos.label}>Descripción de la falla</label>
+            <label style={cs.label}>Descripción de la falla</label>
             <textarea
-              style={{ ...estilos.input, minHeight: 80, resize: "vertical" }}
+              style={{ ...cs.input, minHeight: 60, resize: "vertical" }}
               placeholder="Contá qué le pasa"
               value={descripcionProblema}
               onChange={(e) => setDescripcionProblema(e.target.value)}
@@ -289,9 +349,9 @@ function CrearSolicitud({ onCreada }) {
           </div>
 
           <div style={estilos.campo}>
-            <label style={estilos.label}>Ubicación</label>
+            <label style={cs.label}>Ubicación</label>
             <input
-              style={estilos.input}
+              style={cs.input}
               placeholder="Ej: Quirófano 2"
               value={ubicacion}
               onChange={(e) => setUbicacion(e.target.value)}
@@ -301,7 +361,7 @@ function CrearSolicitud({ onCreada }) {
           {error && <p style={estilos.error}>{error}</p>}
           {exito && <p style={estilos.exito}>{exito}</p>}
 
-          <button style={estilos.boton} onClick={enviar} disabled={enviando}>
+          <button style={{ ...boton("primario"), width: "100%", padding: "12px" }} onClick={enviar} disabled={enviando}>
             {enviando ? "Enviando..." : "Enviar solicitud"}
           </button>
         </>
@@ -328,7 +388,7 @@ function ListaSolicitudes({ estado, vacio }) {
   }, [estado]);
 
   if (cargando) return <p style={estilos.mensaje}>Cargando…</p>;
-  if (error) return <p style={{ ...estilos.mensaje, color: "#d70015" }}>{error}</p>;
+  if (error) return <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>;
   if (solicitudes.length === 0) return <p style={estilos.mensaje}>{vacio}</p>;
 
   // Filtra por número de solicitud (acepta que escriban "#12" o solo "12").
@@ -372,10 +432,10 @@ function ListaSolicitudes({ estado, vacio }) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function estadoOt(ot) {
-  if (!ot) return { texto: "Sin asignar", color: "#e37400", fondo: "#fff4e5" };
-  if (ot.estado === "CERRADA") return { texto: "Finalizada", color: "#1a7f37", fondo: "#e6f7ec" };
-  if (!ot.tecnico_id) return { texto: "Sin asignar", color: "#e37400", fondo: "#fff4e5" };
-  return { texto: "En progreso", color: "#0071e3", fondo: "#e8f2ff" };
+  if (!ot) return { texto: "Sin asignar", tono: "advertencia" };
+  if (ot.estado === "CERRADA") return { texto: "Finalizada", tono: "exito" };
+  if (!ot.tecnico_id) return { texto: "Sin asignar", tono: "advertencia" };
+  return { texto: "En progreso", tono: "primario" };
 }
 
 function ListaAceptadas() {
@@ -413,7 +473,7 @@ function ListaAceptadas() {
   }, [cargar]);
 
   if (cargando) return <p style={estilos.mensaje}>Cargando…</p>;
-  if (error) return <p style={{ ...estilos.mensaje, color: "#d70015" }}>{error}</p>;
+  if (error) return <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>;
   if (items.length === 0) return <p style={estilos.mensaje}>No tenés solicitudes aceptadas todavía.</p>;
 
   const textoFiltro = filtroNumero.trim().replace(/^#/, "");
@@ -442,9 +502,7 @@ function ListaAceptadas() {
             const estado = estadoOt(ot);
             return (
               <TarjetaSolicitud key={s.id} s={s}>
-                <span style={{ ...estilos.badge, color: estado.color, background: estado.fondo }}>
-                  {estado.texto}
-                </span>
+                <span style={insignia(estado.tono)}>{estado.texto}</span>
               </TarjetaSolicitud>
             );
           })}
@@ -464,7 +522,7 @@ function TarjetaSolicitud({ s, children }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
         <div>
           <div style={estilos.numeroSolicitud}>Solicitud #{s.numero_solicitud}</div>
-          <strong>{s.titulo}</strong>
+          <strong style={estilos.tituloSolicitud}>{s.titulo}</strong>
           <div style={estilos.detalle}>{s.descripcion_problema}</div>
           <div style={estilos.detalle}>📍 {s.ubicacion}</div>
         </div>
@@ -475,61 +533,89 @@ function TarjetaSolicitud({ s, children }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Estilos (mismo criterio simple que el resto de las pantallas de SYNAP)
+// Estilos (usan los tokens compartidos de tema.js, más los propios de esta
+// pantalla: solapas, tarjeta de solicitud, formulario, etc.)
 // ═══════════════════════════════════════════════════════════════════════════
 
 const estilos = {
-  pagina: { padding: 40, fontFamily: "system-ui", maxWidth: 800, margin: "0 auto" },
-  encabezado: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  titulo: { color: "#0071e3", margin: 0 },
-  botonSecundario: { padding: "8px 16px", borderRadius: 8, border: "1px solid #ddd", background: "white", cursor: "pointer" },
-  solapas: { display: "flex", gap: 6, borderBottom: "1px solid #eee", marginBottom: 20 },
+  solapas: {
+    display: "flex",
+    gap: 6,
+    background: color.bordeSuave,
+    padding: 4,
+    borderRadius: 12,
+    width: "fit-content",
+    margin: "0 auto 18px",
+  },
   solapa: {
-    padding: "10px 16px", border: "none", background: "none", cursor: "pointer",
-    fontSize: "0.95rem", color: "#666", borderBottom: "2px solid transparent",
+    padding: "9px 16px",
+    border: "none",
+    background: "none",
+    cursor: "pointer",
+    borderRadius: 9,
+    fontSize: "0.88rem",
+    fontWeight: 600,
+    color: color.textoSuave,
+    fontFamily: "inherit",
   },
   solapaActiva: {
-    padding: "10px 16px", border: "none", background: "none", cursor: "pointer",
-    fontSize: "0.95rem", color: "#0071e3", fontWeight: 600, borderBottom: "2px solid #0071e3",
+    padding: "9px 16px",
+    border: "none",
+    cursor: "pointer",
+    borderRadius: 9,
+    fontSize: "0.88rem",
+    fontWeight: 600,
+    color: color.primario,
+    background: color.tarjeta,
+    boxShadow: "0 1px 3px rgba(20,24,35,0.1)",
+    fontFamily: "inherit",
   },
-  contenido: { minHeight: 200 },
-  tarjetaForm: { background: "white", padding: 24, borderRadius: 12, border: "1px solid #eee", maxWidth: 480 },
-  pregunta: { fontWeight: 600, marginBottom: 10 },
-  opcion: { flex: 1, padding: "12px", borderRadius: 10, border: "1px solid #ddd", background: "white", cursor: "pointer" },
-  opcionActiva: { flex: 1, padding: "12px", borderRadius: 10, border: "2px solid #0071e3", background: "#e8f2ff", cursor: "pointer", fontWeight: 600 },
-  campo: { marginBottom: 16 },
-  label: { display: "block", marginBottom: 6, fontSize: "0.85rem", color: "#666" },
-  input: { width: "100%", padding: "12px", borderRadius: 10, border: "1px solid #ddd", fontSize: "1rem", boxSizing: "border-box", fontFamily: "inherit" },
+  contenidoSolapa: { minHeight: 200 },
+  // Centra la tarjeta de "Crear solicitud" en el medio de la pantalla (en vez
+  // de quedar pegada a la izquierda) y le da un tamaño compacto para que
+  // entre todo sin tener que scrollear.
+  envoltorioForm: { display: "flex", justifyContent: "center" },
+  tarjetaForm: { ...cs.tarjeta, padding: "22px 26px", width: "100%", maxWidth: 440 },
+  pregunta: { fontWeight: 700, marginBottom: 8, color: color.texto, fontSize: "0.95rem" },
+  opcion: {
+    flex: 1, padding: "12px", borderRadius: 10, border: `1.5px solid ${color.borde}`,
+    background: color.tarjeta, cursor: "pointer", fontFamily: "inherit", fontSize: "0.88rem", color: color.texto,
+  },
+  opcionActiva: {
+    flex: 1, padding: "12px", borderRadius: 10, border: `1.5px solid ${color.primario}`,
+    background: color.primarioClaro, cursor: "pointer", fontWeight: 600,
+    fontFamily: "inherit", fontSize: "0.88rem", color: color.primarioOscuro,
+  },
+  campo: { marginBottom: 13 },
   equipoElegido: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "12px", borderRadius: 10, border: "1px solid #ddd", background: "#f9f9fb",
+    padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${color.borde}`, background: color.fondo,
   },
   linkCambiar: {
-    border: "none", background: "none", color: "#0071e3", cursor: "pointer",
-    fontSize: "0.85rem", fontWeight: 600, padding: 0,
+    border: "none", background: "none", color: color.primario, cursor: "pointer",
+    fontSize: "0.85rem", fontWeight: 600, padding: 0, fontFamily: "inherit",
   },
   listaSugerencias: {
-    marginTop: 6, maxHeight: 220, overflowY: "auto", border: "1px solid #ddd",
-    borderRadius: 10, background: "white",
+    marginTop: 6, maxHeight: 220, overflowY: "auto", border: `1px solid ${color.borde}`,
+    borderRadius: 10, background: color.tarjeta,
   },
   sugerencia: {
-    padding: "10px 12px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", fontSize: "0.9rem",
+    padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${color.bordeSuave}`, fontSize: "0.88rem", color: color.texto,
   },
-  sugerenciaVacia: { padding: "10px 12px", color: "#666", fontSize: "0.85rem" },
-  boton: { width: "100%", padding: "12px", background: "#0071e3", color: "white", border: "none", borderRadius: 10, fontSize: "1rem", cursor: "pointer" },
-  error: { color: "#d70015", fontSize: "0.85rem", margin: "0 0 12px" },
-  exito: { color: "#1a7f37", fontSize: "0.85rem", margin: "0 0 12px" },
-  mensaje: { color: "#666", padding: "20px 0" },
+  ayudaCampo: { color: color.textoSuave, fontSize: "0.8rem", margin: "6px 0 0" },
+  error: { color: color.peligro, fontSize: "0.85rem", margin: "0 0 12px" },
+  exito: { color: color.exito, fontSize: "0.85rem", margin: "0 0 12px" },
+  mensaje: { color: color.textoSuave, padding: "20px 0" },
   filtro: {
-    width: "100%", maxWidth: 280, padding: "10px 14px", marginBottom: 20, borderRadius: 10,
-    border: "1px solid #ddd", fontSize: "0.9rem", boxSizing: "border-box", fontFamily: "inherit",
+    ...cs.input,
+    width: "100%", maxWidth: 280, marginBottom: 20,
   },
-  fechaTitulo: { fontSize: "0.85rem", color: "#666", fontWeight: 600, margin: "20px 0 10px" },
-  numeroSolicitud: { fontSize: "0.75rem", color: "#0071e3", fontWeight: 600, marginBottom: 4 },
-  tarjeta: { background: "white", padding: 16, borderRadius: 10, marginBottom: 10, border: "1px solid #eee" },
-  detalle: { fontSize: "0.85rem", color: "#666", marginTop: 4 },
-  motivoRechazo: { fontSize: "0.85rem", color: "#d70015", marginTop: 6 },
-  badge: { fontSize: "0.75rem", fontWeight: 600, padding: "4px 10px", borderRadius: 20, whiteSpace: "nowrap" },
+  fechaTitulo: { fontSize: "0.8rem", color: color.textoDebil, fontWeight: 700, letterSpacing: "0.02em", margin: "22px 0 10px", textTransform: "uppercase" },
+  numeroSolicitud: { fontSize: "0.74rem", color: color.primario, fontWeight: 700, marginBottom: 4 },
+  tituloSolicitud: { color: color.texto, fontSize: "0.98rem" },
+  tarjeta: { ...cs.tarjeta, padding: "16px 20px", marginBottom: 10 },
+  detalle: { fontSize: "0.85rem", color: color.textoSuave, marginTop: 4 },
+  motivoRechazo: { fontSize: "0.85rem", color: color.peligro, marginTop: 6 },
 };
 
 export default Solicitudes;

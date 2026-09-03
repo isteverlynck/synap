@@ -9,6 +9,8 @@ import { estaLogueado } from "./api/auth";
 import Login from "./pages/Login";
 import Activos from "./pages/Activos";
 import Solicitudes from "./pages/Solicitudes";
+import EscanearQR from "./pages/EscanearQR";
+import FichaActivo from "./pages/FichaActivo";
 
 // "Guardia": envuelve una pantalla protegida. Si no estás logueada, te manda
 // al login. Así ninguna pantalla protegida se ve sin haber entrado.
@@ -27,7 +29,12 @@ function App() {
         <Route path="/activos" element={<Protegida><Activos /></Protegida>} />
         <Route path="/solicitudes" element={<Protegida><Solicitudes /></Protegida>} />
 
-        {/* Acá van sumando: OT, stock, dashboard, ficha de activo, escaneo... */}
+        {/* Escaneo de QR: lo puede abrir cualquier rol. Según quién escanea,
+        la pantalla decide a dónde mandarlo (ver EscanearQR.jsx). */}
+        <Route path="/escanear" element={<Protegida><EscanearQR /></Protegida>} />
+        <Route path="/activos/:codigo" element={<Protegida><FichaActivo /></Protegida>} />
+
+        {/* Acá van sumando: OT, stock, dashboard... */}
         {/* Ejemplo para cuando las hagan:
         <Route path="/stock" element={<Protegida><Stock /></Protegida>} />
         <Route path="/dashboard" element={<Protegida><Dashboard /></Protegida>} />

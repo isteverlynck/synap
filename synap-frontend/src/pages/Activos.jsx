@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import cliente from "../api/cliente";
 import { logout } from "../api/auth";
+import Encabezado from "../componentes/Encabezado";
+import { color, cs, boton, insignia, tonoEstadoActivo } from "../tema";
 
 function Activos() {
   const [activos, setActivos] = useState([]);
@@ -25,34 +27,60 @@ function Activos() {
     navegar("/");
   }
 
-  if (cargando) return <p style={{ padding: 40 }}>Cargando activos...</p>;
-  if (error) return <p style={{ padding: 40, color: "#d70015" }}>{error}</p>;
-
   return (
-    <div style={{ padding: 40, fontFamily: "system-ui", maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ color: "#0071e3" }}>Activos ({activos.length})</h1>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => navegar("/solicitudes")} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" }}>
+    <div style={cs.pagina}>
+      <div style={cs.contenido}>
+        <Encabezado titulo={`Activos (${activos.length})`} subtitulo="Equipamiento médico registrado">
+          <button style={boton("secundario")} onClick={() => navegar("/escanear")}>
+            Escanear equipo (QR)
+          </button>
+          <button style={boton("secundario")} onClick={() => navegar("/solicitudes")}>
             Solicitudes de servicio
           </button>
-          <button onClick={cerrarSesion} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" }}>
+          <button style={boton("fantasma")} onClick={cerrarSesion}>
             Cerrar sesión
           </button>
-        </div>
-      </div>
-      <div style={{ marginTop: 20 }}>
-        {activos.map((a) => (
-          <div key={a.codigo} style={{ background: "white", padding: 16, borderRadius: 10, marginBottom: 10, border: "1px solid #eee" }}>
-            <strong>{a.codigo}</strong> — {a.descripcion}
-            <div style={{ fontSize: "0.85rem", color: "#666" }}>
-              {a.marca} {a.modelo} · Estado: {a.estado}
-            </div>
+        </Encabezado>
+
+        {cargando && <p style={estilos.mensaje}>Cargando activos...</p>}
+        {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
+
+        {!cargando && !error && (
+          <div style={estilos.lista}>
+            {activos.map((a) => (
+              <div key={a.codigo} onClick={() => navegar(`/activos/${a.codigo}`)} style={estilos.tarjeta}>
+                <div>
+                  <div style={estilos.codigo}>{a.codigo}</div>
+                  <div style={estilos.descripcion}>{a.descripcion}</div>
+                  {(a.marca || a.modelo) && (
+                    <div style={estilos.detalle}>{[a.marca, a.modelo].filter(Boolean).join(" ")}</div>
+                  )}
+                </div>
+                <span style={insignia(tonoEstadoActivo(a.estado))}>{a.estado}</span>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 }
+
+const estilos = {
+  mensaje: { color: color.textoSuave, padding: "20px 0" },
+  lista: { display: "flex", flexDirection: "column", gap: 10 },
+  tarjeta: {
+    ...cs.tarjeta,
+    padding: "16px 20px",
+    cursor: "pointer",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  codigo: { fontWeight: 700, color: color.texto, fontSize: "0.95rem" },
+  descripcion: { color: color.textoSuave, fontSize: "0.88rem", marginTop: 2 },
+  detalle: { color: color.textoDebil, fontSize: "0.78rem", marginTop: 4 },
+};
 
 export default Activos;
