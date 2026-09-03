@@ -166,6 +166,7 @@ class OrdenTrabajoOut(BaseModel):
     fecha_cierre: datetime | None = None
     observaciones: str | None = None
     created_at: datetime | None = None
+    fecha_notificacion: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 class OrdenTrabajoCreate(BaseModel):
@@ -555,6 +556,11 @@ class SolicitudOut(BaseModel):
     numero_solicitud: int
     solicitante_id: uuid.UUID | None = None
     persona_afectada_id: uuid.UUID | None = None
+    # Nombres ya armados, para no tener que pedir el usuario aparte desde el
+    # frontend. Se agregan SIN sacar los ids: lo que ya consume la pantalla de
+    # Solicitudes sigue funcionando igual.
+    solicitante_nombre: str | None = None
+    persona_afectada_nombre: str | None = None
     activo_codigo: str | None = None
     descripcion_cosa: str | None = None
     titulo: str

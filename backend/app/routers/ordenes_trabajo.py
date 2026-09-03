@@ -27,7 +27,7 @@ from ..schemas import (
     OrdenTrabajoCambioEstado,
     OrdenTrabajoCierre,
 )
-from ..security import get_current_user, requiere_rol
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 
@@ -36,32 +36,80 @@ router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 # LECTURA (GET) — funcionando
 # ═══════════════════════════════════════════════════════════════════════════
 
+# @router.get("", response_model=list[OrdenTrabajoOut])
+# def listar_ordenes(
+#     estado: str | None = None,
+#     tipo: str | None = None,
+#     activo_codigo: str | None = None,
+#     limit: int = 50,
+#     db: Session = Depends(get_db),
+#     current_user: Usuario = Depends(get_current_user),
+# ):
+#     """Listar OTs (hasta 'limit'), con filtros opcionales.
+
+#     Los filtros son opcionales: si no mandás ninguno, trae las últimas 'limit'.
+#     Se pueden combinar (ej: estado='ABIERTA' + tipo='correctiva').
+#       - estado: ABIERTA / EN_PROGRESO / CERRADA
+#       - tipo: correctiva / preventiva
+#       - activo_codigo: todas las OT de un equipo puntual
+#     """
+#     q = db.query(OrdenTrabajo)
+#     if estado is not None:
+#         q = q.filter(OrdenTrabajo.estado == estado)
+#     if tipo is not None:
+#         q = q.filter(OrdenTrabajo.tipo == tipo)
+#     if activo_codigo is not None:
+#         q = q.filter(OrdenTrabajo.activo_codigo == activo_codigo)
+#     return q.limit(limit).all()
+
 @router.get("", response_model=list[OrdenTrabajoOut])
 def listar_ordenes(
     estado: str | None = None,
     tipo: str | None = None,
     activo_codigo: str | None = None,
+    grupo_id: str | None = None,
+    sin_asignar: bool | None = None,
+    mis_grupos: bool = False,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Listar OTs (hasta 'limit'), con filtros opcionales.
+    """Listar OTs (hasta 'limit'), con filtros opcionales y combinables.
 
-    Los filtros son opcionales: si no mandás ninguno, trae las últimas 'limit'.
-    Se pueden combinar (ej: estado='ABIERTA' + tipo='correctiva').
       - estado: ABIERTA / EN_PROGRESO / CERRADA
-      - tipo: correctiva / preventiva
+      - tipo: CORRECTIVA / PREVENTIVA
       - activo_codigo: todas las OT de un equipo puntual
+      - grupo_id: las de un grupo técnico puntual
+      - sin_asignar=true: solo las que todavía no tienen técnico. Es la bandeja
+        de pendientes del coordinador después de aceptar solicitudes.
+      - mis_grupos=true: las de los grupos que coordina el usuario logueado
+        (jefatura las ve todas, no filtra).
     """
     q = db.query(OrdenTrabajo)
+
+    # estado y tipo se guardan en mayúsculas: normalizamos lo que llega para
+    # que 'abierta' y 'ABIERTA' funcionen igual.
     if estado is not None:
-        q = q.filter(OrdenTrabajo.estado == estado)
+        q = q.filter(OrdenTrabajo.estado == estado.upper())
     if tipo is not None:
-        q = q.filter(OrdenTrabajo.tipo == tipo)
+        q = q.filter(OrdenTrabajo.tipo == tipo.upper())
     if activo_codigo is not None:
         q = q.filter(OrdenTrabajo.activo_codigo == activo_codigo)
-    return q.limit(limit).all()
+    if grupo_id is not None:
+        q = q.filter(OrdenTrabajo.grupo_id == grupo_id)
 
+    # sin_asignar=true → sin técnico; false → solo las ya asignadas.
+    if sin_asignar is True:
+        q = q.filter(OrdenTrabajo.tecnico_id.is_(None))
+    elif sin_asignar is False:
+        q = q.filter(OrdenTrabajo.tecnico_id.isnot(None))
+
+    if mis_grupos and current_user.rol != "jefatura":
+        q = q.filter(OrdenTrabajo.grupo_id.in_(grupos_del_coordinador(db, current_user)))
+
+    # Orden fijo: las más nuevas primero. Sin esto la lista puede cambiar de
+    # orden entre recargas y confunde al usuario.
+    return q.order_by(OrdenTrabajo.fecha_apertura.desc().nullslast()).limit(limit).all()
 
 @router.get("/mias", response_model=list[OrdenTrabajoOut])
 def mis_ordenes(

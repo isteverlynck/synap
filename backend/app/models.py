@@ -441,6 +441,30 @@ class SolicitudServicio(Base):
     motivo_rechazo: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
     
+    # Relaciones hacia usuarios. Hay que aclarar foreign_keys porque esta tabla
+    # tiene DOS columnas que apuntan a usuarios (quien pidió y a quién le pasó):
+    # sin eso, SQLAlchemy no sabe cuál usar para cada relación.
+    solicitante = relationship("Usuario", foreign_keys=[solicitante_id])
+    persona_afectada = relationship("Usuario", foreign_keys=[persona_afectada_id])
+
+    @property
+    def solicitante_nombre(self) -> str | None:
+        """Nombre completo de quien hizo el pedido, listo para mostrar.
+
+        La pantalla del coordinador necesita ver 'Lucía García', no un UUID.
+        Devuelve None si la solicitud no tiene solicitante cargado.
+        """
+        if self.solicitante is None:
+            return None
+        return f"{self.solicitante.nombre} {self.solicitante.apellido}"
+
+    @property
+    def persona_afectada_nombre(self) -> str | None:
+        """Igual que arriba, para la persona afectada (puede no estar cargada)."""
+        if self.persona_afectada is None:
+            return None
+        return f"{self.persona_afectada.nombre} {self.persona_afectada.apellido}"
+    
 class PasswordResetToken(Base):
     """Un pedido de recuperación de contraseña.
 

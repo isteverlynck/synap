@@ -115,3 +115,16 @@ def buscar_usuario_por_numero(db: Session, numero: str) -> Usuario | None:
     return db.query(Usuario).filter(
         func.lower(Usuario.numero_identificacion) == numero.strip().lower()
     ).first()
+    
+def grupos_del_coordinador(db: Session, usuario: Usuario) -> list[str]:
+    """Ids de los grupos que coordina esta persona.
+
+    Jefatura devuelve lista vacía a propósito: no coordina grupos, tiene visión
+    global, así que quien llame a esto tiene que tratar ese caso aparte (ver
+    listar_ordenes).
+    """
+    from .models import GrupoTecnico   # import local: evita import circular
+    grupos = db.query(GrupoTecnico).filter(
+        GrupoTecnico.coordinador_id == usuario.id
+    ).all()
+    return [g.id for g in grupos]
