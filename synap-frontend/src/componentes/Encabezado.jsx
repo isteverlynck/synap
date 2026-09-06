@@ -12,7 +12,6 @@ function Encabezado({ titulo, subtitulo, children }) {
   return (
     <header style={estilos.header}>
       <div style={estilos.marca}>
-        <span style={estilos.logo}>S</span>
         <div>
           <h1 style={estilos.titulo}>{titulo}</h1>
           {subtitulo && <p style={estilos.subtitulo}>{subtitulo}</p>}

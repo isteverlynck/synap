@@ -164,6 +164,21 @@ export function insignia(tono = "primario") {
 //
 // Devuelve todo lo que la ficha necesita pintar: tono, título, detalle y qué
 // acción ofrecer. Así la lógica vive en un lugar y no repartida por la pantalla.
+
+// Dos funciones distintas para dos usos distintos:
+//
+//   tonoEstadoActivo  → la LISTA de activos. Solo necesita el color de una
+//                       pastilla chica al lado de cada equipo.
+//   estadoDelEquipo   → la FICHA. Necesita además el título, el detalle y qué
+//                       acción ofrecer, y mira las OT abiertas, no solo el campo.
+export function tonoEstadoActivo(estado) {
+  const texto = (estado || "").toUpperCase();
+  if (texto.includes("BAJA") || texto.includes("FUERA")) return "peligro";
+  if (texto.includes("REPARAC") || texto.includes("MANTENIM")) return "advertencia";
+  if (texto.includes("OPERAT") || texto.includes("ACTIVO")) return "exito";
+  return "neutro";
+}
+
 export function estadoDelEquipo(activo) {
   const texto = (activo?.estado || "").toUpperCase();
   const abiertas = (activo?.ordenes_de_trabajo || []).filter(

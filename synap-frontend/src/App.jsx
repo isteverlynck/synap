@@ -12,6 +12,7 @@ import Solicitudes from "./pages/Solicitudes";
 import EscanearQR from "./pages/EscanearQR";
 import FichaActivo from "./pages/FichaActivo";
 import RecuperarPassword from "./pages/RecuperarPassword";
+import Cascaron from "./componentes/Cascaron";
 
 
 // "Guardia": envuelve una pantalla protegida. Si no estás logueada, te manda
@@ -24,26 +25,17 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Pantalla pública: login */}
         <Route path="/" element={<Login />} />
-
-        {/* Pantallas protegidas (requieren login) */}
-        <Route path="/activos" element={<Protegida><Activos /></Protegida>} />
-        <Route path="/solicitudes" element={<Protegida><Solicitudes /></Protegida>} />
-
-        {/* Escaneo de QR: lo puede abrir cualquier rol. Según quién escanea,
-        la pantalla decide a dónde mandarlo (ver EscanearQR.jsx). */}
-        <Route path="/escanear" element={<Protegida><EscanearQR /></Protegida>} />
-        <Route path="/activos/:codigo" element={<Protegida><FichaActivo /></Protegida>} />
-
         <Route path="/recuperar" element={<RecuperarPassword />} />
         <Route path="/restablecer" element={<RecuperarPassword />} />
 
-        {/* Acá van sumando: OT, stock, dashboard... */}
-        {/* Ejemplo para cuando las hagan:
-        <Route path="/stock" element={<Protegida><Stock /></Protegida>} />
-        <Route path="/dashboard" element={<Protegida><Dashboard /></Protegida>} />
-        */}
+        {/* Todo lo de adentro vive dentro del cascarón */}
+        <Route element={<Protegida><Cascaron /></Protegida>}>
+          <Route path="/activos" element={<Activos />} />
+          <Route path="/activos/:codigo" element={<FichaActivo />} />
+          <Route path="/escanear" element={<EscanearQR />} />
+          <Route path="/solicitudes" element={<Solicitudes />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
