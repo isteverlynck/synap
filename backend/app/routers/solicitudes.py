@@ -234,12 +234,22 @@ def aceptar_solicitud(
                 detail="Esta solicitud no es de un equipo: indicá grupo_id.",
             )
         grupo_destino = payload.grupo_id
+    
+    if grupo_destino is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Este tipo de equipo no está asignado a ningún grupo técnico. "
+                "Avisale a jefatura para que lo configure."
+            ),
+        )
 
     if grupo_destino not in mis_grupos:
         raise HTTPException(
             status_code=403,
             detail="Solo podés aceptar solicitudes de los grupos que coordinás.",
         )
+        
 
     # Si se indicó a quién asignarla, verificar que exista y sea del grupo destino.
     # Si no se indicó, la OT nace "sin asignar" (tecnico_id None) y se asigna después.

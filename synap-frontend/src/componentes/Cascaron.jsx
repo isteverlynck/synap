@@ -24,14 +24,14 @@ const MENUS = {
   ],
   tecnico: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
-    { id: "ot", texto: "Mis órdenes", ruta: "/ordenes", icono: "orden", listo: false },
+    { id: "ot", texto: "Mis órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: false },
   ],
   coordinacion: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
     { id: "solicitudes", texto: "Solicitudes", ruta: "/pendientes", icono: "bandeja", listo: true },
-    { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: false },
+    { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: false },
     { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: false },
@@ -39,7 +39,7 @@ const MENUS = {
   jefatura: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
     { id: "dashboard", texto: "Dashboard", ruta: "/dashboard", icono: "grafico", listo: false },
-    { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: false },
+    { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: false },
   ],

@@ -185,6 +185,8 @@ class OrdenTrabajoOut(BaseModel):
     created_at: datetime | None = None
     fecha_notificacion: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+    activo_descripcion: str | None = None
+    activo_ubicacion: str | None = None
 
 class OrdenTrabajoCreate(BaseModel):
     """Lo que el frontend manda para ABRIR una OT nueva (POST).

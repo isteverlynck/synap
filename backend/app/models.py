@@ -161,6 +161,21 @@ class OrdenTrabajo(Base):
     mantenimientos: Mapped[list["MantenimientoPreventivo"]] = relationship(back_populates="orden")
     consumos: Mapped[list["ConsumoInsumo"]] = relationship(back_populates="orden")
     adjuntos: Mapped[list["Adjunto"]] = relationship(back_populates="orden")
+    
+    @property
+    def activo_descripcion(self) -> str | None:
+        """Nombre del equipo, listo para mostrar en las listas de OT.
+
+        El código (B-CIRU-MAAN-056) identifica sin ambigüedad pero no se lee de
+        un vistazo. Traemos también la descripción para que el listado diga
+        "Bomba de infusión" y el código quede como dato de apoyo.
+        """
+        return self.activo.descripcion if self.activo else None
+
+    @property
+    def activo_ubicacion(self) -> str | None:
+        """Dónde está el equipo. El técnico necesita saber adónde ir."""
+        return self.activo.ubicacion if self.activo else None
  
  
 class Falla(Base):

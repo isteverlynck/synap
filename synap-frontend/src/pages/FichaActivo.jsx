@@ -400,6 +400,19 @@ function formatearFecha(valor) {
   return f.toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Los estados se guardan en mayúsculas y con guión bajo (así los espera el
+// backend). Para mostrar, los pasamos a texto legible.
+function textoEstado(estado) {
+  const nombres = {
+    ABIERTA: "Abierta",
+    EN_PROGRESO: "En progreso",
+    CERRADA: "Cerrada",
+    PENDIENTE: "Pendiente",
+    CUMPLIDO: "Cumplido",
+  };
+  return nombres[estado] || estado;
+}
+
 function Dato({ etiqueta, valor }) {
   return (
     <div>
@@ -425,7 +438,7 @@ function ItemHistorial({ titulo, detalle, tono, estado }) {
         <div style={{ color: color.texto, fontWeight: 500 }}>{titulo}</div>
         <div style={estilos.detalle}>{detalle}</div>
       </div>
-      <span style={{ ...insignia(tono), marginLeft: "auto" }}>{estado}</span>
+      <span style={{ ...insignia(tono), marginLeft: "auto" }}>{textoEstado(estado)}</span>
     </div>
   );
 }

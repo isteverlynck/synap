@@ -198,9 +198,13 @@ export function estadoDelEquipo(activo) {
   // 2. Con OT abierta: ya lo están mirando, no hace falta otra solicitud.
   if (abiertas.length > 0) {
     const ot = abiertas[0];
+    // "En reparación", no "En mantenimiento": mantenimiento en este sistema
+    // significa preventivo, y confundirlos hace pensar que el equipo está en
+    // una rutina programada cuando en realidad está fallado.
+    const esPreventiva = ot.tipo === "PREVENTIVA";
     return {
       tono: "advertencia",
-      titulo: "En mantenimiento",
+      titulo: esPreventiva ? "En mantenimiento preventivo" : "En reparación",
       detalle: `OT-${String(ot.numero_ot).padStart(4, "0")} abierta`,
       accion: "ver_ot",
       otId: ot.id,

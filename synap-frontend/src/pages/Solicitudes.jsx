@@ -285,7 +285,18 @@ function CrearSolicitud({ onCreada, activoInicial }) {
               {!errorCodigo && !validandoCodigo && textoBusqueda && activosFiltrados.length > 0 && (
                 <div style={estilos.listaSugerencias}>
                   {activosFiltrados.map((a) => (
-                    <div key={a.codigo} style={estilos.sugerencia} onClick={() => validarCodigo(a.codigo)}>
+                    <div
+                      key={a.codigo}
+                      style={estilos.sugerencia}
+                      // onMouseDown y no onClick: el mousedown ocurre ANTES del
+                      // blur del input. Con onClick, el onBlur validaba el texto
+                      // a medio escribir, la lista se cerraba, y el click se
+                      // perdía. preventDefault evita que el input pierda el foco.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        validarCodigo(a.codigo);
+                      }}
+                    >
                       <strong>{a.codigo}</strong> — {a.descripcion}
                     </div>
                   ))}
