@@ -15,6 +15,7 @@ import { crearSolicitud, misSolicitudes, verOrdenTrabajo } from "../api/solicitu
 import { verActivo } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
+import { formatearFecha, agruparPorFecha } from "../utiles/fechas";
 
 const SOLAPAS = [
   { key: "crear", label: "Crear solicitud" },
@@ -28,35 +29,6 @@ const SOLAPAS = [
 // (de más reciente a más antigua), para mostrar un encabezado de fecha
 // seguido de todas las solicitudes de ese día.
 // ═══════════════════════════════════════════════════════════════════════════
-
-function formatearFecha(fechaISO) {
-  return new Date(fechaISO).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-// "obtenerFecha" le dice a la función cómo sacarle la fecha a cada elemento
-// de la lista (útil porque en "Aceptadas" cada elemento es { solicitud, ot },
-// no la solicitud directamente).
-function agruparPorFecha(lista, obtenerFecha) {
-  const ordenada = [...lista].sort(
-    (a, b) => new Date(obtenerFecha(b)) - new Date(obtenerFecha(a))
-  );
-  const grupos = [];
-  for (const item of ordenada) {
-    const fechaRaw = obtenerFecha(item);
-    const fecha = fechaRaw ? formatearFecha(fechaRaw) : "Sin fecha";
-    const ultimoGrupo = grupos[grupos.length - 1];
-    if (ultimoGrupo && ultimoGrupo.fecha === fecha) {
-      ultimoGrupo.items.push(item);
-    } else {
-      grupos.push({ fecha, items: [item] });
-    }
-  }
-  return grupos;
-}
 
 function Solicitudes() {
   const [solapa, setSolapa] = useState("crear");

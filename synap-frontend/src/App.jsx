@@ -13,6 +13,7 @@ import EscanearQR from "./pages/EscanearQR";
 import FichaActivo from "./pages/FichaActivo";
 import RecuperarPassword from "./pages/RecuperarPassword";
 import Cascaron from "./componentes/Cascaron";
+import Pendientes from "./pages/Pendientes";
 
 
 // "Guardia": envuelve una pantalla protegida. Si no estás logueada, te manda
@@ -35,6 +36,7 @@ function App() {
           <Route path="/activos/:codigo" element={<FichaActivo />} />
           <Route path="/escanear" element={<EscanearQR />} />
           <Route path="/solicitudes" element={<Solicitudes />} />
+          <Route path="/pendientes" element={<Pendientes />} />
         </Route>
       </Routes>
     </BrowserRouter>

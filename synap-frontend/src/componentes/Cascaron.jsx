@@ -30,7 +30,7 @@ const MENUS = {
   ],
   coordinacion: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
-    { id: "solicitudes", texto: "Solicitudes", ruta: "/solicitudes", icono: "bandeja", listo: true },
+    { id: "solicitudes", texto: "Solicitudes", ruta: "/pendientes", icono: "bandeja", listo: true },
     { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: false },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: false },
@@ -190,24 +190,37 @@ function iniciales(perfil) {
   return `${perfil.nombre?.[0] || ""}${perfil.apellido?.[0] || ""}`.toUpperCase();
 }
 
-// Íconos en SVG, sin librerías. Todos comparten el mismo marco de 24x24.
+// Íconos en SVG, sin librerías. Algunos necesitan círculos además de líneas
+// (la campana, los controles de ajustes), por eso el ícono puede tener las dos
+// cosas y no solo un trazo.
 function Icono({ nombre, color: c = "currentColor" }) {
-  const trazos = {
-    qr: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM19 19h2v2h-2z",
-    bandeja: "M3 13h5l2 3h4l2-3h5M4 4h16l1 9v7H3v-7z",
-    orden: "M9 3h6v3H9zM5 6h14v15H5zM9 12h6M9 16h4",
-    equipo: "M4 5h16v11H4zM9 20h6M12 16v4M8 10h2l1.5-3 2 6 1.5-3h2",
-    caja: "M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7",
-    calendario: "M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M9 15h2",
-    grafico: "M4 20V10M10 20V4M16 20v-7M22 20H2",
-    campana: "M18 9a6 6 0 10-12 0c0 5-2 6-2 6h16s-2-1-2-6M10 20h4",
-    rueda: "M12 15a3 3 0 100-6 3 3 0 000 6zM19 12l2-1-2-4-2 1-2-1-1-2h-4l-1 2-2 1-2-1-2 4 2 1v0l-2 1 2 4 2-1 2 1 1 2h4l1-2 2-1 2 1 2-4-2-1z",
+  const iconos = {
+    qr: { trazos: ["M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM19 19h2v2h-2z"] },
+    bandeja: { trazos: ["M3 13h5l2 3h4l2-3h5M4 4h16l1 9v7H3v-7z"] },
+    orden: { trazos: ["M9 3h6v3H9zM5 6h14v15H5zM9 12h6M9 16h4"] },
+    equipo: { trazos: ["M4 5h16v11H4zM9 20h6M12 16v4M8 10h2l1.5-3 2 6 1.5-3h2"] },
+    caja: { trazos: ["M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7"] },
+    calendario: { trazos: ["M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M9 15h2"] },
+    grafico: { trazos: ["M4 20V10M10 20V4M16 20v-7M22 20H2"] },
+    campana: {
+      trazos: ["M6 9a6 6 0 1112 0c0 6 2 7 2 7H4s2-1 2-7", "M10 20a2 2 0 004 0"],
+    },
+    // Controles deslizantes en vez de engranaje: a 19 píxeles se lee mejor y
+    // significa lo mismo.
+    rueda: {
+      trazos: ["M4 8h9", "M18 8h2", "M4 16h4", "M13 16h7"],
+      circulos: [{ cx: 15.5, cy: 8, r: 2.2 }, { cx: 10.5, cy: 16, r: 2.2 }],
+    },
   };
+
+  const icono = iconos[nombre] || { trazos: [] };
+
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
       stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
       style={{ flexShrink: 0 }} aria-hidden="true">
-      <path d={trazos[nombre] || ""} />
+      {icono.trazos.map((d, i) => <path key={i} d={d} />)}
+      {(icono.circulos || []).map((c2, i) => <circle key={`c${i}`} {...c2} />)}
     </svg>
   );
 }
