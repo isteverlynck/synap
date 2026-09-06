@@ -13,7 +13,7 @@ import { obtenerPerfil, logout } from "../api/auth";
 import { color } from "../tema";
 import {
   QrCode, Inbox, ClipboardList, HeartPulse, Package,
-  CalendarClock, BarChart3, Bell, SlidersHorizontal,
+  CalendarClock, BarChart3, Bell,
 } from "lucide-react";
 
 // ─── Qué ve cada rol ──────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ const MENUS = {
   jefatura: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
     { id: "dashboard", texto: "Dashboard", ruta: "/dashboard", icono: "grafico", listo: false },
-    { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: true },
+    { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: false },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: false },
   ],
@@ -120,15 +120,17 @@ function Cascaron() {
           </div>
 
           <div style={estilos.iconosArriba}>
-            {/* Todavía no hacen nada: las pantallas no existen. Están acá para
-            que el lugar quede reservado y no haya que rediseñar después. */}
             <button style={estilos.iconoBoton} title="Notificaciones">
               <Icono nombre="campana" color={color.textoSuave} />
             </button>
-            <button style={estilos.iconoBoton} title="Ajustes">
-              <Icono nombre="rueda" color={color.textoSuave} />
-            </button>
-            <div style={estilos.avatar} onClick={cerrarSesion} title="Cerrar sesión">
+            {/* El avatar lleva a Mi cuenta, donde vive el cerrar sesión. Antes
+            cerraba la sesión de una: un click sin querer te sacaba. */}
+            <div
+              style={estilos.avatar}
+              onClick={() => navegar("/perfil")}
+              className="sy-clickeable"
+              title="Mi cuenta"
+            >
               {iniciales(perfil)}
             </div>
           </div>
@@ -207,7 +209,6 @@ const ICONOS = {
   calendario: CalendarClock,
   grafico: BarChart3,
   campana: Bell,
-  rueda: SlidersHorizontal,
 };
 
 function Icono({ nombre, color: c = "currentColor" }) {
@@ -246,21 +247,21 @@ const estilos = {
   },
   barraArriba: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
-    gap: 14, padding: "14px 22px", background: color.tarjeta,
+    gap: 14, padding: "20px 28px", background: color.tarjeta,
     borderBottom: `1px solid ${color.borde}`,
   },
-  saludo: { margin: 0, fontSize: "1rem", color: color.texto, fontWeight: 700 },
-  rolTexto: { margin: "1px 0 0", fontSize: "0.76rem", color: color.textoSuave },
-  iconosArriba: { display: "flex", alignItems: "center", gap: 6 },
+  saludo: { margin: 0, fontSize: "1.4rem", color: color.texto, fontWeight: 700 },
+  rolTexto: { margin: "3px 0 0", fontSize: "0.88rem", color: color.textoSuave },
+  iconosArriba: { display: "flex", alignItems: "center", gap: 12 },
   iconoBoton: {
     background: "transparent", border: "none", cursor: "pointer",
-    padding: 7, borderRadius: 8, display: "flex",
+    padding: 9, borderRadius: 10, display: "flex",
   },
   avatar: {
-    width: 32, height: 32, borderRadius: "50%", background: color.primarioClaro,
+    width: 42, height: 42, borderRadius: "50%", background: color.primarioClaro,
     color: color.primarioOscuro, display: "flex", alignItems: "center",
-    justifyContent: "center", fontSize: "0.72rem", fontWeight: 700,
-    cursor: "pointer", marginLeft: 4,
+    justifyContent: "center", fontSize: "0.88rem", fontWeight: 700,
+    marginLeft: 4,
   },
   barraAbajo: {
     position: "fixed", bottom: 0, left: 0, right: 0,

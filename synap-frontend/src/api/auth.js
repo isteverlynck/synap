@@ -73,3 +73,13 @@ export async function restablecerPassword(token, password, confirmacion) {
   });
   return res.data;
 }
+
+// Cambiar la propia contraseña estando logueada (distinto de recuperarla).
+export async function cambiarPassword(actual, nueva, confirmacion) {
+  const res = await cliente.post("/auth/cambiar-password", {
+    password_actual: actual,
+    password_nueva: nueva,
+    password_confirmacion: confirmacion,
+  });
+  return res.data;
+}

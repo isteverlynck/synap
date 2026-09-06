@@ -12,6 +12,7 @@ import { tecnicosDisponibles } from "../api/coordinacion";
 import { obtenerPerfil } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
+import Volver from "../componentes/Volver";
 
 function DetalleOrden() {
   const { id } = useParams();
@@ -56,6 +57,7 @@ function DetalleOrden() {
 
   return (
     <>
+      <Volver a="/ordenes" />
       <Encabezado
         titulo={`OT-${String(ot.numero_ot).padStart(4, "0")}`}
         subtitulo={ot.tipo}
@@ -68,9 +70,11 @@ function DetalleOrden() {
       {/* Estado arriba de todo, igual que en la ficha del equipo. */}
       <div style={estilos.pastillas}>
         <span style={insignia(tonoEstadoOT(ot.estado))}>{textoEstado(ot.estado)}</span>
-        {ot.prioridad && <span style={insignia(ot.prioridad === "ALTA" ? "peligro" : "neutro")}>
-          Prioridad {ot.prioridad.toLowerCase()}
-        </span>}
+        {ot.prioridad && (
+          <span className={`sy-prioridad sy-prioridad-${ot.prioridad.toLowerCase()}`}>
+            Prioridad {ot.prioridad.toLowerCase()}
+          </span>
+        )}
       </div>
 
       {/* El equipo, clickeable: desde la OT se llega a su ficha completa. */}
@@ -252,10 +256,13 @@ function fechaHora(valor) {
   return f.toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+// Azul = hay que hacerla. Violeta = alguien la está haciendo. Gris = terminada,
+// ya no pide atención. Nada de rojo: si toda OT abierta fuera roja, el rojo
+// dejaría de significar "urgente".
 function tonoEstadoOT(estado) {
-  if (estado === "CERRADA") return "exito";
-  if (estado === "EN_PROGRESO") return "advertencia";
-  return "peligro";
+  if (estado === "CERRADA") return "apagado";
+  if (estado === "EN_PROGRESO") return "proceso";
+  return "pendiente";
 }
 
 function textoEstado(estado) {

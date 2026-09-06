@@ -1,23 +1,23 @@
-// EscanearQR.jsx — pantalla de escaneo del QR de un equipo.
+// EscanearQR.jsx — escaneo del QR de un equipo.
 //
-// La idea: cada equipo tiene pegado un QR con su código (ej: B-CIRU-MAAN-056).
-// Esta pantalla la puede abrir CUALQUIER usuario logueado, sea cual sea su rol.
-// Al escanear, según el rol de quien escanea pasa una cosa distinta:
-//   - enfermería  → va directo a "crear solicitud" con el equipo ya cargado.
-//   - cualquier otro rol (técnico, coordinación, jefatura) → por ahora, hasta
-//     que armemos sus pantallas propias, ve una ficha básica del equipo
-//     (sus datos + historial de OT, fallas y mantenimientos).
+// La cámara arranca solo cuando la persona toca "Activar cámara": pedir el
+// permiso apenas se abre la pantalla es invasivo, y muchos lo rechazan por
+// reflejo. Primero se explica para qué es, después se pide.
 //
-// Usamos Html5QrcodeScanner (con su propia interfaz: botón de pedir permiso
-// de cámara, selector si hay varias cámaras, etc.) — el mismo enfoque que
-// Ine ya probó en prueba_qr.html. Además dejamos un campo para escribir el
-// código a mano, por si la cámara no anda o el QR está dañado/ilegible.
+// Usamos Html5Qrcode (no Html5QrcodeScanner): la clase básica solo maneja la
+// cámara y nos deja dibujar la pantalla nosotras. La otra trae su propia
+// interfaz, en inglés y sin forma de darle estilo.
+//
+// Según quién escanea pasa algo distinto: enfermería va directo a crear una
+// solicitud con el equipo cargado; el resto ve la ficha del equipo.
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
+import { Camera, CameraOff, Keyboard } from "lucide-react";
 import { rolActual } from "../api/auth";
 import { verActivo } from "../api/activos";
+import { normalizarCodigo } from "../utiles/codigos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton } from "../tema";
 
@@ -25,13 +25,14 @@ const ID_LECTOR = "lector-qr";
 
 function EscanearQR() {
   const navegar = useNavigate();
+  const [camaraActiva, setCamaraActiva] = useState(false);
   const [codigoManual, setCodigoManual] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState("");
-  const scannerRef = useRef(null);      // instancia de Html5QrcodeScanner
-  const yaResueltoRef = useRef(false);  // evita procesar el mismo escaneo dos veces
 
-  // A dónde mandar según el rol de quien escaneó.
+  const lectorRef = useRef(null);       // instancia de Html5Qrcode
+  const yaResueltoRef = useRef(false);  // evita procesar dos veces la misma lectura
+
   function irSegunRol(codigo) {
     const rol = rolActual();
     if (rol === "enfermeria") {
@@ -41,98 +42,162 @@ function EscanearQR() {
     }
   }
 
-  // Verifica que el equipo exista antes de navegar (por si el QR está viejo,
-  // roto, o alguien tipeó mal el código a mano).
-  async function procesarCodigo(codigo) {
+  async function detenerCamara() {
+    const lector = lectorRef.current;
+    if (!lector) return;
+    try {
+      await lector.stop();
+      await lector.clear();
+    } catch {
+      // Si ya estaba detenida, no importa.
+    }
+    lectorRef.current = null;
+    setCamaraActiva(false);
+  }
+
+  // Antes de navegar verificamos que el equipo exista: el QR puede estar viejo,
+  // o el código tipeado mal.
+  async function procesarCodigo(textoCrudo) {
     if (yaResueltoRef.current) return;
+    const codigo = normalizarCodigo(textoCrudo);
+    if (!codigo) {
+      setError("Escribí el código del equipo.");
+      return;
+    }
     yaResueltoRef.current = true;
     setBuscando(true);
     setError("");
     try {
       await verActivo(codigo);
+      await detenerCamara();
       irSegunRol(codigo);
     } catch {
       setError(`No encontramos ningún equipo con el código "${codigo}".`);
       setBuscando(false);
-      yaResueltoRef.current = false; // dejar reintentar
+      yaResueltoRef.current = false;   // dejar reintentar
     }
   }
 
+  async function activarCamara() {
+    setError("");
+    try {
+      const lector = new Html5Qrcode(ID_LECTOR);
+      lectorRef.current = lector;
+      setCamaraActiva(true);
+      await lector.start(
+        // "environment" = cámara trasera, que es con la que se escanea un
+        // equipo. En una notebook cae a la única que haya.
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        (texto) => procesarCodigo(texto),
+        () => {
+          // Se llama constantemente mientras no hay QR en cuadro. Es normal.
+        }
+      );
+    } catch {
+      setError(
+        "No pudimos acceder a la cámara. Revisá que le hayas dado permiso al " +
+        "navegador, o escribí el código a mano."
+      );
+      setCamaraActiva(false);
+      lectorRef.current = null;
+    }
+  }
+
+  // Apagar la cámara al salir de la pantalla. Sin esto queda prendida.
   useEffect(() => {
-    const scanner = new Html5QrcodeScanner(
-      ID_LECTOR,
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
-    );
-    scannerRef.current = scanner;
-
-    scanner.render(
-      (textoDecodificado) => {
-        // Lectura exitosa: frenamos la cámara y procesamos el código.
-        scanner.clear().catch(() => {});
-        procesarCodigo(textoDecodificado.trim());
-      },
-      () => {
-        // Se llama todo el tiempo mientras no encuentra un QR en cuadro.
-        // No hacemos nada acá, es el funcionamiento normal.
-      }
-    );
-
-    // Al salir de la pantalla, apagar la cámara.
     return () => {
-      scannerRef.current?.clear().catch(() => {});
+      lectorRef.current?.stop().catch(() => {});
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function enviarCodigoManual() {
-    const codigo = codigoManual.trim();
-    if (!codigo) {
-      setError("Escribí el código del equipo.");
-      return;
-    }
-    procesarCodigo(codigo);
-  }
-
   return (
-    <div style={cs.pagina}>
-      <div style={{ ...cs.contenido, maxWidth: 480 }}>
-        <Encabezado titulo="Escanear equipo" subtitulo="Apuntá la cámara al QR pegado en el equipo">
-          <button style={boton("secundario")} onClick={() => navegar(-1)}>Volver</button>
-        </Encabezado>
+    <>
+      {/* Sin botón "Volver": esta pantalla es una pestaña del menú, no un
+      detalle al que se llega desde otro lado. */}
+      <Encabezado
+        titulo="Escanear equipo"
+        subtitulo="Apuntá la cámara al código QR pegado en el equipo"
+      />
 
-        <div style={{ ...cs.tarjeta, padding: 20, marginBottom: 20, textAlign: "center" }}>
-          <div id={ID_LECTOR} style={estilos.lector} />
-          <p style={estilos.ayuda}>
-            Apretá "Request Camera Permissions" para activar la cámara.
-          </p>
-        </div>
+      <div style={{ ...cs.tarjeta, padding: 22, textAlign: "center" }}>
+        {/* El div del lector siempre está en el DOM (la librería lo necesita
+        para montarse), pero solo se ve cuando la cámara está activa. */}
+        <div
+          id={ID_LECTOR}
+          style={{
+            ...estilos.lector,
+            display: camaraActiva ? "block" : "none",
+          }}
+        />
 
-        <div style={{ ...cs.tarjeta, padding: 20 }}>
-          <label style={cs.label}>O escribí el código del equipo</label>
-          <div style={{ display: "flex", gap: 10 }}>
-            <input
-              style={cs.input}
-              placeholder="Ej: B-CIRU-MAAN-056"
-              value={codigoManual}
-              onChange={(e) => setCodigoManual(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && enviarCodigoManual()}
-            />
-            <button style={boton("primario")} onClick={enviarCodigoManual} disabled={buscando}>
-              {buscando ? "Buscando..." : "Buscar"}
+        {!camaraActiva ? (
+          <div style={estilos.reposo}>
+            <div style={estilos.iconoGrande}>
+              <Camera size={30} strokeWidth={1.5} color={color.primario} aria-hidden="true" />
+            </div>
+            <p style={estilos.titulo}>Escaneá el código del equipo</p>
+            <p style={estilos.ayuda}>
+              Vamos a pedirte permiso para usar la cámara. Solo se usa para leer
+              el código: no se guarda ninguna imagen.
+            </p>
+            <button style={{ ...boton("primario"), gap: 8, marginTop: 6 }} onClick={activarCamara}>
+              <Camera size={17} strokeWidth={1.9} aria-hidden="true" />
+              Activar cámara
             </button>
           </div>
-          {error && <p style={estilos.error}>{error}</p>}
-        </div>
+        ) : (
+          <button style={{ ...boton("secundario"), gap: 8, marginTop: 14 }} onClick={detenerCamara}>
+            <CameraOff size={17} strokeWidth={1.9} aria-hidden="true" />
+            Apagar cámara
+          </button>
+        )}
       </div>
-    </div>
+
+      <div style={{ ...cs.tarjeta, padding: 22, marginTop: 12 }}>
+        <p style={estilos.subtitulo}>
+          <Keyboard size={16} strokeWidth={1.9} aria-hidden="true" />
+          ¿El QR está roto o no se lee?
+        </p>
+        <label style={cs.label}>Escribí el código a mano</label>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <input
+            style={{ ...cs.input, flex: 1, minWidth: 180 }}
+            placeholder="B-CIRU-MAAN-056 o B CIRU MAAN 056"
+            value={codigoManual}
+            onChange={(e) => { setCodigoManual(e.target.value); setError(""); }}
+            onKeyDown={(e) => e.key === "Enter" && procesarCodigo(codigoManual)}
+          />
+          <button
+            style={boton("primario")}
+            onClick={() => procesarCodigo(codigoManual)}
+            disabled={buscando}
+          >
+            {buscando ? "Buscando..." : "Buscar"}
+          </button>
+        </div>
+        <p style={estilos.nota}>Da igual si lo escribís con guiones o con espacios.</p>
+        {error && <p style={estilos.error}>{error}</p>}
+      </div>
+    </>
   );
 }
 
 const estilos = {
-  lector: { borderRadius: 12, overflow: "hidden" },
-  ayuda: { color: color.textoSuave, fontSize: "0.85rem", marginTop: 14 },
-  error: { color: color.peligro, fontSize: "0.85rem", margin: "12px 0 0" },
+  lector: { borderRadius: 12, overflow: "hidden", margin: "0 auto", maxWidth: 340 },
+  reposo: { display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "18px 0" },
+  iconoGrande: {
+    width: 62, height: 62, borderRadius: "50%", background: color.primarioClaro,
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  titulo: { margin: 0, fontSize: "1.05rem", color: color.texto, fontWeight: 700 },
+  ayuda: { margin: 0, color: color.textoSuave, fontSize: "0.86rem", maxWidth: 330, lineHeight: 1.55 },
+  subtitulo: {
+    display: "flex", alignItems: "center", gap: 7, margin: "0 0 14px",
+    fontSize: "0.92rem", color: color.texto, fontWeight: 600,
+  },
+  nota: { margin: "10px 0 0", fontSize: "0.79rem", color: color.textoDebil },
+  error: { color: color.peligro, fontSize: "0.85rem", margin: "10px 0 0" },
 };
 
 export default EscanearQR;

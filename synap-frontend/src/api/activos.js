@@ -2,11 +2,6 @@
 
 import cliente from "./cliente";
 
-// Lista de activos (para el buscador de "crear solicitud" y la pantalla de Activos).
-export async function listarActivos(limit = 50) {
-  const res = await cliente.get("/activos", { params: { limit } });
-  return res.data;
-}
 
 // Un activo puntual, por su código (ej: al escanear su QR y confirmar que existe).
 export async function verActivo(codigo) {
@@ -17,5 +12,23 @@ export async function verActivo(codigo) {
 // Ficha completa del activo: sus datos + historial de OT, fallas y mantenimientos.
 export async function verActivoDetalle(codigo) {
   const res = await cliente.get(`/activos/${codigo}/detalle`);
+  return res.data;
+}
+
+// Listado con búsqueda y filtros. Todos opcionales y combinables.
+export async function listarActivos({ buscar, estado, tipoEquipoId, sectorId, grupoId } = {}) {
+  const params = {};
+  if (buscar) params.buscar = buscar;
+  if (estado) params.estado = estado;
+  if (tipoEquipoId) params.tipo_equipo_id = tipoEquipoId;
+  if (sectorId) params.sector_id = sectorId;
+  if (grupoId) params.grupo_id = grupoId;
+  const res = await cliente.get("/activos", { params });
+  return res.data;
+}
+
+// Opciones para los desplegables de filtro.
+export async function opcionesDeFiltro() {
+  const res = await cliente.get("/activos/filtros");
   return res.data;
 }

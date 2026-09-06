@@ -659,6 +659,17 @@ class RestablecerPasswordRequest(BaseModel):
     token: str
     password: str
     password_confirmacion: str
+    
+class CambiarPasswordRequest(BaseModel):
+    """Cambio de contraseña estando logueado.
+
+    Pedimos la actual a propósito: si alguien deja la sesión abierta en una
+    computadora del hospital, sin este paso cualquiera podría cambiarle la
+    contraseña y quedarse con la cuenta.
+    """
+    password_actual: str
+    password_nueva: str
+    password_confirmacion: str
 
 
 class MensajeGenerico(BaseModel):

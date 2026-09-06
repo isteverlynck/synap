@@ -168,3 +168,41 @@ button,
 .sy-pestania {
   user-select: none;
 }
+
+/* Prioridad, en línea dentro del renglón gris de la tarjeta. El punto de color
+   da la lectura rápida y la palabra la hace accesible: quien no distingue
+   colores, o usa un lector de pantalla, igual se entera. */
+.sy-prioridad {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.sy-prioridad-punto {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+.sy-prioridad-alta  .sy-prioridad-punto { background: #E11D1D; }
+.sy-prioridad-media .sy-prioridad-punto { background: #F59E0B; }
+.sy-prioridad-baja  .sy-prioridad-punto { background: #16A34A; }
+
+.sy-prioridad::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Crítica es la única que colorea el TEXTO además del símbolo. Es el escalón
+   más alto de la escala y tiene que leerse distinto de un vistazo. */
+.sy-prioridad-critica {
+  color: #E11D1D;
+  font-weight: 700;
+}

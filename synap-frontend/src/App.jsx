@@ -18,6 +18,7 @@ import Ordenes from "./pages/Ordenes";
 import DetalleOrden from "./pages/DetalleOrden";
 import Dashboard from "./pages/Dashboard";
 import { Toaster } from "sonner";
+import Perfil from "./pages/Perfil";
 
 
 // "Guardia": envuelve una pantalla protegida. Si no estás logueada, te manda
@@ -51,6 +52,7 @@ function App() {
           <Route path="/ordenes" element={<Ordenes />} />
           <Route path="/ordenes/:id" element={<DetalleOrden />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/perfil" element={<Perfil />} />
         </Route>
       </Routes>
     </BrowserRouter>

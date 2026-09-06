@@ -30,6 +30,7 @@ from ..schemas import (
     MensajeGenerico,
     RecuperarPasswordRequest,
     RestablecerPasswordRequest,
+    CambiarPasswordRequest
 )
 from ..security import create_access_token, get_current_user, hash_password, verify_password, buscar_usuario_por_numero
 
@@ -217,3 +218,24 @@ def restablecer_password(payload: RestablecerPasswordRequest, db: Session = Depe
     db.commit()
 
     return MensajeGenerico(mensaje="Listo, ya podés entrar con tu contraseña nueva.")
+
+@router.post("/cambiar-password", response_model=MensajeGenerico)
+def cambiar_password(
+    payload: CambiarPasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Cambiar la propia contraseña, sabiendo la actual."""
+    if not verify_password(payload.password_actual, current_user.hashed_password or ""):
+        raise HTTPException(status_code=400, detail="La contraseña actual no es correcta.")
+    if payload.password_nueva != payload.password_confirmacion:
+        raise HTTPException(status_code=400, detail="Las contraseñas nuevas no coinciden.")
+    if len(payload.password_nueva) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres.")
+    if payload.password_nueva == payload.password_actual:
+        raise HTTPException(status_code=400, detail="La contraseña nueva tiene que ser distinta de la actual.")
+
+    current_user.hashed_password = hash_password(payload.password_nueva)
+    db.commit()
+
+    return MensajeGenerico(mensaje="Contraseña actualizada.")

@@ -172,6 +172,7 @@ import { logout, rolActual } from "../api/auth";
 import { verActivoDetalle } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, estadoDelEquipo } from "../tema";
+import Volver from "../componentes/Volver";
 
 function FichaActivo() {
   const { codigo } = useParams();
@@ -225,9 +226,9 @@ function FichaActivo() {
   return (
     <div style={cs.pagina}>
       <div style={cs.contenido}>
+        <Volver />
         <Encabezado titulo="Ficha del equipo">
           <button style={boton("secundario")} onClick={() => navegar("/escanear")}>Escanear otro</button>
-          <button style={boton("fantasma")} onClick={cerrarSesion}>Cerrar sesión</button>
         </Encabezado>
 
         {/* Aviso de estado: ancho completo y ANTES del nombre del equipo, para

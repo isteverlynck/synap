@@ -194,7 +194,9 @@ function PanelAceptar({ s, tecnicos, cerrar, alResolver }) {
       <label style={cs.label}>Prioridad</label>
       <select style={{ ...cs.input, marginBottom: 14 }} value={prioridad}
               onChange={(e) => setPrioridad(e.target.value)}>
+        
         <option value="">Sin definir</option>
+        <option value="CRITICA">Crítica</option>
         <option value="ALTA">Alta</option>
         <option value="MEDIA">Media</option>
         <option value="BAJA">Baja</option>

@@ -17,6 +17,7 @@ import { obtenerPerfil } from "../api/auth";
 import { agruparPorFecha } from "../utiles/fechas";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, insignia } from "../tema";
+import { AlertTriangle } from "lucide-react";
 
 // Los filtros de arriba. "sin_asignar" no es un estado real de la base: es un
 // recorte (OT abiertas sin técnico), por eso se trata aparte.
@@ -135,6 +136,7 @@ function Ordenes() {
                 style={estilos.tarjeta}
                 onClick={() => navegar(`/ordenes/${ot.id}`)}
               >
+                
                 <div style={{ minWidth: 0, flex: 1 }}>
                   {/* Primero el nombre del equipo, que es lo que se lee. */}
                   <p style={estilos.titulo}>
@@ -144,10 +146,20 @@ function Ordenes() {
                   <p style={estilos.codigo}>
                     {ot.activo_codigo}
                     {ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
+                    {ot.prioridad && (
+                      <span className={`sy-prioridad sy-prioridad-${ot.prioridad.toLowerCase()}`}>
+                        {/* Crítica lleva triángulo en vez de punto: un cuarto
+                        color de rojo no se distinguiría del rojo de "alta". */}
+                        {ot.prioridad === "CRITICA"
+                          ? <AlertTriangle size={13} strokeWidth={2.4} style={{ marginRight: 5, flexShrink: 0 }} aria-hidden="true" />
+                          : <span className="sy-prioridad-punto" />}
+                        Prioridad {ot.prioridad.toLowerCase()}
+                      </span>
+                    )}
                   </p>
 
                   {esCoordinacion && (
-                    <p style={estilos.asignacion}>
+                    <p style={ot.tecnico_id ? estilos.asignacion : estilos.sinAsignar}>
                       {ot.tecnico_id
                         ? nombreTecnico(ot.tecnico_id)
                         : "Sin técnico asignado"}
@@ -155,14 +167,10 @@ function Ordenes() {
                   )}
                 </div>
 
-                <div style={estilos.pastillas}>
-                  <span style={insignia(tonoEstadoOT(ot.estado))}>
-                    {textoEstado(ot.estado)}
-                  </span>
-                  {ot.prioridad === "ALTA" && (
-                    <span style={insignia("peligro")}>Alta</span>
-                  )}
-                </div>
+                <span style={insignia(tonoEstadoOT(ot.estado))}>
+                  {textoEstado(ot.estado)}
+                </span>
+                
               </div>
             ))}
           </div>
@@ -172,13 +180,13 @@ function Ordenes() {
   );
 }
 
-// Cerrada en verde (está resuelta), en progreso en ámbar (alguien la está
-// mirando), abierta en rojo suave: es la que todavía no arrancó y la que más
-// importa que se note.
+// Azul = hay que hacerla. Violeta = alguien la está haciendo. Gris = terminada,
+// ya no pide atención. Nada de rojo: si toda OT abierta fuera roja, el rojo
+// dejaría de significar "urgente".
 function tonoEstadoOT(estado) {
-  if (estado === "CERRADA") return "exito";
-  if (estado === "EN_PROGRESO") return "advertencia";
-  return "peligro";
+  if (estado === "CERRADA") return "apagado";
+  if (estado === "EN_PROGRESO") return "proceso";
+  return "pendiente";
 }
 
 function textoEstado(estado) {
@@ -212,7 +220,10 @@ const estilos = {
     fontFamily: "ui-monospace, monospace",
   },
   asignacion: { margin: "4px 0 0", fontSize: "0.82rem", color: color.textoDebil },
-  pastillas: { display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" },
+  sinAsignar: {
+    margin: "4px 0 0", fontSize: "0.82rem",
+    color: color.advertencia, fontWeight: 700,
+  },
 };
 
 export default Ordenes;

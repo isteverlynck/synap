@@ -133,6 +133,9 @@ export function insignia(tono = "primario") {
     advertencia: { color: color.advertencia, background: color.advertenciaFondo },
     peligro: { color: color.peligro, background: color.peligroFondo },
     neutro: { color: color.textoSuave, background: color.bordeSuave },
+    pendiente: { color: "#14538C", background: "#E7F0FB" },
+    proceso:   { color: "#5A3E9E", background: "#EFE9FA" },
+    apagado:   { color: "#667085", background: "#F0F2F5" },
   };
   return {
     display: "inline-block",
