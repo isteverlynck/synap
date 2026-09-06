@@ -11,6 +11,8 @@ import { solicitudesPendientes, tecnicosDisponibles, aceptarSolicitud,
 import { agruparPorFecha } from "../utiles/fechas";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
+import { toast } from "sonner";
+import { HeartPulse, Wrench } from "lucide-react";
 
 function Pendientes() {
   const [solicitudes, setSolicitudes] = useState([]);
@@ -106,7 +108,13 @@ function Tarjeta({ solicitud: s, tecnicos, abierta, setAbierta, alResolver, alMo
       <div style={estilos.cabecera}>
         <div style={{ minWidth: 0 }}>
           <p style={estilos.titulo}>#{s.numero_solicitud} · {s.titulo}</p>
-          <p style={estilos.linea}>
+          <p style={{ ...estilos.linea, display: "flex", alignItems: "center", gap: 6 }}>
+            {/* Equipo médico o "cosa": son circuitos distintos (uno se rutea
+            solo por el tipo de equipo, el otro necesita que el coordinador
+            elija el grupo). Que se distinga de un vistazo ahorra abrir. */}
+            {s.es_equipo_medico
+              ? <HeartPulse size={14} strokeWidth={1.8} aria-hidden="true" />
+              : <Wrench size={14} strokeWidth={1.8} aria-hidden="true" />}
             {s.es_equipo_medico
               ? `${s.activo_codigo || "Equipo sin código"} · ${s.ubicacion || "Sin ubicación"}`
               : `${s.descripcion_cosa || "Sin equipo asociado"} · ${s.ubicacion || "Sin ubicación"}`}
@@ -156,6 +164,11 @@ function PanelAceptar({ s, tecnicos, cerrar, alResolver }) {
     setError("");
     try {
       await aceptarSolicitud(s.id, { asignarAId: tecnicoId || null, prioridad: prioridad || null });
+      toast.success(`Solicitud #${s.numero_solicitud} aceptada`, {
+        description: tecnicoId
+          ? "Se generó la orden y quedó asignada."
+          : "Se generó la orden. Queda sin técnico asignado.",
+      });
       alResolver(s.id);
     } catch (e) {
       setError(e.response?.data?.detail || "No pudimos aceptar la solicitud.");
@@ -207,7 +220,6 @@ function PanelRechazar({ s, cerrar, alResolver }) {
   const [error, setError] = useState("");
 
   async function confirmar() {
-    // El motivo lo va a leer quien pidió: sin explicación, el rechazo no sirve.
     if (!motivo.trim()) {
       setError("Escribí un motivo: lo va a ver quien hizo la solicitud.");
       return;
@@ -216,6 +228,9 @@ function PanelRechazar({ s, cerrar, alResolver }) {
     setError("");
     try {
       await rechazarSolicitud(s.id, motivo.trim());
+      toast.success(`Solicitud #${s.numero_solicitud} rechazada`, {
+        description: "Quien la pidió va a ver el motivo.",
+      });
       alResolver(s.id);
     } catch (e) {
       setError(e.response?.data?.detail || "No pudimos rechazar la solicitud.");
@@ -257,7 +272,6 @@ function PanelModificar({ s, cerrar, alModificar }) {
     setEnviando(true);
     setError("");
     try {
-      // Solo mandamos lo que cambió: el backend deja intacto lo que no llega.
       const cambios = {};
       if (titulo !== s.titulo) cambios.titulo = titulo;
       if (descripcion !== s.descripcion_problema) cambios.descripcion_problema = descripcion;
@@ -266,6 +280,7 @@ function PanelModificar({ s, cerrar, alModificar }) {
       if (Object.keys(cambios).length === 0) { cerrar(); return; }
 
       const actualizada = await modificarSolicitud(s.id, cambios);
+      toast.success("Cambios guardados");
       alModificar(actualizada);
       cerrar();
     } catch (e) {

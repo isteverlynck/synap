@@ -16,6 +16,8 @@ import Cascaron from "./componentes/Cascaron";
 import Pendientes from "./pages/Pendientes";
 import Ordenes from "./pages/Ordenes";
 import DetalleOrden from "./pages/DetalleOrden";
+import Dashboard from "./pages/Dashboard";
+import { Toaster } from "sonner";
 
 
 // "Guardia": envuelve una pantalla protegida. Si no estás logueada, te manda
@@ -27,6 +29,13 @@ function Protegida({ children }) {
 function App() {
   return (
     <BrowserRouter>
+      {/* Los avisos flotantes viven acá, fuera de las rutas: así siguen
+      visibles aunque la pantalla cambie debajo. */}
+      <Toaster
+        position="bottom-right"
+        richColors
+        toastOptions={{ style: { fontFamily: "inherit" } }}
+      />
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/recuperar" element={<RecuperarPassword />} />
@@ -41,6 +50,7 @@ function App() {
           <Route path="/pendientes" element={<Pendientes />} />
           <Route path="/ordenes" element={<Ordenes />} />
           <Route path="/ordenes/:id" element={<DetalleOrden />} />
+          <Route path="/dashboard" element={<Dashboard />} />
         </Route>
       </Routes>
     </BrowserRouter>

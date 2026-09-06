@@ -74,3 +74,97 @@ button:focus-visible {
   outline: 2px solid #0a66d6;
   outline-offset: 1px;
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   Estados interactivos.
+   Van acá y no en tema.js porque los estilos en línea (style={}) no pueden
+   expresar :hover, :focus ni transiciones: React los aplica directo al
+   elemento y esos estados solo existen en CSS.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Todo lo clickeable reacciona igual: cambio suave, sin saltos bruscos. */
+button,
+a,
+[role="button"] {
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+              color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+button:not(:disabled):hover {
+  filter: brightness(0.95);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Foco visible para quien navega con teclado. NO lo saques: es lo único que
+   le dice a esa persona dónde está parada. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--sy-primario, #1D9E75);
+  outline-offset: 2px;
+}
+
+/* El borde negro que te molestaba: aparece solo al navegar con teclado,
+   nunca al hacer click con el mouse. */
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Tarjetas clickeables: se levantan apenas al pasar por encima. Es la señal
+   de "esto se puede tocar" sin necesidad de decirlo. */
+.sy-clickeable {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease,
+              border-color 0.15s ease;
+}
+
+.sy-clickeable:hover {
+  box-shadow: 0 4px 14px rgba(13, 26, 38, 0.09);
+  transform: translateY(-1px);
+  border-color: #cfdcd8;
+}
+
+/* Ítems del menú lateral. */
+.sy-item-menu {
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sy-item-menu:hover {
+  background-color: #12303A;
+  color: #ffffff;
+}
+
+/* Los que todavía no tienen pantalla no deben responder al mouse: si se
+   iluminan, invitan a un click que no lleva a ningún lado. */
+.sy-item-menu-inactivo,
+.sy-item-menu-inactivo:hover {
+  cursor: default;
+  background-color: transparent;
+}
+
+/* Campos de formulario. */
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #1D9E75;
+}
+
+/* Filas de listas: fondo apenas marcado al pasar. */
+.sy-fila:hover {
+  background-color: #f3f7f6;
+}
+
+/* Que el usuario no seleccione sin querer el texto de botones y pestañas
+   al hacer doble click. */
+button,
+.sy-item-menu,
+.sy-pestania {
+  user-select: none;
+}

@@ -49,8 +49,9 @@ export function rolActual() {
 // A qué pantalla mandar a cada quien según su rol, justo después de loguearse.
 export function pantallaInicioPorRol(rol) {
   if (rol === "enfermeria") return "/solicitudes";
-  // Coordinación, técnicos y jefatura todavía no tienen pantalla propia:
-  // por ahora van a Activos, como antes.
+  if (rol === "jefatura") return "/dashboard";
+  if (rol === "coordinacion") return "/pendientes";
+  if (rol === "tecnico" || rol === "junior") return "/ordenes";
   return "/activos";
 }
 

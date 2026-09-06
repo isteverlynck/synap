@@ -43,6 +43,7 @@ function DetalleOrden() {
   async function arrancar() {
     try {
       setOt(await cambiarEstado(id, "EN_PROGRESO"));
+      toast.success("Orden en progreso");
     } catch (e) {
       setError(e.response?.data?.detail || "No pudimos cambiar el estado.");
     }
@@ -74,6 +75,7 @@ function DetalleOrden() {
 
       {/* El equipo, clickeable: desde la OT se llega a su ficha completa. */}
       <div
+        className="sy-clickeable"
         style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12, cursor: "pointer" }}
         onClick={() => navegar(`/activos/${ot.activo_codigo}`)}
       >
@@ -153,6 +155,10 @@ function PanelCerrar({ ot, setOt, cerrar }) {
     setEnviando(true);
     try {
       setOt(await cerrarOrden(ot.id, observaciones.trim()));
+      toast.success(`OT-${String(ot.numero_ot).padStart(4, "0")} cerrada`, {
+        description: "Ya figura en el historial del equipo.",
+      });
+      cerrar();
       cerrar();
     } catch (e) {
       setError(e.response?.data?.detail || "No pudimos cerrar la orden.");
@@ -193,6 +199,7 @@ function PanelAsignar({ ot, setOt, tecnicos, cerrar }) {
     setEnviando(true);
     try {
       setOt(await asignarTecnico(ot.id, tecnicoId));
+      toast.success("Orden asignada");
       cerrar();
     } catch (e) {
       setError(e.response?.data?.detail || "No pudimos asignar la orden.");

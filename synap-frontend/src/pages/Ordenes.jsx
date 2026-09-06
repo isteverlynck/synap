@@ -131,6 +131,7 @@ function Ordenes() {
             {grupo.items.map((ot) => (
               <div
                 key={ot.id}
+                className="sy-clickeable"
                 style={estilos.tarjeta}
                 onClick={() => navegar(`/ordenes/${ot.id}`)}
               >
@@ -191,7 +192,7 @@ const estilos = {
   filtro: {
     padding: "6px 14px", borderRadius: 999, border: `1px solid ${color.borde}`,
     background: color.tarjeta, color: color.textoSuave, fontSize: "0.83rem",
-    cursor: "pointer", fontFamily: "inherit", fontWeight: 600, outline: "none",
+    cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
   },
   filtroActivo: {
     background: color.primarioClaro, color: color.primarioOscuro,
