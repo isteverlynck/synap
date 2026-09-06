@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import SolicitudServicio, Activo, Usuario
 from ..schemas import SolicitudCrear, SolicitudOut
-from ..security import get_current_user, requiere_rol
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador
 
 router = APIRouter(prefix="/solicitudes", tags=["solicitudes_servicio"])
 
@@ -134,7 +134,7 @@ def solicitudes_pendientes(
     que se muestran a todos los coordinadores para que alguno las tome (esas no
     tienen grupo hasta que el coordinador se lo asigne a mano).
     """
-    mis_grupos = _grupos_del_coordinador(db, current_user.id)
+    mis_grupos = grupos_del_coordinador(db, current_user)
 
     pendientes = db.query(SolicitudServicio).filter(
         SolicitudServicio.estado == "PENDIENTE"
@@ -179,19 +179,11 @@ def ver_solicitud(
 from datetime import datetime as _dt
 from sqlalchemy import func as _func
 from ..models import (
-    GrupoTecnico,
     GrupoTipoEquipo,
     OrdenTrabajo,
 )
 from ..schemas import SolicitudAceptar, SolicitudRechazar, SolicitudModificar
 
-
-def _grupos_del_coordinador(db, coordinador_id):
-    """Lista de ids de grupos que coordina este usuario."""
-    grupos = db.query(GrupoTecnico).filter(
-        GrupoTecnico.coordinador_id == coordinador_id
-    ).all()
-    return [g.id for g in grupos]
 
 
 def _grupo_de_activo(db, activo_codigo):
@@ -229,7 +221,7 @@ def aceptar_solicitud(
     if sol.estado != "PENDIENTE":
         raise HTTPException(status_code=400, detail=f"La solicitud ya está {sol.estado}.")
 
-    mis_grupos = _grupos_del_coordinador(db, current_user.id)
+    mis_grupos = grupos_del_coordinador(db, current_user)
 
     # Determinar el grupo destino.
     if sol.activo_codigo:

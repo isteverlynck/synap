@@ -110,16 +110,27 @@ class ActivoOut(BaseModel):
     modelo: str | None = None
     numero_serie: str | None = None
     estado: str
+    # Fechas del plan preventivo. Ya estaban en la base y en el modelo, solo
+    # faltaba exponerlas: la ficha muestra cuándo toca el próximo.
+    ultima_fecha_mp: date | None = None
+    proxima_fecha_mp: date | None = None
+    fecha_instalacion: date | None = None
+    criticidad: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
     
 # ─── Schemas resumidos para anidar en la ficha del activo ───
+    
 class OrdenTrabajoResumen(BaseModel):
     id: uuid.UUID
     numero_ot: int
     tipo: str
     estado: str
     prioridad: str | None = None
+    # Necesarias para el aviso "en mantenimiento" de la ficha: desde cuándo
+    # está abierta y quién la tiene.
+    fecha_apertura: datetime | None = None
+    tecnico_id: uuid.UUID | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -144,6 +155,12 @@ class ActivoDetalle(ActivoOut):
     ordenes_de_trabajo: list[OrdenTrabajoResumen] = []
     fallas: list[FallaResumen] = []
     mantenimientos: list[MantenimientoResumen] = []
+    
+    # Bioingeniero a cargo del equipo. No es una columna del activo: se deduce
+    # de qué grupo atiende su tipo de equipo, y quién coordina ese grupo. Lo
+    # calcula el endpoint (ver activos.py).
+    responsable_nombre: str | None = None
+    responsable_email: str | None = None
     
 # ─── Órdenes de trabajo ───
 class OrdenTrabajoOut(BaseModel):

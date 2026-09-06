@@ -10,22 +10,34 @@
 // cada elemento, por ejemplo: style={cs.tarjeta} o style={boton("primario")}.
 
 export const color = {
-  primario: "#0a66d6",
-  primarioOscuro: "#08509f",
-  primarioClaro: "#e8f1fd",
+  // Acento de la marca: navegación, botones principales, foco. Verde agua.
+  primario: "#1D9E75",
+  primarioOscuro: "#0F6E56",
+  primarioClaro: "#E1F5EE",
+
+  // Barra lateral (escritorio) y encabezado (celular).
+  lateral: "#0D1A26",
+  lateralActivo: "#12303A",
+  lateralTexto: "#9FB0C6",
+  lateralTextoTenue: "#6A7F9C",
+
   texto: "#1b2430",
   textoSuave: "#5b6472",
   textoDebil: "#94a0b3",
-  fondo: "#f2f4f8",
+  fondo: "#f3f7f6",
   tarjeta: "#ffffff",
-  borde: "#e2e6ed",
-  bordeSuave: "#edf0f4",
-  exito: "#1a8f4c",
-  exitoFondo: "#e7f7ee",
-  advertencia: "#c8720b",
-  advertenciaFondo: "#fdf1e2",
-  peligro: "#d13c3c",
-  peligroFondo: "#fceceb",
+  borde: "#e0e8e5",
+  bordeSuave: "#eef3f1",
+
+  // Estados. OJO: son verde/ámbar/rojo puros, distintos del verde agua de la
+  // marca. Que el acento y el estado "operativo" compartan color hace que el
+  // ojo tenga que pensar cuál es cuál.
+  exito: "#3B6D11",
+  exitoFondo: "#EAF3DE",
+  advertencia: "#854F0B",
+  advertenciaFondo: "#FAEEDA",
+  peligro: "#A32D2D",
+  peligroFondo: "#FCEBEB",
 };
 
 export const radio = { chico: 8, mediano: 12, grande: 18, pastilla: 999 };
@@ -134,14 +146,67 @@ export function insignia(tono = "primario") {
   };
 }
 
-// El campo "estado" de un activo es texto libre en la base (no hay una lista
-// fija todavía), así que esto es una aproximación por palabras clave: verde
-// si suena a "andando", rojo/naranja si suena a "de baja" o "en reparación",
-// y gris neutro para cualquier otro caso.
-export function tonoEstadoActivo(estado) {
-  const texto = (estado || "").toUpperCase();
-  if (texto.includes("BAJA") || texto.includes("FUERA")) return "peligro";
-  if (texto.includes("REPARAC") || texto.includes("MANTEN")) return "advertencia";
-  if (texto.includes("ACTIV") || texto.includes("OPERATIV")) return "exito";
-  return "neutro";
+// // El campo "estado" de un activo es texto libre en la base (no hay una lista
+// // fija todavía), así que esto es una aproximación por palabras clave: verde
+// // si suena a "andando", rojo/naranja si suena a "de baja" o "en reparación",
+// // y gris neutro para cualquier otro caso.
+// export function tonoEstadoActivo(estado) {
+//   const texto = (estado || "").toUpperCase();
+//   if (texto.includes("BAJA") || texto.includes("FUERA")) return "peligro";
+//   if (texto.includes("REPARAC") || texto.includes("MANTEN")) return "advertencia";
+//   if (texto.includes("ACTIV") || texto.includes("OPERATIV")) return "exito";
+//   return "neutro";
+// }
+
+// El cartel de estado de la ficha depende de DOS cosas: el campo 'estado' del
+// activo y si tiene OT abiertas. Un equipo puede figurar "operativo" en la base
+// y estar con una reparación en curso — mostrar solo el campo mentiría.
+//
+// Devuelve todo lo que la ficha necesita pintar: tono, título, detalle y qué
+// acción ofrecer. Así la lógica vive en un lugar y no repartida por la pantalla.
+export function estadoDelEquipo(activo) {
+  const texto = (activo?.estado || "").toUpperCase();
+  const abiertas = (activo?.ordenes_de_trabajo || []).filter(
+    (ot) => ot.estado !== "CERRADA"
+  );
+
+  // 1. De baja: gana sobre todo lo demás. Es lo primero que se tiene que ver.
+  if (texto.includes("BAJA") || texto.includes("FUERA")) {
+    return {
+      tono: "peligro",
+      titulo: "Este equipo está de baja",
+      detalle: "No debe usarse. Consultá con Bioingeniería.",
+      accion: "contactar",
+    };
+  }
+
+  // 2. Con OT abierta: ya lo están mirando, no hace falta otra solicitud.
+  if (abiertas.length > 0) {
+    const ot = abiertas[0];
+    return {
+      tono: "advertencia",
+      titulo: "En mantenimiento",
+      detalle: `OT-${String(ot.numero_ot).padStart(4, "0")} abierta`,
+      accion: "ver_ot",
+      otId: ot.id,
+    };
+  }
+
+  // 3. Sin dato de estado: no inventamos que está operativo.
+  if (!texto) {
+    return {
+      tono: "neutro",
+      titulo: "Estado sin registrar",
+      detalle: "No hay información de estado para este equipo.",
+      accion: "reportar",
+    };
+  }
+
+  // 4. Todo lo demás: operativo.
+  return {
+    tono: "exito",
+    titulo: "Equipo operativo",
+    detalle: "Sin órdenes de trabajo abiertas.",
+    accion: "reportar",
+  };
 }
