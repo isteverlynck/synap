@@ -113,6 +113,14 @@ class Activo(Base):
     plantilla_mp_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     ultima_fecha_mp: Mapped[date | None] = mapped_column(Date, nullable=True)
     proxima_fecha_mp: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    # frecuencia_mp_meses: cada cuántos meses toca el preventivo de ESTE equipo
+    # puntual (no de la plantilla en general — dos equipos del mismo tipo
+    # podrían tener una frecuencia distinta si el fabricante lo pide). Se carga
+    # al crear el activo (si se eligió programarle mantenimiento) y es lo que
+    # usa /preventivas/generar para reprogramar el ciclo siguiente cada vez que
+    # dispara una OT. Nula en los activos que no tienen mantenimiento programado.
+    frecuencia_mp_meses: Mapped[int | None] = mapped_column(Integer, nullable=True)
  
     # Trazabilidad de préstamos temporales entre sectores.
     en_prestamo_temporal: Mapped[bool | None] = mapped_column(default=False, nullable=True)
@@ -154,7 +162,15 @@ class OrdenTrabajo(Base):
     notificado_por: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
-    
+
+    # ot_origen_id: si esta OT es una correctiva que se abrió DESDE una
+    # preventiva (durante el mantenimiento se encontró algo que no funciona),
+    # acá queda el id de esa preventiva. Nula en el resto de las OT. Es
+    # autorreferencia (apunta a otra fila de la misma tabla).
+    ot_origen_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=True
+    )
+
     # ─── Relaciones ───
     activo: Mapped["Activo"] = relationship(back_populates="ordenes_de_trabajo")
     fallas: Mapped[list["Falla"]] = relationship(back_populates="orden")
@@ -176,8 +192,16 @@ class OrdenTrabajo(Base):
     def activo_ubicacion(self) -> str | None:
         """Dónde está el equipo. El técnico necesita saber adónde ir."""
         return self.activo.ubicacion if self.activo else None
- 
- 
+
+    # notas: la bitácora de la OT — se define después de NotaOT (más abajo en
+    # este archivo) porque SQLAlchemy necesita que la clase ya exista para
+    # resolver el back_populates. Python permite este orden porque acá solo
+    # queda una referencia en forma de texto ("NotaOT"), no la clase en sí.
+    notas: Mapped[list["NotaOT"]] = relationship(
+        back_populates="orden", order_by="NotaOT.created_at"
+    )
+
+
 class Falla(Base):
     """Una falla reportada sobre un activo. Puede derivar en una orden de trabajo."""
     __tablename__ = "fallas"
@@ -372,6 +396,35 @@ class Adjunto(Base):
     orden: Mapped["OrdenTrabajo"] = relationship(back_populates="adjuntos")
  
     
+class NotaOT(Base):
+    """Una entrada de la bitácora de una orden de trabajo.
+
+    A diferencia de 'observaciones' (un solo texto que se completa recién al
+    cerrar la OT), acá se van sumando entradas mientras se trabaja: cada una
+    con fecha y quién la escribió. Sirve para que, si más de una persona del
+    grupo toca la misma OT, quede quién hizo qué y cuándo — y para que al
+    cerrar quede un historial real de todo el proceso, no solo el resumen
+    final."""
+    __tablename__ = "notas_ot"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ot_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=False)
+    autor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True)
+    texto: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # ─── Relaciones ───
+    orden: Mapped["OrdenTrabajo"] = relationship(back_populates="notas")
+    autor = relationship("Usuario", foreign_keys=[autor_id])
+
+    @property
+    def autor_nombre(self) -> str | None:
+        """Nombre de quien escribió la entrada, listo para mostrar."""
+        if self.autor is None:
+            return None
+        return f"{self.autor.nombre} {self.autor.apellido}"
+
+
 class GrupoTecnico(Base):
     """Catálogo de grupos técnicos (equipos de trabajo de Bioingeniería)."""
     __tablename__ = "grupos_tecnicos"

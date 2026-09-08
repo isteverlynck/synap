@@ -22,6 +22,7 @@ from sqlalchemy import func, extract
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..fechas import sumar_meses
 from ..models import Activo, OrdenTrabajo, GrupoTipoEquipo, Usuario
 from ..schemas import GenerarPreventivasRequest, PreventivasGeneradas
 from ..security import get_current_user, requiere_rol
@@ -71,16 +72,6 @@ def generar_preventivas(
 
     for activo in equipos:
         # ¿ya hay una OT preventiva para este equipo en ese mes? (no duplicar)
-        # existente = (
-        #     db.query(OrdenTrabajo)
-        #     .filter(
-        #         OrdenTrabajo.activo_codigo == activo.codigo,
-        #         OrdenTrabajo.tipo == "PREVENTIVA",
-        #         extract("year", OrdenTrabajo.fecha_apertura) == anio,
-        #         extract("month", OrdenTrabajo.fecha_apertura) == mes,
-        #     )
-        #     .first()
-        # )
         descripcion_mp = f"Mantenimiento preventivo programado ({anio}-{mes:02d})"
         existente = (
             db.query(OrdenTrabajo)
@@ -105,7 +96,6 @@ def generar_preventivas(
             activo_codigo=activo.codigo,
             tipo="PREVENTIVA",
             estado="ABIERTA",   # las preventivas del grupo nacen abiertas (las toma el grupo)
-            # descripcion=f"Mantenimiento preventivo programado ({anio}-{mes:02d})",
             descripcion=descripcion_mp,
             grupo_id=grupo,
             fecha_apertura=datetime.utcnow(),
@@ -113,6 +103,15 @@ def generar_preventivas(
         db.add(orden)
         generadas += 1
         codigos.append(activo.codigo)
+
+        # Reprogramar el ciclo siguiente: fecha fija, avanza apenas se genera
+        # la OT (no cuando se cierra) — así el 1° de junio de todos los años
+        # siguientes vuelve a dispararse sola, se haya cerrado a tiempo la
+        # anterior o no. Los equipos sin frecuencia cargada (los que ya
+        # existían antes de esta función, o los que se crearon sin programarles
+        # mantenimiento) no se tocan: no hay forma de saber cada cuánto repetir.
+        if activo.frecuencia_mp_meses:
+            activo.proxima_fecha_mp = sumar_meses(activo.proxima_fecha_mp, activo.frecuencia_mp_meses)
 
     db.commit()
 

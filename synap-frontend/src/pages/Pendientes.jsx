@@ -6,7 +6,7 @@
 // donde hay que navegar varias pantallas para hacer algo simple.
 
 import { useEffect, useState } from "react";
-import { solicitudesPendientes, tecnicosDisponibles, aceptarSolicitud,
+import { solicitudesPendientes, tecnicosDisponibles, listarGrupos, aceptarSolicitud,
          rechazarSolicitud, modificarSolicitud } from "../api/coordinacion";
 import { agruparPorFecha } from "../utiles/fechas";
 import Encabezado from "../componentes/Encabezado";
@@ -17,6 +17,7 @@ import { HeartPulse, Wrench } from "lucide-react";
 function Pendientes() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
+  const [gruposTecnicos, setGruposTecnicos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   // Qué tarjeta está abierta y en qué modo: { id, modo: 'aceptar'|'rechazar'|'modificar' }
@@ -28,13 +29,17 @@ function Pendientes() {
     setCargando(true);
     setError("");
     try {
-      // Las dos cosas en paralelo: la lista y los técnicos para el desplegable.
-      const [lista, gente] = await Promise.all([
+      // Las tres cosas en paralelo: la lista, los técnicos y los grupos (estos
+      // últimos hacen falta para aceptar una solicitud que no es de un
+      // equipo, donde el grupo no se puede deducir y hay que elegirlo).
+      const [lista, gente, listaGrupos] = await Promise.all([
         solicitudesPendientes(),
         tecnicosDisponibles(),
+        listarGrupos(),
       ]);
       setSolicitudes(lista);
       setTecnicos(gente);
+      setGruposTecnicos(listaGrupos);
     } catch {
       setError("No pudimos cargar las solicitudes pendientes.");
     } finally {
@@ -79,6 +84,7 @@ function Pendientes() {
                 key={s.id}
                 solicitud={s}
                 tecnicos={tecnicos}
+                grupos={gruposTecnicos}
                 abierta={abierta}
                 setAbierta={setAbierta}
                 alResolver={quitarDeLaLista}
@@ -100,7 +106,7 @@ function Pendientes() {
 // Una solicitud
 // ─────────────────────────────────────────────────────────────────────────
 
-function Tarjeta({ solicitud: s, tecnicos, abierta, setAbierta, alResolver, alModificar }) {
+function Tarjeta({ solicitud: s, tecnicos, grupos, abierta, setAbierta, alResolver, alModificar }) {
   const modo = abierta?.id === s.id ? abierta.modo : null;
 
   return (
@@ -139,7 +145,7 @@ function Tarjeta({ solicitud: s, tecnicos, abierta, setAbierta, alResolver, alMo
       )}
 
       {modo === "aceptar" && (
-        <PanelAceptar s={s} tecnicos={tecnicos} cerrar={() => setAbierta(null)} alResolver={alResolver} />
+        <PanelAceptar s={s} tecnicos={tecnicos} grupos={grupos} cerrar={() => setAbierta(null)} alResolver={alResolver} />
       )}
       {modo === "rechazar" && (
         <PanelRechazar s={s} cerrar={() => setAbierta(null)} alResolver={alResolver} />
@@ -153,17 +159,39 @@ function Tarjeta({ solicitud: s, tecnicos, abierta, setAbierta, alResolver, alMo
 
 // ─── Aceptar ───
 
-function PanelAceptar({ s, tecnicos, cerrar, alResolver }) {
+function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
+  // Las solicitudes de un equipo médico ya saben su grupo (sale del equipo);
+  // las de "cosa" no, así que acá hay que elegirlo antes de poder asignar.
+  const requiereGrupo = !s.es_equipo_medico;
+  const [grupoId, setGrupoId] = useState("");
   const [tecnicoId, setTecnicoId] = useState("");
+  const [tecnicosDelGrupo, setTecnicosDelGrupo] = useState(tecnicos);
   const [prioridad, setPrioridad] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
 
+  // Mientras no se eligió grupo (solicitud de "cosa"), no hay a quién ofrecer
+  // en "Asignar a". Apenas se elige, traemos solo los técnicos de ese grupo.
+  useEffect(() => {
+    if (!requiereGrupo) return;
+    setTecnicoId("");
+    if (!grupoId) { setTecnicosDelGrupo([]); return; }
+    tecnicosDisponibles(grupoId).then(setTecnicosDelGrupo).catch(() => setTecnicosDelGrupo([]));
+  }, [grupoId, requiereGrupo]);
+
   async function confirmar() {
+    if (requiereGrupo && !grupoId) {
+      setError("Elegí a qué grupo le corresponde.");
+      return;
+    }
     setEnviando(true);
     setError("");
     try {
-      await aceptarSolicitud(s.id, { asignarAId: tecnicoId || null, prioridad: prioridad || null });
+      await aceptarSolicitud(s.id, {
+        asignarAId: tecnicoId || null,
+        grupoId: requiereGrupo ? grupoId : null,
+        prioridad: prioridad || null,
+      });
       toast.success(`Solicitud #${s.numero_solicitud} aceptada`, {
         description: tecnicoId
           ? "Se generó la orden y quedó asignada."
@@ -180,13 +208,29 @@ function PanelAceptar({ s, tecnicos, cerrar, alResolver }) {
     <div style={estilos.panel}>
       <p style={estilos.panelTitulo}>Aceptar y generar la orden de trabajo</p>
 
+      {requiereGrupo && (
+        <>
+          <label style={cs.label}>Grupo</label>
+          <select style={{ ...cs.input, marginBottom: 12 }} value={grupoId}
+                  onChange={(e) => setGrupoId(e.target.value)}>
+            <option value="">Elegir grupo...</option>
+            {grupos.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.descripcion ? `${g.id} — ${g.descripcion}` : g.id}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+
       <label style={cs.label}>Asignar a</label>
       <select style={{ ...cs.input, marginBottom: 12 }} value={tecnicoId}
+              disabled={requiereGrupo && !grupoId}
               onChange={(e) => setTecnicoId(e.target.value)}>
         {/* Dejar sin asignar es una opción válida: la OT nace abierta y se
         asigna después. Por eso está primera, no escondida. */}
         <option value="">Dejar sin asignar por ahora</option>
-        {tecnicos.map((t) => (
+        {(requiereGrupo ? tecnicosDelGrupo : tecnicos).map((t) => (
           <option key={t.id} value={t.id}>{t.nombre} {t.apellido}</option>
         ))}
       </select>

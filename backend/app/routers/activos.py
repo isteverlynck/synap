@@ -1,14 +1,17 @@
 """Endpoints de activos (equipos médicos)."""
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import re
 from sqlalchemy import or_
 
 from ..database import get_db
-from ..models import Activo, Usuario, GrupoTipoEquipo, GrupoTecnico, Usuario, TipoEquipo, Servicio
-from ..schemas import ActivoOut, ActivoDetalle
-from ..security import get_current_user
+from ..fechas import sumar_meses
+from ..models import Activo, Usuario, GrupoTipoEquipo, GrupoTecnico, Usuario, TipoEquipo, Servicio, PlantillaMP
+from ..schemas import ActivoOut, ActivoDetalle, ActivoCreate
+from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/activos", tags=["activos"])
 
@@ -93,6 +96,139 @@ def opciones_de_filtro(
     ]
 
     return {"tipos": tipos, "sectores": sectores, "grupos": grupos, "estados": estados}
+
+
+@router.get("/catalogos")
+def catalogos_para_alta(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Catálogos COMPLETOS de tipos de equipo y servicios, para el formulario
+    de 'nuevo activo'.
+
+    A diferencia de /filtros (que solo devuelve lo que YA está en uso, para no
+    ofrecer filtros que dan cero resultados), acá hace falta la lista entera:
+    un tipo de equipo que todavía no tiene ningún activo cargado tiene que
+    poder elegirse igual al dar de alta el primero.
+    """
+    tipos = [
+        {"id": t.id, "nombre": t.nombre}
+        for t in db.query(TipoEquipo).order_by(TipoEquipo.nombre).all()
+    ]
+    sectores = [
+        {"id": s.id, "nombre": s.nombre}
+        for s in db.query(Servicio).order_by(Servicio.nombre).all()
+    ]
+    return {"tipos": tipos, "sectores": sectores}
+
+
+@router.post("", response_model=ActivoOut, status_code=201)
+def crear_activo(
+    payload: ActivoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion", "tecnico", "junior")),
+):
+    """Dar de alta un equipo nuevo.
+
+    El código lo arma el backend (no lo manda el frontend): B-<area>-<tipo de
+    equipo>-<número>. El área es la que eligió la persona (ActivoCreate.area);
+    el número es el siguiente correlativo PARA ESE TIPO DE EQUIPO, contando en
+    todo el hospital sin importar el área — así el próximo desfibrilador sigue
+    la numeración de los desfibriladores, no la del área donde va a estar.
+
+    Si vino crear_mantenimiento=True, además:
+      1. Busca el plan de mantenimiento (checklist) de este tipo de equipo (o
+         el genérico, si no hay uno específico para el tipo).
+      2. Calcula la primera 'próxima fecha' sumándole la frecuencia (en meses)
+         a la fecha de instalación (o a hoy, si no se cargó esa fecha).
+      3. Guarda la frecuencia en el activo: es lo que usa /preventivas/generar
+         para reprogramar el ciclo siguiente cada vez que dispara la OT.
+    """
+    tipo = db.query(TipoEquipo).filter(TipoEquipo.id == payload.tipo_equipo_id).first()
+    if tipo is None:
+        raise HTTPException(status_code=404, detail="El tipo de equipo no existe.")
+    sector = db.query(Servicio).filter(Servicio.id == payload.sector_id).first()
+    if sector is None:
+        raise HTTPException(status_code=404, detail="El servicio/sector no existe.")
+
+    # 1. Número correlativo para este tipo de equipo (el máximo actual + 1).
+    #    Se busca por tipo_equipo_id (la columna), no adivinando el número
+    #    dentro del texto del código de otros equipos con formatos viejos.
+    maximo = 0
+    for a in db.query(Activo.codigo).filter(Activo.tipo_equipo_id == payload.tipo_equipo_id).all():
+        sufijo = a.codigo.rsplit("-", 1)[-1]
+        if sufijo.isdigit():
+            maximo = max(maximo, int(sufijo))
+    numero = maximo + 1
+    codigo = f"B-{payload.area}-{payload.tipo_equipo_id}-{numero:03d}"
+
+    # Por las dudas (formato manual antiguo que pisara el que armamos ahora).
+    if db.query(Activo).filter(Activo.codigo == codigo).first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"El código {codigo} ya existe. Probá de nuevo (puede haberse creado otro equipo del mismo tipo justo ahora).",
+        )
+
+    # 2. Grupo técnico: se deduce del tipo de equipo, igual que en el resto
+    #    del sistema (no lo elige la persona a mano).
+    rel_grupo = db.query(GrupoTipoEquipo).filter(
+        GrupoTipoEquipo.tipo_equipo_id == payload.tipo_equipo_id
+    ).first()
+    grupo_id = rel_grupo.grupo_id if rel_grupo else None
+
+    # 3. Mantenimiento preventivo (opcional).
+    plantilla_mp_id = None
+    proxima_fecha_mp = None
+    frecuencia_mp_meses = None
+    if payload.crear_mantenimiento:
+        if not payload.frecuencia_meses or payload.frecuencia_meses <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Indicá cada cuántos meses se repite el mantenimiento.",
+            )
+        plan = db.query(PlantillaMP).filter(
+            PlantillaMP.tipo_equipo_id == payload.tipo_equipo_id
+        ).first()
+        if plan is None:
+            plan = db.query(PlantillaMP).filter(PlantillaMP.es_generica == True).first()  # noqa: E712
+        if plan is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No hay un checklist de mantenimiento para este tipo de equipo "
+                    "ni uno genérico. Pedile a jefatura que cargue un plan antes de "
+                    "programarle el mantenimiento a este equipo."
+                ),
+            )
+        plantilla_mp_id = plan.id
+        fecha_base = payload.fecha_instalacion or date.today()
+        proxima_fecha_mp = sumar_meses(fecha_base, payload.frecuencia_meses)
+        frecuencia_mp_meses = payload.frecuencia_meses
+
+    activo = Activo(
+        codigo=codigo,
+        codigo_qr=payload.codigo_qr,
+        tipo_equipo_id=payload.tipo_equipo_id,
+        sector_id=payload.sector_id,
+        grupo_id=grupo_id,
+        descripcion=payload.descripcion,
+        ubicacion=payload.ubicacion,
+        marca=payload.marca,
+        modelo=payload.modelo,
+        numero_serie=payload.numero_serie,
+        numero_orden_compra=payload.numero_orden_compra,
+        fecha_instalacion=payload.fecha_instalacion,
+        estado=payload.estado,
+        criticidad=payload.criticidad,
+        plantilla_mp_id=plantilla_mp_id,
+        proxima_fecha_mp=proxima_fecha_mp,
+        frecuencia_mp_meses=frecuencia_mp_meses,
+    )
+    db.add(activo)
+    db.commit()
+    db.refresh(activo)
+    return activo
+
 
 @router.get("/{codigo}", response_model=ActivoOut)
 def ver_activo(codigo: str, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):

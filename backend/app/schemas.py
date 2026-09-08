@@ -91,6 +91,14 @@ class UsuarioOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class GrupoTecnicoOut(BaseModel):
+    """Un grupo técnico, para elegir a cuál mandar una solicitud que no es de
+    un equipo (ahí el grupo no se puede deducir de un activo)."""
+    id: str
+    descripcion: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ─── Token de sesión ───
 class Token(BaseModel):
     """Lo que devuelve el login: el token que la app guarda para pedidos futuros."""
@@ -104,21 +112,76 @@ class ActivoOut(BaseModel):
     codigo_qr: str | None = None
     tipo_equipo_id: str
     sector_id: str
+    grupo_id: str | None = None
     descripcion: str
     ubicacion: str | None = None
     marca: str | None = None
     modelo: str | None = None
     numero_serie: str | None = None
+    numero_orden_compra: str | None = None
     estado: str
     # Fechas del plan preventivo. Ya estaban en la base y en el modelo, solo
     # faltaba exponerlas: la ficha muestra cuándo toca el próximo.
     ultima_fecha_mp: date | None = None
     proxima_fecha_mp: date | None = None
+    # Cada cuántos meses se repite el mantenimiento de ESTE equipo. Nulo si
+    # no se le programó mantenimiento (ver ActivoCreate más abajo).
+    frecuencia_mp_meses: int | None = None
     fecha_instalacion: date | None = None
     criticidad: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
-    
+
+
+class ActivoCreate(BaseModel):
+    """Lo que se manda para dar de alta un activo nuevo.
+
+    El código NO se manda: lo arma el backend con el formato del hospital
+    (B-<área>-<tipo de equipo>-<número>), a partir de 'area' (el segmento que
+    la persona conoce de memoria, ej. 'INTR' para Internación — no siempre
+    coincide con el sector/servicio elegido, así que se pide aparte) y
+    tipo_equipo_id (el número sale solo: el siguiente correlativo para ese
+    tipo de equipo, sin importar el área).
+
+    crear_mantenimiento es el paso opcional: si viene en True, hay que mandar
+    frecuencia_meses (cada cuántos meses repetirlo). El backend busca el plan
+    de mantenimiento (checklist) de ese tipo de equipo —o el genérico si no
+    hay uno específico— y calcula la primera 'próxima fecha' a partir de
+    fecha_instalacion (o de hoy, si no se cargó fecha de instalación).
+    """
+    area: str
+    tipo_equipo_id: str
+    sector_id: str
+    descripcion: str
+    ubicacion: str | None = None
+    marca: str | None = None
+    modelo: str | None = None
+    numero_serie: str | None = None
+    numero_orden_compra: str | None = None
+    codigo_qr: str | None = None
+    fecha_instalacion: date | None = None
+    estado: str = "ACTIVO"
+    criticidad: str | None = None
+
+    crear_mantenimiento: bool = False
+    frecuencia_meses: int | None = None
+
+    @field_validator("area")
+    @classmethod
+    def _validar_area(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not v:
+            raise ValueError("Indicá el área del equipo (ej: INTR, TERA, CIRU).")
+        return v
+
+    @field_validator("descripcion")
+    @classmethod
+    def _validar_descripcion(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Indicá una descripción del equipo.")
+        return v
+
 # ─── Schemas resumidos para anidar en la ficha del activo ───
     
 class OrdenTrabajoResumen(BaseModel):
@@ -184,9 +247,42 @@ class OrdenTrabajoOut(BaseModel):
     observaciones: str | None = None
     created_at: datetime | None = None
     fecha_notificacion: datetime | None = None
+    # Si esta OT es una correctiva que se abrió desde una preventiva (durante
+    # el mantenimiento se encontró algo que no funciona), acá queda el id de
+    # esa preventiva. Nulo en el resto de las OT.
+    ot_origen_id: uuid.UUID | None = None
     model_config = ConfigDict(from_attributes=True)
     activo_descripcion: str | None = None
     activo_ubicacion: str | None = None
+
+
+class OrdenTrabajoCorrectivaCreate(BaseModel):
+    """Lo que se manda para abrir una correctiva asociada a una preventiva.
+
+    Se usa desde el detalle de una OT preventiva: durante el mantenimiento se
+    encuentra algo que no funciona y hace falta una correctiva aparte. La
+    correctiva nace en el mismo equipo y grupo que la preventiva; solo se
+    piden la descripción del problema y, opcionalmente, la prioridad.
+    """
+    descripcion: str
+    prioridad: str | None = None
+
+
+class NotaOTOut(BaseModel):
+    """Una entrada de la bitácora de una OT, lista para mostrar."""
+    id: uuid.UUID
+    ot_id: uuid.UUID
+    autor_id: uuid.UUID | None = None
+    autor_nombre: str | None = None
+    texto: str
+    created_at: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotaOTCrear(BaseModel):
+    """Lo que se manda para sumar una entrada a la bitácora de una OT."""
+    texto: str
+
 
 class OrdenTrabajoCreate(BaseModel):
     """Lo que el frontend manda para ABRIR una OT nueva (POST).

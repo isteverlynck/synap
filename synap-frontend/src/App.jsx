@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { estaLogueado } from "./api/auth";
 import Login from "./pages/Login";
 import Activos from "./pages/Activos";
+import NuevoActivo from "./pages/NuevoActivo";
 import Solicitudes from "./pages/Solicitudes";
 import EscanearQR from "./pages/EscanearQR";
 import FichaActivo from "./pages/FichaActivo";
@@ -45,6 +46,7 @@ function App() {
         {/* Todo lo de adentro vive dentro del cascarón */}
         <Route element={<Protegida><Cascaron /></Protegida>}>
           <Route path="/activos" element={<Activos />} />
+          <Route path="/activos/nuevo" element={<NuevoActivo />} />
           <Route path="/activos/:codigo" element={<FichaActivo />} />
           <Route path="/escanear" element={<EscanearQR />} />
           <Route path="/solicitudes" element={<Solicitudes />} />

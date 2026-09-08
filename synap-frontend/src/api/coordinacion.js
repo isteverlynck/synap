@@ -9,11 +9,22 @@ export async function solicitudesPendientes() {
   return res.data;
 }
 
-// Técnicos que este coordinador puede asignar. Con "grupo" filtra a uno solo,
-// que hace falta en las solicitudes de "cosa" (sin equipo, el grupo se elige).
+// Técnicos que esta persona puede asignar. Con "grupo" filtra a uno solo, que
+// hace falta en las solicitudes de "cosa" (sin equipo, el grupo se elige). Lo
+// usan tanto coordinación (ve los técnicos de sus grupos) como los propios
+// técnicos (ven solo a sus compañeros de grupo, para reasignar una OT entre
+// ellos) — el backend decide el recorte según el rol de quien pregunta.
 export async function tecnicosDisponibles(grupo) {
   const params = grupo ? { grupo } : {};
   const res = await cliente.get("/usuarios/tecnicos", { params });
+  return res.data;
+}
+
+// Los grupos técnicos que existen, para que el coordinador elija a cuál
+// mandar una solicitud que no es de un equipo (ahí el grupo no se puede
+// deducir de ningún activo).
+export async function listarGrupos() {
+  const res = await cliente.get("/usuarios/grupos");
   return res.data;
 }
 

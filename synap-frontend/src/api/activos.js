@@ -32,3 +32,20 @@ export async function opcionesDeFiltro() {
   const res = await cliente.get("/activos/filtros");
   return res.data;
 }
+
+// ─── Alta de un equipo nuevo ───
+
+// Catálogos completos (tipos de equipo y servicios) para el formulario de
+// "nuevo activo". A diferencia de opcionesDeFiltro(), acá van TODOS, no solo
+// los que ya están en uso.
+export async function catalogosParaAlta() {
+  const res = await cliente.get("/activos/catalogos");
+  return res.data;
+}
+
+// Crear un activo nuevo. El código lo arma el backend (área + tipo de equipo
+// + número correlativo); acá no se manda.
+export async function crearActivo(datos) {
+  const res = await cliente.post("/activos", datos);
+  return res.data;
+}

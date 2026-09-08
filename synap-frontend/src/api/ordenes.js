@@ -57,3 +57,41 @@ export async function cerrarOrden(otId, observaciones) {
   });
   return res.data;
 }
+
+// ─── Bitácora ───
+// El registro de lo que se va haciendo mientras la OT está en curso: a
+// diferencia de "observaciones" (un solo texto que se completa al cerrar),
+// acá se suman entradas con fecha y quién las escribió.
+
+// Las entradas de la bitácora de una OT, de la más vieja a la más nueva.
+export async function listarNotas(otId) {
+  const res = await cliente.get(`/ordenes-trabajo/${otId}/notas`);
+  return res.data;
+}
+
+// Sumar una entrada nueva.
+export async function agregarNota(otId, texto) {
+  const res = await cliente.post(`/ordenes-trabajo/${otId}/notas`, { texto });
+  return res.data;
+}
+
+// ─── Correctiva asociada a una preventiva ───
+// Durante un mantenimiento programado se puede encontrar algo que no
+// funciona: esto abre una correctiva aparte, sin perder el rastro de qué
+// preventiva la originó.
+
+// Las correctivas que ya se generaron a partir de esta OT (siempre que sea
+// una preventiva).
+export async function listarCorrectivasAsociadas(otId) {
+  const res = await cliente.get(`/ordenes-trabajo/${otId}/correctivas`);
+  return res.data;
+}
+
+// Generar una correctiva nueva a partir de una preventiva.
+export async function crearCorrectivaAsociada(otId, { descripcion, prioridad }) {
+  const res = await cliente.post(`/ordenes-trabajo/${otId}/correctiva`, {
+    descripcion,
+    prioridad: prioridad || null,
+  });
+  return res.data;
+}

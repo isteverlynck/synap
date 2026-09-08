@@ -7,13 +7,19 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus } from "lucide-react";
 import { listarActivos, opcionesDeFiltro } from "../api/activos";
+import { rolActual } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, tonoEstadoActivo } from "../tema";
 
+// Quién puede dar de alta un equipo nuevo. Enfermería no: para ellos "Activos"
+// es solo consulta (reportan un problema desde la ficha, no cargan equipos).
+const PUEDE_CREAR = ["coordinacion", "tecnico", "junior", "jefatura"];
+
 function Activos() {
   const navegar = useNavigate();
+  const puedeCrear = PUEDE_CREAR.includes(rolActual());
   const [activos, setActivos] = useState([]);
   const [opciones, setOpciones] = useState({ tipos: [], sectores: [], grupos: [], estados: [] });
   const [cargando, setCargando] = useState(true);
@@ -58,6 +64,12 @@ function Activos() {
         titulo="Activos"
         subtitulo={cargando ? "Buscando..." : textoDelSubtitulo(activos.length, busqueda, filtrosActivos)}
       >
+        {puedeCrear && (
+          <button style={{ ...boton("primario"), gap: 7 }} onClick={() => navegar("/activos/nuevo")}>
+            <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
+            Nuevo equipo
+          </button>
+        )}
         <button style={boton("secundario")} onClick={() => navegar("/escanear")}>
           Escanear equipo (QR)
         </button>
