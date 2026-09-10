@@ -15,11 +15,21 @@
 // para que las órdenes existan. El botón "Generar ahora" es solo un
 // resguardo manual (para coordinación/jefatura) por si el backend estuvo
 // apagado un tiempo y no quieren esperar al próximo reinicio.
+//
+// Filtros: el endpoint trae TODOS los equipos con MP ese mes, de cualquier
+// grupo (a propósito: es información de planificación, no "mis cosas"). Con
+// varios grupos mezclados la lista se hace larga, así que se filtra acá
+// mismo, sobre lo que ya se trajo — sin pedirle nada nuevo al backend:
+//   - Buscador: por código o nombre del equipo.
+//   - Estado: pronóstico / abierta / en progreso / cerrada.
+//   - Grupo técnico: las opciones salen de los propios ítems del mes (no de
+//     un catálogo aparte), así nunca ofrece un grupo que ese mes no tiene
+//     nada.
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { calendarioPreventivas, generarPreventivas } from "../api/preventivas";
 import { obtenerPerfil } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
@@ -32,6 +42,41 @@ const MESES = [
 
 const PUEDE_GENERAR = ["coordinacion", "jefatura"];
 
+// Los filtros de estado. "PRONOSTICO" no es un estado de OT real: es "la MP
+// existe en el plan pero todavía no se generó la orden" (ver comentario de
+// arriba).
+const FILTROS_ESTADO = [
+  { id: "", texto: "Todos" },
+  { id: "PRONOSTICO", texto: "Pronóstico" },
+  { id: "ABIERTA", texto: "Abiertas" },
+  { id: "EN_PROGRESO", texto: "En progreso" },
+  { id: "CERRADA", texto: "Cerradas" },
+];
+
+// ¿Este ítem del calendario pasa los filtros activos? Los tres son
+// independientes entre sí (AND): busqueda, estado y grupo.
+function coincideFiltros(item, { busqueda, estado, grupo }) {
+  if (grupo && item.grupo_id !== grupo) return false;
+
+  if (estado) {
+    if (estado === "PRONOSTICO") {
+      if (item.generada) return false;
+    } else if (!item.generada || item.estado !== estado) {
+      return false;
+    }
+  }
+
+  const texto = busqueda.trim();
+  if (texto) {
+    const enNombre = item.activo_descripcion?.toLowerCase().includes(texto.toLowerCase());
+    const comoCodigo = texto.toUpperCase().replace(/[\s-]+/g, "-").replace(/^-+|-+$/g, "");
+    const enCodigo = comoCodigo && item.activo_codigo?.toUpperCase().includes(comoCodigo);
+    if (!enNombre && !enCodigo) return false;
+  }
+
+  return true;
+}
+
 function CalendarioMP() {
   const navegar = useNavigate();
   const hoy = new Date();
@@ -43,6 +88,10 @@ function CalendarioMP() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [generando, setGenerando] = useState(false);
+
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+  const [filtroGrupo, setFiltroGrupo] = useState("");
 
   useEffect(() => {
     obtenerPerfil().then(setPerfil).catch(() => setPerfil(null));
@@ -109,11 +158,30 @@ function CalendarioMP() {
   const items = datos?.items || [];
   const puedeGenerar = PUEDE_GENERAR.includes(perfil?.rol);
 
+  // Grupos técnicos presentes ESTE mes, para las opciones del filtro — así
+  // nunca se ofrece un grupo que este mes no tiene ningún mantenimiento.
+  const grupos = [...new Set(items.map((i) => i.grupo_id).filter(Boolean))].sort();
+
+  const hayFiltrosActivos = busqueda.trim() !== "" || filtroEstado !== "" || filtroGrupo !== "";
+  const itemsFiltrados = hayFiltrosActivos
+    ? items.filter((item) => coincideFiltros(item, { busqueda, estado: filtroEstado, grupo: filtroGrupo }))
+    : items;
+
+  function limpiarFiltros() {
+    setBusqueda("");
+    setFiltroEstado("");
+    setFiltroGrupo("");
+  }
+
   return (
     <>
       <Encabezado
         titulo="Calendario de mantenimientos"
-        subtitulo="Preventivos generados y programados, mes a mes"
+        subtitulo={
+          hayFiltrosActivos
+            ? `${itemsFiltrados.length} de ${items.length} en esta vista`
+            : "Preventivos generados y programados, mes a mes"
+        }
       />
 
       <div style={estilos.navegador}>
@@ -144,6 +212,60 @@ function CalendarioMP() {
         )}
       </div>
 
+      {/* ─── Buscador: por código o nombre del equipo ─── */}
+      <div style={estilos.campoBusqueda}>
+        <Search size={17} strokeWidth={1.9} color={color.textoDebil} aria-hidden="true" />
+        <input
+          style={estilos.inputBusqueda}
+          placeholder="Buscar por código o nombre del equipo"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        {busqueda && (
+          <button style={estilos.limpiarBusqueda} onClick={() => setBusqueda("")} title="Limpiar">
+            <X size={15} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        )}
+      </div>
+
+      {/* ─── Filtro por estado ─── */}
+      <div style={estilos.filtros}>
+        {FILTROS_ESTADO.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFiltroEstado(f.id)}
+            style={{
+              ...estilos.filtro,
+              ...(filtroEstado === f.id ? estilos.filtroActivo : {}),
+            }}
+          >
+            {f.texto}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── Filtro por grupo técnico: solo si hay más de uno este mes,
+      elegir entre uno solo no aporta nada. ─── */}
+      {grupos.length > 1 && (
+        <div style={estilos.filtros}>
+          <button
+            onClick={() => setFiltroGrupo("")}
+            style={{ ...estilos.filtro, ...(filtroGrupo === "" ? estilos.filtroActivo : {}) }}
+          >
+            Todos los grupos
+          </button>
+          {grupos.map((g) => (
+            <button
+              key={g}
+              onClick={() => setFiltroGrupo(g)}
+              style={{ ...estilos.filtro, ...(filtroGrupo === g ? estilos.filtroActivo : {}) }}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
       {!cargando && !error && items.length === 0 && (
@@ -152,8 +274,15 @@ function CalendarioMP() {
         </p>
       )}
 
+      {!cargando && !error && items.length > 0 && itemsFiltrados.length === 0 && (
+        <p style={estilos.mensaje}>
+          Ningún equipo coincide con el filtro.{" "}
+          <button style={estilos.linkHoy} onClick={limpiarFiltros}>Limpiar filtros</button>
+        </p>
+      )}
+
       <div style={estilos.lista}>
-        {items.map((item) => (
+        {itemsFiltrados.map((item) => (
           <div
             key={item.activo_codigo}
             className="sy-clickeable"
@@ -207,7 +336,33 @@ const estilos = {
   linkHoy: {
     background: "transparent", border: "none", cursor: "pointer",
     color: color.primario, fontSize: "0.8rem", fontWeight: 600,
-    fontFamily: "inherit", padding: 0,
+    fontFamily: "inherit", padding: 0, textDecoration: "underline",
+  },
+  // Mismo aspecto que el buscador de Equipos/Órdenes, para que las tres
+  // pantallas se sientan consistentes.
+  campoBusqueda: {
+    ...cs.input,
+    display: "flex", alignItems: "center", gap: 9,
+    padding: "0 12px", marginBottom: 12,
+  },
+  inputBusqueda: {
+    flex: 1, border: "none", outline: "none", background: "transparent",
+    fontFamily: "inherit", fontSize: "0.92rem", color: color.texto,
+    padding: "11px 0", minWidth: 0,
+  },
+  limpiarBusqueda: {
+    background: "transparent", border: "none", cursor: "pointer",
+    color: color.textoDebil, display: "flex", padding: 2,
+  },
+  filtros: { display: "flex", gap: 7, marginBottom: 10, flexWrap: "wrap" },
+  filtro: {
+    padding: "6px 14px", borderRadius: 999, border: `1px solid ${color.borde}`,
+    background: color.tarjeta, color: color.textoSuave, fontSize: "0.83rem",
+    cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
+  },
+  filtroActivo: {
+    background: color.primarioClaro, color: color.primarioOscuro,
+    borderColor: color.primarioClaro,
   },
   lista: { display: "flex", flexDirection: "column", gap: 10 },
   tarjeta: {

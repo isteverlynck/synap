@@ -105,6 +105,104 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     
+# ─── Catálogos de activos (tipos de equipo y servicios) ───
+# El mismo criterio de formato que ya usan los ids existentes (ej. "DESF",
+# "MONI", "UTI"): letras y/o números, sin espacios ni símbolos, cortos.
+CATALOGO_ID_REGEX = re.compile(r"^[A-Z0-9]{2,10}$")
+
+
+def _validar_id_catalogo(v: str) -> str:
+    """Normaliza (mayúsculas, sin espacios) y valida el id de un catálogo
+    (tipo de equipo o servicio). Se usa para que, por ejemplo, "robt" o
+    " Robt " terminen guardados como "ROBT", igual que hace el campo "área"
+    en el alta de un activo."""
+    v = v.strip().upper()
+    if not CATALOGO_ID_REGEX.match(v):
+        raise ValueError(
+            "El código debe tener entre 2 y 10 letras o números, sin espacios "
+            "ni símbolos (ej: ROBT para 'Robot quirúrgico')."
+        )
+    return v
+
+
+class TipoEquipoCreate(BaseModel):
+    """Alta de un tipo de equipo nuevo en el catálogo (ej: llegó un robot
+    quirúrgico y no había un tipo para eso todavía).
+
+    El id es la abreviación que después va a aparecer en el código de cada
+    equipo de ese tipo (B-<área>-<id>-<número>), por eso tiene que ser corta
+    y sin espacios.
+    """
+    id: str
+    nombre: str
+    descripcion: str | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _validar_id(cls, v: str) -> str:
+        return _validar_id_catalogo(v)
+
+    @field_validator("nombre")
+    @classmethod
+    def _validar_nombre(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Indicá el nombre del tipo de equipo.")
+        return v
+
+
+class TipoEquipoOut(BaseModel):
+    id: str
+    nombre: str
+    descripcion: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ServicioCreate(BaseModel):
+    """Alta de un servicio/área nueva del hospital (ej: se abrió un sector
+    nuevo y todavía no está en el catálogo).
+
+    centro_costos es obligatorio porque así está la tabla en Supabase (no
+    admite nulos) — si todavía no se sabe el número exacto, alcanza con
+    anotar algo provisorio y corregirlo después.
+    """
+    id: str
+    nombre: str
+    centro_costos: str
+    descripcion: str | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _validar_id(cls, v: str) -> str:
+        return _validar_id_catalogo(v)
+
+    @field_validator("nombre")
+    @classmethod
+    def _validar_nombre(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Indicá el nombre del servicio.")
+        return v
+
+    @field_validator("centro_costos")
+    @classmethod
+    def _validar_centro_costos(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Indicá el centro de costos.")
+        return v
+
+
+class ServicioOut(BaseModel):
+    id: str
+    nombre: str
+    centro_costos: str
+    descripcion: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ─── Activos ───
 class ActivoOut(BaseModel):
     """Datos de un activo que devolvemos al frontend."""

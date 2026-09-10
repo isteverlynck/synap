@@ -49,3 +49,18 @@ export async function crearActivo(datos) {
   const res = await cliente.post("/activos", datos);
   return res.data;
 }
+
+// ─── Catálogos (tipos de equipo y servicios): alta de coordinación ───
+
+// Dar de alta un tipo de equipo nuevo (ej: llegó un robot y no había tipo
+// para eso). datos: { id, nombre, descripcion }.
+export async function crearTipoEquipo(datos) {
+  const res = await cliente.post("/activos/tipos-equipo", datos);
+  return res.data;
+}
+
+// Dar de alta un servicio/área nueva. datos: { id, nombre, centro_costos, descripcion }.
+export async function crearServicio(datos) {
+  const res = await cliente.post("/activos/servicios", datos);
+  return res.data;
+}

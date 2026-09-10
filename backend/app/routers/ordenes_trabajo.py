@@ -15,7 +15,7 @@ Todos los endpoints están protegidos con login (get_current_user).
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -139,14 +139,33 @@ def mis_ordenes(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Las OT asignadas al técnico logueado ("Mis OT asignadas").
+    """Las OT que le tocan al técnico logueado ("Mis OT asignadas"): las que
+    tiene asignadas a su nombre, MÁS las de su propio grupo que todavía no
+    tienen un técnico puntual — esas últimas son del grupo entero, no de una
+    persona en concreto.
+
+    Esto es clave para las preventivas: se generan automáticamente para el
+    GRUPO que atiende el equipo (ver preventivas.py), sin asignarle un
+    técnico puntual a ninguna — así que sin este agregado, una preventiva
+    recién generada no le aparecía a NADIE en "Mis órdenes" hasta que alguien
+    la asignara a mano desde otro lado. Con esto, cualquier persona del grupo
+    la ve y la puede tomar (el botón de asignar ya lo permite: cualquier
+    técnico del mismo grupo se puede autoasignar una OT sin técnico).
 
     Filtros opcionales:
       - tipo: CORRECTIVA / PREVENTIVA (para separar las secciones del panel del
         técnico: "OT asignadas" vs "OT preventivas").
-      - estado: ASIGNADA / EN_PROGRESO / CERRADA.
+      - estado: ABIERTA / EN_PROGRESO / CERRADA.
     """
-    q = db.query(OrdenTrabajo).filter(OrdenTrabajo.tecnico_id == current_user.id)
+    q = db.query(OrdenTrabajo).filter(
+        or_(
+            OrdenTrabajo.tecnico_id == current_user.id,
+            and_(
+                OrdenTrabajo.tecnico_id.is_(None),
+                OrdenTrabajo.grupo_id == current_user.grupo,
+            ),
+        )
+    )
     if estado is not None:
         q = q.filter(OrdenTrabajo.estado == estado)
     if tipo is not None:

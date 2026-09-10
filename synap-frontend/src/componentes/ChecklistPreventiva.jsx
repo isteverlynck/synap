@@ -4,6 +4,10 @@
 // ESE ítem puntual (queda enganchada a esta misma preventiva, igual que la
 // que se genera con el botón general "Algo no funciona" de la OT).
 //
+// Un ítem ya contestado se puede volver a contestar ("Cambiar"): por si se
+// apretó el botón equivocado. El backend guarda esto como un upsert (la
+// misma fila se actualiza, no se duplica).
+//
 // Vive dentro de DetalleOrden.jsx, solo quando la OT es tipo PREVENTIVA.
 
 import { useEffect, useState } from "react";
@@ -25,6 +29,10 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
 
   // El ítem que tiene abierto el formulario de "no pasa" (a lo sumo uno).
   const [itemAbierto, setItemAbierto] = useState(null);
+  // El ítem que se está volviendo a contestar (ya tenía una respuesta, pero
+  // se apretó "Cambiar"): mientras tanto se le vuelven a mostrar los botones
+  // Pasa/No pasa en vez de la insignia de solo lectura.
+  const [itemEditando, setItemEditando] = useState(null);
   const [observacion, setObservacion] = useState("");
   const [generarCorrectiva, setGenerarCorrectiva] = useState(true);
   const [prioridad, setPrioridad] = useState("");
@@ -49,12 +57,39 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
     return respuestas.find((r) => r.checklist_item_id === itemId);
   }
 
-  function abrirNoPasa(item) {
+  // respuestaPrevia: si se está EDITANDO una respuesta que ya existía, se
+  // pasa acá para precargar lo que había escrito antes. Al editar, "Generar
+  // correctiva" arranca destildado (si ya se había decidido no generarla, o
+  // si ya se generó una la primera vez, no queremos abrir otra sin que lo
+  // pidan de nuevo).
+  function abrirNoPasa(item, respuestaPrevia) {
     setItemAbierto(item.id);
-    setObservacion("");
-    setGenerarCorrectiva(true);
+    setObservacion(respuestaPrevia?.observacion || "");
+    setGenerarCorrectiva(!respuestaPrevia);
     setPrioridad("");
     setErrorItem("");
+  }
+
+  function cambiarRespuesta(item) {
+    setItemAbierto(null);
+    setErrorItem("");
+    setItemEditando(item.id);
+  }
+
+  function cancelarEdicion() {
+    setItemAbierto(null);
+    setItemEditando(null);
+    setErrorItem("");
+  }
+
+  // Reemplaza (si ya había una respuesta para este ítem) o agrega, en el
+  // estado local, sin dejar duplicados — el backend hace lo mismo del lado
+  // de la base.
+  function upsertLocal(nueva) {
+    setRespuestas((antes) => [
+      ...antes.filter((r) => r.checklist_item_id !== nueva.checklist_item_id),
+      nueva,
+    ]);
   }
 
   async function marcarPasa(item) {
@@ -62,7 +97,8 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
       const nueva = await registrarRespuesta({
         mpId: mp.id, checklistItemId: item.id, resultado: "PASA", completadoPor: perfil?.id,
       });
-      setRespuestas((antes) => [...antes, nueva]);
+      upsertLocal(nueva);
+      setItemEditando(null);
     } catch (e) {
       toast.error(e.response?.data?.detail || "No pudimos guardar la respuesta.");
     }
@@ -83,10 +119,10 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
         });
         // El backend no devuelve la respuesta (devuelve la OT correctiva);
         // la agregamos acá mismo para que el ítem quede marcado sin recargar.
-        setRespuestas((antes) => [...antes, {
+        upsertLocal({
           id: `local-${item.id}`, mp_id: mp.id, checklist_item_id: item.id,
           completado: true, resultado: "NO_PASA", observacion: observacion.trim(),
-        }]);
+        });
         onCorrectivaCreada?.(correctiva);
         toast.success(`Correctiva OT-${String(correctiva.numero_ot).padStart(4, "0")} generada`, {
           description: item.descripcion,
@@ -97,9 +133,10 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
           mpId: mp.id, checklistItemId: item.id, resultado: "NO_PASA",
           observacion: observacion.trim(), completadoPor: perfil?.id,
         });
-        setRespuestas((antes) => [...antes, nueva]);
+        upsertLocal(nueva);
       }
       setItemAbierto(null);
+      setItemEditando(null);
     } catch (e) {
       setErrorItem(e.response?.data?.detail || "No pudimos guardar el ítem.");
     } finally {
@@ -131,34 +168,50 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
       <div style={estilos.listaItems}>
         {items.map((item) => {
           const r = respuestaDe(item.id);
+          const editando = itemEditando === item.id;
+          // Se muestran los botones Pasa/No pasa cuando el ítem todavía no
+          // tiene respuesta, O cuando se apretó "Cambiar" para esta.
+          const mostrarBotones = puedeCompletar && itemAbierto !== item.id && (!r || editando);
           return (
             <div key={item.id} style={estilos.item}>
               <div style={estilos.filaItem}>
-                <IconoEstado resultado={r?.resultado} />
+                <IconoEstado resultado={editando ? null : r?.resultado} />
                 <span style={estilos.itemTexto}>
                   {item.descripcion}
                   {!item.obligatorio && <span style={estilos.opcional}> (opcional)</span>}
                 </span>
 
-                {!r && puedeCompletar && itemAbierto !== item.id && (
+                {mostrarBotones && (
                   <div style={estilos.botonesItem}>
                     <button style={{ ...boton("secundario"), padding: "6px 12px" }} onClick={() => marcarPasa(item)}>
                       Pasa
                     </button>
-                    <button style={{ ...boton("peligro"), padding: "6px 12px" }} onClick={() => abrirNoPasa(item)}>
+                    <button style={{ ...boton("peligro"), padding: "6px 12px" }} onClick={() => abrirNoPasa(item, r)}>
                       No pasa
                     </button>
+                    {editando && (
+                      <button style={{ ...boton("fantasma"), padding: "6px 12px" }} onClick={cancelarEdicion}>
+                        Cancelar
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {r && (
-                  <span style={insignia(r.resultado === "PASA" ? "exito" : "peligro")}>
-                    {r.resultado === "PASA" ? "Pasa" : "No pasa"}
-                  </span>
+                {r && !editando && itemAbierto !== item.id && (
+                  <>
+                    <span style={insignia(r.resultado === "PASA" ? "exito" : "peligro")}>
+                      {r.resultado === "PASA" ? "Pasa" : "No pasa"}
+                    </span>
+                    {puedeCompletar && (
+                      <button style={estilos.linkCambiar} onClick={() => cambiarRespuesta(item)}>
+                        Cambiar
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
-              {r?.observacion && (
+              {r?.observacion && !editando && itemAbierto !== item.id && (
                 <p style={estilos.observacion}>{r.observacion}</p>
               )}
 
@@ -196,7 +249,7 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
                     <button style={boton("primario")} onClick={() => confirmarNoPasa(item)} disabled={enviando}>
                       {enviando ? "Guardando..." : "Guardar"}
                     </button>
-                    <button style={boton("fantasma")} onClick={() => setItemAbierto(null)} disabled={enviando}>
+                    <button style={boton("fantasma")} onClick={cancelarEdicion} disabled={enviando}>
                       Cancelar
                     </button>
                   </div>
@@ -227,6 +280,11 @@ const estilos = {
   itemTexto: { fontSize: "0.9rem", color: color.texto, flex: 1, minWidth: 160 },
   opcional: { color: color.textoDebil, fontSize: "0.8rem" },
   botonesItem: { display: "flex", gap: 8 },
+  linkCambiar: {
+    background: "transparent", border: "none", cursor: "pointer",
+    color: color.primario, fontSize: "0.78rem", fontWeight: 600,
+    fontFamily: "inherit", padding: 0,
+  },
   observacion: { margin: "8px 0 0 28px", fontSize: "0.84rem", color: color.textoSuave, lineHeight: 1.5 },
   formNoPasa: { marginTop: 12, paddingTop: 12, borderTop: `1px solid ${color.bordeSuave}` },
   checkboxFila: { display: "flex", alignItems: "center", gap: 8, fontSize: "0.86rem", color: color.texto, cursor: "pointer" },

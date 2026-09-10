@@ -12,6 +12,9 @@
 // frecuencia va marcando los meses siguientes solos. También se muestra con
 // qué checklist va a quedar vinculado el equipo (el de su tipo, o el
 // genérico si no hay uno propio) ANTES de crearlo, para que no sea sorpresa.
+// El campo de frecuencia se sugiere solo, a partir de la frecuencia que ya
+// trae ese checklist (frecuencia_dias, convertida a meses) — así no hay que
+// adivinarla, aunque se puede pisar a mano si hace falta un caso puntual.
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -59,6 +62,11 @@ function NuevoActivo() {
   const [criticidad, setCriticidad] = useState("");
 
   const [crearMantenimiento, setCrearMantenimiento] = useState(false);
+  // Lo que la persona escribió a mano en el campo de frecuencia. Empieza
+  // vacío: mientras siga vacío, se MUESTRA la recomendación del checklist en
+  // su lugar (ver frecuenciaEfectiva) sin pisar este estado — así, si todavía
+  // no se eligió un tipo de equipo y la recomendación cambia después, no hay
+  // nada guardado de antes que quede desactualizado.
   const [frecuenciaMeses, setFrecuenciaMeses] = useState("");
   // Mes en que debería abrirse la primera orden (input type="month", da
   // "YYYY-MM"). La OT siempre se abre el día 1 de ese mes.
@@ -85,6 +93,18 @@ function NuevoActivo() {
     ? planes.find((p) => p.tipo_equipo_id === tipoEquipoId) || planes.find((p) => p.es_generica)
     : null;
 
+  // El checklist ya trae su propia frecuencia recomendada (frecuencia_dias):
+  // la convertimos a meses, redondeando al mes más cercano (mínimo 1), para
+  // sugerirla en el campo de abajo en vez de dejarlo en blanco a adivinar.
+  const frecuenciaRecomendada = planQueLeToca
+    ? Math.max(1, Math.round(planQueLeToca.frecuencia_dias / 30))
+    : null;
+
+  // El valor que realmente se usa: lo que escribió la persona, o si todavía
+  // no tocó el campo, la recomendación del checklist. Se calcula en cada
+  // render (no hace falta un efecto que "copie" la sugerencia al estado).
+  const frecuenciaEfectiva = frecuenciaMeses || (frecuenciaRecomendada != null ? String(frecuenciaRecomendada) : "");
+
   async function enviar() {
     setError("");
 
@@ -92,7 +112,7 @@ function NuevoActivo() {
     if (!tipoEquipoId) return setError("Elegí el tipo de equipo.");
     if (!sectorId) return setError("Elegí el servicio/sector.");
     if (crearMantenimiento) {
-      const n = Number(frecuenciaMeses);
+      const n = Number(frecuenciaEfectiva);
       if (!n || n <= 0) return setError("Indicá cada cuántos meses se repite el mantenimiento.");
       if (!primerMes) return setError("Indicá en qué mes debería abrirse la primera orden.");
       if (!planQueLeToca) {
@@ -119,7 +139,7 @@ function NuevoActivo() {
         estado,
         criticidad: criticidad || null,
         crear_mantenimiento: crearMantenimiento,
-        frecuencia_meses: crearMantenimiento ? Number(frecuenciaMeses) : null,
+        frecuencia_meses: crearMantenimiento ? Number(frecuenciaEfectiva) : null,
         // "YYYY-MM" del input type="month" → "YYYY-MM-01" para el backend.
         proxima_fecha_mp: crearMantenimiento && primerMes ? `${primerMes}-01` : null,
       });
@@ -195,7 +215,7 @@ function NuevoActivo() {
             <Campo etiqueta="Ubicación">
               <input
                 style={cs.input}
-                placeholder="Ej: E03-P01-CARD"
+                placeholder="Ej: Habitación 1 UTI"
                 value={ubicacion}
                 onChange={(e) => setUbicacion(e.target.value)}
               />
@@ -241,13 +261,20 @@ function NuevoActivo() {
           {crearMantenimiento && (
             <div style={{ marginTop: 14 }}>
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                <div style={{ maxWidth: 160 }}>
-                  <Campo etiqueta="Frecuencia (en meses)" ayuda="Ej: 12 = una vez por año.">
+                <div style={{ maxWidth: 200 }}>
+                  <Campo
+                    etiqueta="Frecuencia (en meses)"
+                    ayuda={
+                      frecuenciaRecomendada != null
+                        ? `Recomendado según el checklist "${planQueLeToca.nombre}": cada ${frecuenciaRecomendada} ${frecuenciaRecomendada === 1 ? "mes" : "meses"}. Lo podés cambiar.`
+                        : "Ej: 12 = una vez por año."
+                    }
+                  >
                     <input
                       type="number"
                       min="1"
                       style={cs.input}
-                      value={frecuenciaMeses}
+                      value={frecuenciaEfectiva}
                       onChange={(e) => setFrecuenciaMeses(e.target.value)}
                     />
                   </Campo>

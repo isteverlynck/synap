@@ -131,10 +131,15 @@ def registrar_respuesta(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
-    """Registrar la respuesta a un ítem del checklist en un MP concreto.
+    """Registrar (o cambiar) la respuesta a un ítem del checklist en un MP.
 
     Verifica que el MP y el ítem existan antes de guardar (para no dejar
     respuestas colgadas que apunten a cosas que no existen).
+
+    Es un upsert: si el ítem ya tenía una respuesta, la actualiza en vez de
+    crear una segunda. Así, si alguien marcó "No pasa" por error y en
+    realidad "Pasa" (o al revés), puede volver a contestar y se corrige la
+    misma fila en vez de acumular respuestas viejas.
     """
     # 1. El MP tiene que existir.
     mp = db.query(MantenimientoPreventivo).filter(
@@ -151,15 +156,30 @@ def registrar_respuesta(
     if item is None:
         raise HTTPException(status_code=404, detail="El ítem de checklist no existe.")
 
-    # 3. Crear la respuesta.
-    respuesta = ChecklistRespuesta(
-        mp_id=payload.mp_id,
-        checklist_item_id=payload.checklist_item_id,
-        completado=payload.completado,
-        observacion=payload.observacion,
-        completado_por=payload.completado_por,
+    # 3. Crear la respuesta, o actualizar la que ya había para este ítem.
+    respuesta = (
+        db.query(ChecklistRespuesta)
+        .filter(
+            ChecklistRespuesta.mp_id == payload.mp_id,
+            ChecklistRespuesta.checklist_item_id == payload.checklist_item_id,
+        )
+        .first()
     )
-    db.add(respuesta)
+    if respuesta is None:
+        respuesta = ChecklistRespuesta(
+            mp_id=payload.mp_id,
+            checklist_item_id=payload.checklist_item_id,
+        )
+        db.add(respuesta)
+
+    respuesta.completado = payload.completado
+    # BUG (ya corregido): acá faltaba guardar el resultado — por eso toda
+    # respuesta quedaba con resultado=None y el frontend la mostraba siempre
+    # como "No pasa" (su ternario trata "no es PASA" como "No pasa").
+    respuesta.resultado = payload.resultado
+    respuesta.observacion = payload.observacion
+    respuesta.completado_por = payload.completado_por
+
     db.commit()
     db.refresh(respuesta)
     return respuesta
@@ -210,16 +230,27 @@ def generar_correctiva_desde_checklist(
     if activo is None:
         raise HTTPException(status_code=404, detail="El activo del mantenimiento no existe.")
 
-    # 4. Registrar la respuesta NO_PASA.
-    respuesta = ChecklistRespuesta(
-        mp_id=payload.mp_id,
-        checklist_item_id=payload.checklist_item_id,
-        completado=True,
-        resultado="NO_PASA",
-        observacion=payload.descripcion,
-        completado_por=payload.tecnico_id,
+    # 4. Registrar la respuesta NO_PASA — o actualizarla, si el ítem ya tenía
+    #    una (mismo criterio de upsert que en POST /checklists/respuestas).
+    respuesta = (
+        db.query(ChecklistRespuesta)
+        .filter(
+            ChecklistRespuesta.mp_id == payload.mp_id,
+            ChecklistRespuesta.checklist_item_id == payload.checklist_item_id,
+        )
+        .first()
     )
-    db.add(respuesta)
+    if respuesta is None:
+        respuesta = ChecklistRespuesta(
+            mp_id=payload.mp_id,
+            checklist_item_id=payload.checklist_item_id,
+        )
+        db.add(respuesta)
+
+    respuesta.completado = True
+    respuesta.resultado = "NO_PASA"
+    respuesta.observacion = payload.descripcion
+    respuesta.completado_por = payload.tecnico_id
 
     # 5. Crear la OT correctiva para el mismo equipo, heredando el grupo y el
     #    ot_origen_id de la preventiva (si el MP está enganchado a una OT).

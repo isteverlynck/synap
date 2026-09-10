@@ -158,13 +158,14 @@ function Activos() {
             style={estilos.tarjeta}
           >
             <div style={{ minWidth: 0 }}>
-              {/* El nombre primero, el código abajo: nadie reconoce un equipo
-              por B-CIRU-MAAN-056. Mismo criterio que en las órdenes. */}
-              <div style={estilos.descripcion}>{a.descripcion}</div>
+              {/* El código primero, grande: es el identificador con el que se
+              ubica un equipo puntual (QR, etiqueta física) y con el que está
+              ordenada la lista. El nombre queda abajo, como dato secundario. */}
               <div style={estilos.codigo}>
                 {a.codigo}
                 {a.ubicacion ? ` · ${a.ubicacion}` : ""}
               </div>
+              <div style={estilos.descripcion}>{a.descripcion}</div>
               {(a.marca || a.modelo) && (
                 <div style={estilos.detalle}>{[a.marca, a.modelo].filter(Boolean).join(" ")}</div>
               )}
@@ -227,8 +228,8 @@ const estilos = {
     ...cs.tarjeta, padding: "14px 18px",
     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
   },
-  descripcion: { fontSize: "0.97rem", color: color.texto, fontWeight: 600 },
-  codigo: { fontSize: "0.82rem", color: color.textoSuave, fontFamily: "ui-monospace, monospace", marginTop: 3 },
+  codigo: { fontSize: "0.97rem", color: color.texto, fontWeight: 700, fontFamily: "ui-monospace, monospace" },
+  descripcion: { fontSize: "0.85rem", color: color.textoSuave, marginTop: 3 },
   detalle: { fontSize: "0.82rem", color: color.textoDebil, marginTop: 2 },
 };
 

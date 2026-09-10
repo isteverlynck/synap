@@ -13,7 +13,7 @@ import { obtenerPerfil, logout } from "../api/auth";
 import { color } from "../tema";
 import {
   QrCode, Inbox, ClipboardList, HeartPulse, Package,
-  CalendarClock, CalendarDays, BarChart3, Bell,
+  CalendarClock, CalendarDays, BarChart3, Bell, Boxes,
 } from "lucide-react";
 
 // ─── Qué ve cada rol ──────────────────────────────────────────────────────
@@ -41,6 +41,10 @@ const MENUS = {
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
     { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: false },
+    // Tipos de equipo y servicios/áreas: antes solo se cargaban a mano en la
+    // base. Coordinación es quien los da de alta (ej: entra un tipo de
+    // equipo nuevo), por eso vive en su menú y en el de jefatura.
+    { id: "catalogos", texto: "Catálogos", ruta: "/catalogos", icono: "catalogos", listo: true },
   ],
   jefatura: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
@@ -49,6 +53,7 @@ const MENUS = {
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
+    { id: "catalogos", texto: "Catálogos", ruta: "/catalogos", icono: "catalogos", listo: true },
   ],
 };
 
@@ -213,6 +218,7 @@ const ICONOS = {
   "calendario-dias": CalendarDays,
   grafico: BarChart3,
   campana: Bell,
+  catalogos: Boxes,
 };
 
 function Icono({ nombre, color: c = "currentColor" }) {

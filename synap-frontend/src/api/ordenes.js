@@ -5,8 +5,12 @@
 import cliente from "./cliente";
 
 // Las OT asignadas al usuario logueado (la pantalla del técnico).
-export async function misOrdenes(estado) {
-  const params = estado ? { estado } : {};
+//   { estado }  → ABIERTA / EN_PROGRESO / CERRADA
+//   { tipo }    → CORRECTIVA / PREVENTIVA
+export async function misOrdenes({ estado, tipo } = {}) {
+  const params = {};
+  if (estado) params.estado = estado;
+  if (tipo) params.tipo = tipo;
   const res = await cliente.get("/ordenes-trabajo/mias", { params });
   return res.data;
 }

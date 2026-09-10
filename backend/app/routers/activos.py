@@ -7,7 +7,15 @@ from sqlalchemy import or_
 
 from ..database import get_db
 from ..models import Activo, Usuario, GrupoTipoEquipo, GrupoTecnico, Usuario, TipoEquipo, Servicio, PlantillaMP
-from ..schemas import ActivoOut, ActivoDetalle, ActivoCreate
+from ..schemas import (
+    ActivoOut,
+    ActivoDetalle,
+    ActivoCreate,
+    TipoEquipoCreate,
+    TipoEquipoOut,
+    ServicioCreate,
+    ServicioOut,
+)
 from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/activos", tags=["activos"])
@@ -58,7 +66,10 @@ def listar_activos(
     if grupo_id:
         q = q.filter(Activo.grupo_id == grupo_id)
 
-    return q.order_by(Activo.descripcion, Activo.codigo).limit(limit).all()
+    # Ordenado por código: es el identificador que se usa para ubicar un
+    # equipo puntual (QR, etiqueta física), así que conviene que la lista
+    # quede en ese orden en vez de por nombre.
+    return q.order_by(Activo.codigo).limit(limit).all()
 
 @router.get("/filtros")
 def opciones_de_filtro(
@@ -109,14 +120,62 @@ def catalogos_para_alta(
     poder elegirse igual al dar de alta el primero.
     """
     tipos = [
-        {"id": t.id, "nombre": t.nombre}
+        {"id": t.id, "nombre": t.nombre, "descripcion": t.descripcion}
         for t in db.query(TipoEquipo).order_by(TipoEquipo.nombre).all()
     ]
     sectores = [
-        {"id": s.id, "nombre": s.nombre}
+        {"id": s.id, "nombre": s.nombre, "centro_costos": s.centro_costos, "descripcion": s.descripcion}
         for s in db.query(Servicio).order_by(Servicio.nombre).all()
     ]
     return {"tipos": tipos, "sectores": sectores}
+
+
+@router.post("/tipos-equipo", response_model=TipoEquipoOut, status_code=201)
+def crear_tipo_equipo(
+    payload: TipoEquipoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Dar de alta un tipo de equipo nuevo en el catálogo (ej: llegó un robot
+    quirúrgico y todavía no había un tipo para eso). Lo hace coordinación
+    (jefatura también, por requiere_rol), para no depender de tocar la base a
+    mano cada vez que aparece un tipo de equipo nuevo en el hospital.
+    """
+    if db.query(TipoEquipo).filter(TipoEquipo.id == payload.id).first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe un tipo de equipo con el código {payload.id}.",
+        )
+    tipo = TipoEquipo(id=payload.id, nombre=payload.nombre, descripcion=payload.descripcion)
+    db.add(tipo)
+    db.commit()
+    db.refresh(tipo)
+    return tipo
+
+
+@router.post("/servicios", response_model=ServicioOut, status_code=201)
+def crear_servicio(
+    payload: ServicioCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Dar de alta un servicio/área nueva del hospital en el catálogo (mismo
+    caso que crear_tipo_equipo, pero para servicios)."""
+    if db.query(Servicio).filter(Servicio.id == payload.id).first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe un servicio con el código {payload.id}.",
+        )
+    servicio = Servicio(
+        id=payload.id,
+        nombre=payload.nombre,
+        centro_costos=payload.centro_costos,
+        descripcion=payload.descripcion,
+    )
+    db.add(servicio)
+    db.commit()
+    db.refresh(servicio)
+    return servicio
 
 
 @router.post("", response_model=ActivoOut, status_code=201)
@@ -273,3 +332,5 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
                 detalle.responsable_email = responsable.email
 
     return detalle
+    
+    return activo
