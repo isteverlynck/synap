@@ -228,7 +228,7 @@ function FichaActivo() {
       <div style={cs.contenido}>
         <Volver />
         <Encabezado titulo="Ficha del equipo">
-          <button style={boton("secundario")} onClick={() => navegar("/escanear")}>Escanear otro</button>
+          {/* <button style={boton("secundario")} onClick={() => navegar("/escanear")}>Escanear otro</button> */}
         </Encabezado>
 
         {/* Aviso de estado: ancho completo y ANTES del nombre del equipo, para
