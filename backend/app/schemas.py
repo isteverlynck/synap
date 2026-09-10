@@ -143,16 +143,23 @@ class ActivoCreate(BaseModel):
     tipo_equipo_id (el número sale solo: el siguiente correlativo para ese
     tipo de equipo, sin importar el área).
 
+    Tampoco se manda 'descripcion': antes se pedía a mano y terminaba siendo
+    casi lo mismo que el tipo de equipo, pero escrito distinto cada vez
+    (mayúsculas, minúsculas, con o sin tildes). Ahora el backend la completa
+    solo con el nombre del tipo de equipo elegido, así el listado de activos
+    queda consistente.
+
     crear_mantenimiento es el paso opcional: si viene en True, hay que mandar
-    frecuencia_meses (cada cuántos meses repetirlo). El backend busca el plan
-    de mantenimiento (checklist) de ese tipo de equipo —o el genérico si no
-    hay uno específico— y calcula la primera 'próxima fecha' a partir de
-    fecha_instalacion (o de hoy, si no se cargó fecha de instalación).
+    también frecuencia_meses (cada cuántos meses se repite) y
+    proxima_fecha_mp (el MES en que debería abrirse la primera orden — la
+    persona que carga el equipo lo elige a mano, no se calcula solo a partir
+    de la fecha de instalación). El backend busca el plan de mantenimiento
+    (checklist) de ese tipo de equipo —o el genérico si no hay uno
+    específico— y lo vincula al activo.
     """
     area: str
     tipo_equipo_id: str
     sector_id: str
-    descripcion: str
     ubicacion: str | None = None
     marca: str | None = None
     modelo: str | None = None
@@ -165,6 +172,10 @@ class ActivoCreate(BaseModel):
 
     crear_mantenimiento: bool = False
     frecuencia_meses: int | None = None
+    # El mes en que debería saltar la primera orden de este mantenimiento.
+    # La OT siempre se abre el día 1 del mes elegido, así que el día que
+    # venga en la fecha se ignora (se normaliza a 1 acá mismo).
+    proxima_fecha_mp: date | None = None
 
     @field_validator("area")
     @classmethod
@@ -174,13 +185,12 @@ class ActivoCreate(BaseModel):
             raise ValueError("Indicá el área del equipo (ej: INTR, TERA, CIRU).")
         return v
 
-    @field_validator("descripcion")
+    @field_validator("proxima_fecha_mp")
     @classmethod
-    def _validar_descripcion(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("Indicá una descripción del equipo.")
-        return v
+    def _normalizar_dia_1(cls, v: date | None) -> date | None:
+        if v is None:
+            return v
+        return v.replace(day=1)
 
 # ─── Schemas resumidos para anidar en la ficha del activo ───
     
@@ -251,6 +261,13 @@ class OrdenTrabajoOut(BaseModel):
     # el mantenimiento se encontró algo que no funciona), acá queda el id de
     # esa preventiva. Nulo en el resto de las OT.
     ot_origen_id: uuid.UUID | None = None
+    # Tiempo real de parada del equipo (medido con los botones "Iniciar
+    # parada" / "Finalizar parada", no calculado a partir de otras fechas).
+    # parada_iniciada_en tiene valor mientras hay una parada corriendo; el
+    # frontend lo usa para saber qué botón mostrar y para sumarle el tiempo
+    # transcurrido al total en vivo.
+    parada_iniciada_en: datetime | None = None
+    tiempo_parada_segundos: int = 0
     model_config = ConfigDict(from_attributes=True)
     activo_descripcion: str | None = None
     activo_ubicacion: str | None = None
@@ -744,6 +761,32 @@ class PreventivasGeneradas(BaseModel):
     cantidad_generada: int
     ya_existian: int
     equipos: list[str]
+
+class ItemCalendarioPreventiva(BaseModel):
+    """Un mantenimiento preventivo dentro del calendario de un mes puntual:
+    ya generado (con su OT), o todavía en pronóstico.
+    """
+    activo_codigo: str
+    activo_descripcion: str
+    activo_ubicacion: str | None = None
+    grupo_id: str | None = None
+    # True: ya existe la OT (orden_id/numero_ot/estado vienen completos).
+    # False: es un pronóstico — la próxima MP del equipo cae en este mes,
+    # pero la OT todavía no se generó (mes futuro, o el generador automático
+    # todavía no llegó a esa fecha).
+    generada: bool
+    orden_id: uuid.UUID | None = None
+    numero_ot: int | None = None
+    estado: str | None = None
+
+
+class CalendarioPreventivas(BaseModel):
+    """Los mantenimientos preventivos de un mes puntual (cualquiera, no solo
+    el actual), para que cualquier usuario pueda mirar hacia adelante o hacia
+    atrás y organizarse."""
+    anio: int
+    mes: int
+    items: list[ItemCalendarioPreventiva] = []
     
 class RecuperarPasswordRequest(BaseModel):
     """Pedido de recuperación: solo el número de identificación."""

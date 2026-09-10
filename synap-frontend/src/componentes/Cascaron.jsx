@@ -13,7 +13,7 @@ import { obtenerPerfil, logout } from "../api/auth";
 import { color } from "../tema";
 import {
   QrCode, Inbox, ClipboardList, HeartPulse, Package,
-  CalendarClock, BarChart3, Bell,
+  CalendarClock, CalendarDays, BarChart3, Bell,
 } from "lucide-react";
 
 // ─── Qué ve cada rol ──────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ const MENUS = {
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
     { id: "ot", texto: "Mis órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
+    { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
     { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: false },
   ],
   coordinacion: [
@@ -37,7 +38,8 @@ const MENUS = {
     { id: "solicitudes", texto: "Solicitudes", ruta: "/pendientes", icono: "bandeja", listo: true },
     { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
-    { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: false },
+    { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
+    { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
     { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: false },
   ],
   jefatura: [
@@ -45,7 +47,8 @@ const MENUS = {
     { id: "dashboard", texto: "Dashboard", ruta: "/dashboard", icono: "grafico", listo: false },
     { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: false },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
-    { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: false },
+    { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
+    { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
   ],
 };
 
@@ -207,6 +210,7 @@ const ICONOS = {
   equipo: HeartPulse,
   caja: Package,
   calendario: CalendarClock,
+  "calendario-dias": CalendarDays,
   grafico: BarChart3,
   campana: Bell,
 };

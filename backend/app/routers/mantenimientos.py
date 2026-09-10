@@ -31,14 +31,19 @@ router = APIRouter(prefix="/mantenimientos", tags=["mantenimientos_preventivos"]
 def listar_mantenimientos(
     estado: str | None = None,
     activo_codigo: str | None = None,
+    ot_id: str | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
     """Consultar los MP programados (hasta 'limit'), con filtros opcionales.
 
-      - estado: ej. programado / realizado / vencido
+      - estado: ej. PROGRAMADO / REALIZADO
       - activo_codigo: todos los MP de un equipo puntual
+      - ot_id: el MP enganchado a una OT preventiva puntual. Es lo que usa la
+        pantalla de detalle de una OT para encontrar su checklist (a lo sumo
+        hay uno por OT, pero devolvemos lista igual por consistencia con el
+        resto de los filtros).
 
     Este es el entregable de 'consulta de mantenimientos preventivos programados'
     del objetivo de mínima.
@@ -48,6 +53,8 @@ def listar_mantenimientos(
         q = q.filter(MantenimientoPreventivo.estado == estado)
     if activo_codigo is not None:
         q = q.filter(MantenimientoPreventivo.activo_codigo == activo_codigo)
+    if ot_id is not None:
+        q = q.filter(MantenimientoPreventivo.ot_id == ot_id)
     return q.limit(limit).all()
 
 

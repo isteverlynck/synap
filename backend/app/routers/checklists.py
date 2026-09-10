@@ -43,7 +43,34 @@ from ..schemas import (
     OrdenTrabajoOut,
 )
 
-from ..security import get_current_user, requiere_rol
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador
+
+
+def _validar_permiso_sobre_mp(db: Session, current_user: Usuario, mp: MantenimientoPreventivo) -> None:
+    """Valida que el usuario pueda tocar el checklist de este MP.
+
+    Mismo criterio que en el resto de las acciones sobre una OT (bitácora,
+    reasignar, correctiva asociada): técnico/junior del grupo de la OT
+    preventiva, o coordinación de ese grupo. Jefatura pasa siempre (lo
+    resuelve requiere_rol antes de llegar acá). Si el MP no está enganchado
+    a ninguna OT (no debería pasar con los generados por /preventivas/generar,
+    pero por las dudas), no se restringe por grupo.
+    """
+    if not mp.ot_id:
+        return
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == mp.ot_id).first()
+    if orden is None or orden.grupo_id is None:
+        return
+    if current_user.rol in ("tecnico", "junior") and current_user.grupo != orden.grupo_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo podés completar el checklist de OT de tu propio grupo.",
+        )
+    if current_user.rol == "coordinacion" and orden.grupo_id not in grupos_del_coordinador(db, current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo podés completar el checklist de OT de los grupos que coordinás.",
+        )
 
 router = APIRouter(prefix="/checklists", tags=["checklists"])
 
@@ -102,7 +129,7 @@ def ver_respuestas_de_mp(
 def registrar_respuesta(
     payload: ChecklistRespuestaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Registrar la respuesta a un ítem del checklist en un MP concreto.
 
@@ -115,6 +142,7 @@ def registrar_respuesta(
     ).first()
     if mp is None:
         raise HTTPException(status_code=404, detail="El mantenimiento no existe.")
+    _validar_permiso_sobre_mp(db, current_user, mp)
 
     # 2. El ítem de checklist tiene que existir.
     item = db.query(ChecklistItem).filter(
@@ -145,7 +173,7 @@ def registrar_respuesta(
 def generar_correctiva_desde_checklist(
     payload: GenerarCorrectivaDesdeChecklist,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Registra un ítem como NO_PASA y crea la OT correctiva para ese equipo.
 
@@ -156,7 +184,11 @@ def generar_correctiva_desde_checklist(
     Hace todo junto (una sola transacción):
       1. Verifica que el mantenimiento y el ítem existan.
       2. Registra la respuesta NO_PASA (con la descripción como observación).
-      3. Crea la OT correctiva enganchada al MISMO activo del mantenimiento.
+      3. Crea la OT correctiva enganchada al MISMO activo del mantenimiento,
+         en el mismo grupo, y con ot_origen_id apuntando a la OT preventiva de
+         la que salió — así aparece junto con las que se generan a mano desde
+         el botón "Algo no funciona" de esa misma OT (ver
+         POST /ordenes-trabajo/{id}/correctiva), en un solo listado.
     """
     # 1. El mantenimiento tiene que existir (de él sacamos el equipo).
     mp = db.query(MantenimientoPreventivo).filter(
@@ -164,6 +196,7 @@ def generar_correctiva_desde_checklist(
     ).first()
     if mp is None:
         raise HTTPException(status_code=404, detail="El mantenimiento no existe.")
+    _validar_permiso_sobre_mp(db, current_user, mp)
 
     # 2. El ítem de checklist tiene que existir.
     item = db.query(ChecklistItem).filter(
@@ -188,7 +221,16 @@ def generar_correctiva_desde_checklist(
     )
     db.add(respuesta)
 
-    # 5. Crear la OT correctiva para el mismo equipo.
+    # 5. Crear la OT correctiva para el mismo equipo, heredando el grupo y el
+    #    ot_origen_id de la preventiva (si el MP está enganchado a una OT).
+    grupo_id = None
+    ot_origen_id = None
+    if mp.ot_id:
+        origen = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == mp.ot_id).first()
+        if origen is not None:
+            grupo_id = origen.grupo_id
+            ot_origen_id = origen.id
+
     ultimo = db.query(func.max(OrdenTrabajo.numero_ot)).scalar()
     numero_ot = (ultimo or 0) + 1
     orden = OrdenTrabajo(
@@ -197,8 +239,10 @@ def generar_correctiva_desde_checklist(
         tipo="CORRECTIVA",
         estado="ABIERTA",
         prioridad=(payload.prioridad.upper() if payload.prioridad else None),
-        descripcion=f"[Generada desde checklist de MP] {payload.descripcion}",
+        descripcion=f"[Generada desde checklist: {item.descripcion}] {payload.descripcion}",
         tecnico_id=payload.tecnico_id,
+        grupo_id=grupo_id,
+        ot_origen_id=ot_origen_id,
         fecha_apertura=datetime.utcnow(),
     )
     db.add(orden)

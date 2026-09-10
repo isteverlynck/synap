@@ -11,8 +11,9 @@ Flujo que soporta (lo que pidió Cami):
     tiene, el genérico. Esto es lo que permite asociar el plan automáticamente
     al crear un MP.
 
-Protegido con login. (Más adelante: restringir crear-plan a jefatura/técnicos
-cuando sumemos permisos por rol — anotado como pendiente aparte.)
+Protegido con login. Crear un plan está restringido a coordinación (y
+jefatura, que siempre pasa): es lo que pidió Cami — solo coordinadores arman
+los checklists de mantenimiento.
 """
 
 from fastapi import APIRouter, Depends, HTTPException

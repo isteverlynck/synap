@@ -35,9 +35,53 @@ from ..security import get_current_user, requiere_rol, grupos_del_coordinador
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 
 
+def _validar_permiso_sobre_ot(current_user: Usuario, db: Session, orden: OrdenTrabajo) -> None:
+    """Mismo criterio que en el resto de las acciones sobre una OT (bitácora,
+    reasignar, correctiva asociada): técnico/junior de su propio grupo, o
+    coordinación de los grupos que coordina. Jefatura ya pasó por requiere_rol
+    antes de llegar acá.
+    """
+    if current_user.rol in ("tecnico", "junior") and current_user.grupo != orden.grupo_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo podés hacer esto en órdenes de tu propio grupo.",
+        )
+    if current_user.rol == "coordinacion" and orden.grupo_id not in grupos_del_coordinador(db, current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo podés hacer esto en órdenes de los grupos que coordinás.",
+        )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
-# LECTURA (GET)
+# LECTURA (GET) — funcionando
 # ═══════════════════════════════════════════════════════════════════════════
+
+# @router.get("", response_model=list[OrdenTrabajoOut])
+# def listar_ordenes(
+#     estado: str | None = None,
+#     tipo: str | None = None,
+#     activo_codigo: str | None = None,
+#     limit: int = 50,
+#     db: Session = Depends(get_db),
+#     current_user: Usuario = Depends(get_current_user),
+# ):
+#     """Listar OTs (hasta 'limit'), con filtros opcionales.
+
+#     Los filtros son opcionales: si no mandás ninguno, trae las últimas 'limit'.
+#     Se pueden combinar (ej: estado='ABIERTA' + tipo='correctiva').
+#       - estado: ABIERTA / EN_PROGRESO / CERRADA
+#       - tipo: correctiva / preventiva
+#       - activo_codigo: todas las OT de un equipo puntual
+#     """
+#     q = db.query(OrdenTrabajo)
+#     if estado is not None:
+#         q = q.filter(OrdenTrabajo.estado == estado)
+#     if tipo is not None:
+#         q = q.filter(OrdenTrabajo.tipo == tipo)
+#     if activo_codigo is not None:
+#         q = q.filter(OrdenTrabajo.activo_codigo == activo_codigo)
+#     return q.limit(limit).all()
 
 @router.get("", response_model=list[OrdenTrabajoOut])
 def listar_ordenes(
@@ -255,6 +299,7 @@ def cambiar_estado(
     # Si se cierra por esta vía, igual completamos la fecha de cierre.
     if nuevo == "CERRADA" and orden.fecha_cierre is None:
         orden.fecha_cierre = datetime.utcnow()
+        _cerrar_parada_si_quedo_abierta(orden, orden.fecha_cierre)
 
     db.commit()
     db.refresh(orden)
@@ -265,6 +310,17 @@ def cambiar_estado(
 # CIERRE (PATCH) — cerrar una OT y registrar la fecha de cierre
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _cerrar_parada_si_quedo_abierta(orden: OrdenTrabajo, hasta: datetime) -> None:
+    """Si la OT se cierra con una parada corriendo (se olvidaron de apretar
+    "Finalizar parada"), la cerramos acá mismo — así el acumulado de tiempo
+    parado siempre queda completo, nunca colgado a mitad de camino."""
+    if orden.parada_iniciada_en is None:
+        return
+    transcurrido = (hasta - orden.parada_iniciada_en).total_seconds()
+    orden.tiempo_parada_segundos += max(0, int(transcurrido))
+    orden.parada_iniciada_en = None
+
+
 @router.patch("/{ot_id}/cerrar", response_model=OrdenTrabajoOut)
 def cerrar_orden(
     ot_id: str,
@@ -274,8 +330,10 @@ def cerrar_orden(
 ):
     """Cerrar una OT: la marca como CERRADA y le pone la fecha de cierre (ahora).
 
-    Con esto quedan completas las 3 fechas (notificacion -> apertura -> cierre),
-    que son las que alimentan el KPI de tiempo de inactividad.
+    Con esto quedan completas las 3 fechas (notificacion -> apertura -> cierre).
+    Si quedaba una parada del equipo corriendo, se cierra sola acá (ver
+    _cerrar_parada_si_quedo_abierta) para que el tiempo de parada no quede
+    incompleto.
     """
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
@@ -286,6 +344,7 @@ def cerrar_orden(
 
     orden.estado = "CERRADA"
     orden.fecha_cierre = datetime.utcnow()
+    _cerrar_parada_si_quedo_abierta(orden, orden.fecha_cierre)
     # si mandan observaciones del cierre, las sumamos (sin pisar las que hubiera)
     if payload.observaciones:
         if orden.observaciones:
@@ -293,6 +352,59 @@ def cerrar_orden(
         else:
             orden.observaciones = payload.observaciones
 
+    db.commit()
+    db.refresh(orden)
+    return orden
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TIEMPO DE PARADA — medido a mano, no calculado a partir de otras fechas
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.patch("/{ot_id}/iniciar-parada", response_model=OrdenTrabajoOut)
+def iniciar_parada(
+    ot_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+):
+    """Marca que el equipo ACABA de quedar fuera de servicio, a partir de
+    ahora mismo. Es el arranque real del tiempo de parada — no se calcula
+    solo, lo dispara quien está con el equipo.
+    """
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    if orden.estado == "CERRADA":
+        raise HTTPException(status_code=400, detail="Esta OT ya está cerrada.")
+    _validar_permiso_sobre_ot(current_user, db, orden)
+    if orden.parada_iniciada_en is not None:
+        raise HTTPException(status_code=400, detail="Ya hay una parada en curso para esta orden.")
+
+    orden.parada_iniciada_en = datetime.utcnow()
+    db.commit()
+    db.refresh(orden)
+    return orden
+
+
+@router.patch("/{ot_id}/finalizar-parada", response_model=OrdenTrabajoOut)
+def finalizar_parada(
+    ot_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+):
+    """Marca que el equipo VOLVIÓ a estar en servicio. Suma el tiempo que
+    duró esta parada al acumulado total de la OT (tiempo_parada_segundos).
+    """
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    _validar_permiso_sobre_ot(current_user, db, orden)
+    if orden.parada_iniciada_en is None:
+        raise HTTPException(status_code=400, detail="No hay ninguna parada en curso para esta orden.")
+
+    transcurrido = (datetime.utcnow() - orden.parada_iniciada_en).total_seconds()
+    orden.tiempo_parada_segundos += max(0, int(transcurrido))
+    orden.parada_iniciada_en = None
     db.commit()
     db.refresh(orden)
     return orden

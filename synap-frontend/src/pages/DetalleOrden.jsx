@@ -9,13 +9,14 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   verOrden, cambiarEstado, cerrarOrden, asignarTecnico, listarNotas, agregarNota,
-  listarCorrectivasAsociadas, crearCorrectivaAsociada,
+  listarCorrectivasAsociadas, crearCorrectivaAsociada, iniciarParada, finalizarParada,
 } from "../api/ordenes";
 import { tecnicosDisponibles } from "../api/coordinacion";
 import { obtenerPerfil } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
 import Volver from "../componentes/Volver";
+import ChecklistPreventiva from "../componentes/ChecklistPreventiva";
 import { toast } from "sonner";
 
 function DetalleOrden() {
@@ -58,12 +59,39 @@ function DetalleOrden() {
     tecnicosDisponibles().then(setTecnicos).catch(() => setTecnicos([]));
   }, [puedeAsignar]);
 
+  // Mientras hay una parada corriendo, refrescamos cada un rato para que el
+  // "Tiempo parado" que se muestra abajo vaya sumando, no se quede clavado.
+  const [, forzarRefresco] = useState(0);
+  useEffect(() => {
+    if (!ot?.parada_iniciada_en) return;
+    const intervalo = setInterval(() => forzarRefresco((n) => n + 1), 60000);
+    return () => clearInterval(intervalo);
+  }, [ot?.parada_iniciada_en]);
+
   async function arrancar() {
     try {
       setOt(await cambiarEstado(id, "EN_PROGRESO"));
       toast.success("Orden en progreso");
     } catch (e) {
       setError(e.response?.data?.detail || "No pudimos cambiar el estado.");
+    }
+  }
+
+  async function iniciarParadaClick() {
+    try {
+      setOt(await iniciarParada(id));
+      toast.success("Parada del equipo iniciada");
+    } catch (e) {
+      setError(e.response?.data?.detail || "No pudimos iniciar la parada.");
+    }
+  }
+
+  async function finalizarParadaClick() {
+    try {
+      setOt(await finalizarParada(id));
+      toast.success("Parada del equipo finalizada");
+    } catch (e) {
+      setError(e.response?.data?.detail || "No pudimos finalizar la parada.");
     }
   }
 
@@ -92,6 +120,9 @@ function DetalleOrden() {
             Prioridad {ot.prioridad.toLowerCase()}
           </span>
         )}
+        {ot.parada_iniciada_en && (
+          <span style={insignia("peligro")}>Equipo parado ahora</span>
+        )}
       </div>
 
       {/* El equipo, clickeable: desde la OT se llega a su ficha completa. */}
@@ -117,9 +148,11 @@ function DetalleOrden() {
         <Dato etiqueta="Notificada" valor={fechaHora(ot.fecha_notificacion)} />
         <Dato etiqueta="Abierta" valor={fechaHora(ot.fecha_apertura)} />
         <Dato etiqueta="Cerrada" valor={fechaHora(ot.fecha_cierre)} />
-        {/* Este es el KPI de inactividad del anteproyecto, calculado acá para
-        que quien mira la OT lo vea sin ir al dashboard. */}
-        <Dato etiqueta="Fuera de servicio" valor={tiempoFueraDeServicio(ot)} />
+        {/* Tiempo real que el equipo estuvo parado — medido con los botones
+        "Iniciar parada" / "Finalizar parada" de abajo, no calculado a partir
+        de otras fechas (antes se restaba notificación/apertura contra cierre,
+        y en OT que tardan en arrancar eso daba números sin sentido). */}
+        <Dato etiqueta="Tiempo parado" valor={tiempoDeParada(ot)} />
       </div>
 
       {ot.observaciones && (
@@ -152,6 +185,20 @@ function DetalleOrden() {
               Algo no funciona: generar correctiva
             </button>
           )}
+          {/* Tiempo real de parada: se aprieta al momento en que el equipo
+          deja (o vuelve) a poder usarse — no tiene por qué coincidir con
+          abrir/cerrar la OT. */}
+          {(puedeAsignar || esMiOrden) && (
+            ot.parada_iniciada_en ? (
+              <button style={boton("peligro")} onClick={finalizarParadaClick}>
+                Finalizar parada del equipo
+              </button>
+            ) : (
+              <button style={boton("secundario")} onClick={iniciarParadaClick}>
+                Iniciar parada del equipo
+              </button>
+            )
+          )}
         </div>
       )}
 
@@ -166,6 +213,18 @@ function DetalleOrden() {
           ot={ot}
           setCorrectivas={setCorrectivas}
           cerrar={() => setAccion(null)}
+          navegar={navegar}
+        />
+      )}
+
+      {/* ─── Checklist del mantenimiento: se completa ítem por ítem, y desde
+      cada ítem que "no pasa" se puede generar de una su propia correctiva ─── */}
+      {ot.tipo === "PREVENTIVA" && (
+        <ChecklistPreventiva
+          ot={ot}
+          perfil={perfil}
+          puedeCompletar={!cerrada && (puedeAsignar || esMiOrden)}
+          onCorrectivaCreada={(nueva) => setCorrectivas((antes) => [...antes, nueva])}
           navegar={navegar}
         />
       )}
@@ -299,6 +358,12 @@ function PanelCerrar({ ot, setOt, cerrar }) {
   return (
     <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
       <p style={estilos.panelTitulo}>Cerrar la orden</p>
+      {ot.parada_iniciada_en && (
+        <p style={estilos.bitacoraAyuda}>
+          El equipo figura parado ahora mismo. Al cerrar, la parada se
+          finaliza sola con la fecha de cierre.
+        </p>
+      )}
       <label style={cs.label}>Qué se hizo</label>
       <textarea
         style={{ ...cs.input, minHeight: 80, marginBottom: 12, resize: "vertical" }}
@@ -423,16 +488,22 @@ function PanelCorrectivaAsociada({ ot, setCorrectivas, cerrar, navegar }) {
 
 // ─────────────────────────────────────────────────────────────────────────
 
-// Tiempo que el equipo estuvo sin poder usarse. El anteproyecto lo define como
-// la diferencia entre el cierre y la notificación; si no hay notificación,
-// usamos la apertura como referencia.
-function tiempoFueraDeServicio(ot) {
-  const desde = ot.fecha_notificacion || ot.fecha_apertura;
-  if (!desde) return "—";
-  const hasta = ot.fecha_cierre ? new Date(ot.fecha_cierre) : new Date();
-  const horas = Math.round((hasta - new Date(desde)) / 36e5);
-  if (isNaN(horas)) return "—";
-  const sufijo = ot.fecha_cierre ? "" : " y contando";
+// Tiempo real que el equipo estuvo parado — medido con "Iniciar parada" /
+// "Finalizar parada", no calculado a partir de otras fechas. Suma todas las
+// paradas ya cerradas (ot.tiempo_parada_segundos) más, si hay una corriendo
+// ahora mismo (ot.parada_iniciada_en), lo que lleva transcurrido.
+function tiempoDeParada(ot) {
+  let segundos = ot.tiempo_parada_segundos || 0;
+  if (ot.parada_iniciada_en) {
+    const desde = new Date(ot.parada_iniciada_en);
+    if (!isNaN(desde)) segundos += Math.max(0, Math.floor((Date.now() - desde) / 1000));
+  }
+  if (segundos <= 0) return ot.parada_iniciada_en ? "recién empieza" : "—";
+
+  const sufijo = ot.parada_iniciada_en ? " y contando" : "";
+  const minutos = Math.floor(segundos / 60);
+  if (minutos < 60) return `${minutos} min${sufijo}`;
+  const horas = Math.floor(minutos / 60);
   if (horas < 24) return `${horas} h${sufijo}`;
   return `${Math.floor(horas / 24)} d ${horas % 24} h${sufijo}`;
 }

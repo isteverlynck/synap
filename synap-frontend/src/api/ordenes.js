@@ -58,6 +58,22 @@ export async function cerrarOrden(otId, observaciones) {
   return res.data;
 }
 
+// ─── Tiempo de parada del equipo ───
+// Medido a mano (no calculado a partir de otras fechas): se aprieta "Iniciar
+// parada" cuando el equipo deja de poder usarse y "Finalizar parada" cuando
+// vuelve a andar. Si la OT se cierra con una parada corriendo, el backend la
+// cierra solo con la fecha de cierre.
+
+export async function iniciarParada(otId) {
+  const res = await cliente.patch(`/ordenes-trabajo/${otId}/iniciar-parada`);
+  return res.data;
+}
+
+export async function finalizarParada(otId) {
+  const res = await cliente.patch(`/ordenes-trabajo/${otId}/finalizar-parada`);
+  return res.data;
+}
+
 // ─── Bitácora ───
 // El registro de lo que se va haciendo mientras la OT está en curso: a
 // diferencia de "observaciones" (un solo texto que se completa al cerrar),

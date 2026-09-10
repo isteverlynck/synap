@@ -9,6 +9,9 @@ import { estaLogueado } from "./api/auth";
 import Login from "./pages/Login";
 import Activos from "./pages/Activos";
 import NuevoActivo from "./pages/NuevoActivo";
+import PlanesMantenimiento from "./pages/PlanesMantenimiento";
+import NuevoPlan from "./pages/NuevoPlan";
+import DetallePlan from "./pages/DetallePlan";
 import Solicitudes from "./pages/Solicitudes";
 import EscanearQR from "./pages/EscanearQR";
 import FichaActivo from "./pages/FichaActivo";
@@ -18,6 +21,7 @@ import Pendientes from "./pages/Pendientes";
 import Ordenes from "./pages/Ordenes";
 import DetalleOrden from "./pages/DetalleOrden";
 import Dashboard from "./pages/Dashboard";
+import CalendarioMP from "./pages/CalendarioMP";
 import { Toaster } from "sonner";
 import Perfil from "./pages/Perfil";
 
@@ -48,11 +52,15 @@ function App() {
           <Route path="/activos" element={<Activos />} />
           <Route path="/activos/nuevo" element={<NuevoActivo />} />
           <Route path="/activos/:codigo" element={<FichaActivo />} />
+          <Route path="/mantenimientos" element={<PlanesMantenimiento />} />
+          <Route path="/mantenimientos/nuevo" element={<NuevoPlan />} />
+          <Route path="/mantenimientos/:id" element={<DetallePlan />} />
           <Route path="/escanear" element={<EscanearQR />} />
           <Route path="/solicitudes" element={<Solicitudes />} />
           <Route path="/pendientes" element={<Pendientes />} />
           <Route path="/ordenes" element={<Ordenes />} />
           <Route path="/ordenes/:id" element={<DetalleOrden />} />
+          <Route path="/calendario-mp" element={<CalendarioMP />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/perfil" element={<Perfil />} />
         </Route>

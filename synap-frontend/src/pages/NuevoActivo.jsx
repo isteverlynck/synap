@@ -3,11 +3,15 @@
 // La usan coordinación, técnicos (y junior) y jefatura. El código del equipo
 // NO se escribe a mano: lo arma el backend (B-<área>-<tipo de equipo>-<número
 // correlativo>) a partir del área que se elige acá y el tipo de equipo.
+// La descripción tampoco se escribe a mano: el backend la completa sola con
+// el nombre del tipo de equipo elegido (ver el select "Tipo de equipo").
 //
 // El segundo bloque (mantenimiento preventivo) es opcional: si se activa, se
-// pide la frecuencia (en meses) y se muestra con qué checklist va a quedar
-// vinculado el equipo (el de su tipo, o el genérico si no hay uno propio)
-// ANTES de crearlo, para que no sea una sorpresa.
+// pide la frecuencia (en meses) y EN QUÉ MES debería abrirse la primera
+// orden (la OT siempre se abre el día 1 de ese mes) — a partir de ahí, la
+// frecuencia va marcando los meses siguientes solos. También se muestra con
+// qué checklist va a quedar vinculado el equipo (el de su tipo, o el
+// genérico si no hay uno propio) ANTES de crearlo, para que no sea sorpresa.
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -44,7 +48,6 @@ function NuevoActivo() {
   const [area, setArea] = useState("");
   const [tipoEquipoId, setTipoEquipoId] = useState("");
   const [sectorId, setSectorId] = useState("");
-  const [descripcion, setDescripcion] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
@@ -57,6 +60,9 @@ function NuevoActivo() {
 
   const [crearMantenimiento, setCrearMantenimiento] = useState(false);
   const [frecuenciaMeses, setFrecuenciaMeses] = useState("");
+  // Mes en que debería abrirse la primera orden (input type="month", da
+  // "YYYY-MM"). La OT siempre se abre el día 1 de ese mes.
+  const [primerMes, setPrimerMes] = useState("");
 
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -85,14 +91,14 @@ function NuevoActivo() {
     if (!area.trim()) return setError("Indicá el área (va en el código del equipo, ej: INTR, TERA).");
     if (!tipoEquipoId) return setError("Elegí el tipo de equipo.");
     if (!sectorId) return setError("Elegí el servicio/sector.");
-    if (!descripcion.trim()) return setError("Indicá una descripción del equipo.");
     if (crearMantenimiento) {
       const n = Number(frecuenciaMeses);
       if (!n || n <= 0) return setError("Indicá cada cuántos meses se repite el mantenimiento.");
+      if (!primerMes) return setError("Indicá en qué mes debería abrirse la primera orden.");
       if (!planQueLeToca) {
         return setError(
           "No hay un checklist de mantenimiento para este tipo de equipo ni uno genérico. " +
-          "Pedile a jefatura que cargue un plan antes de programar este mantenimiento."
+          "Pedile a coordinación que cargue un plan antes de programar este mantenimiento."
         );
       }
     }
@@ -103,7 +109,6 @@ function NuevoActivo() {
         area: area.trim(),
         tipo_equipo_id: tipoEquipoId,
         sector_id: sectorId,
-        descripcion: descripcion.trim(),
         ubicacion: ubicacion.trim() || null,
         marca: marca.trim() || null,
         modelo: modelo.trim() || null,
@@ -115,6 +120,8 @@ function NuevoActivo() {
         criticidad: criticidad || null,
         crear_mantenimiento: crearMantenimiento,
         frecuencia_meses: crearMantenimiento ? Number(frecuenciaMeses) : null,
+        // "YYYY-MM" del input type="month" → "YYYY-MM-01" para el backend.
+        proxima_fecha_mp: crearMantenimiento && primerMes ? `${primerMes}-01` : null,
       });
       toast.success(`Equipo creado: ${activo.codigo}`);
       navegar(`/activos/${activo.codigo}`);
@@ -184,15 +191,6 @@ function NuevoActivo() {
             </Campo>
           </div>
 
-          <Campo etiqueta="Descripción del equipo">
-            <input
-              style={cs.input}
-              placeholder="Ej: Monitor multiparamétrico"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-            />
-          </Campo>
-
           <div style={{ ...estilos.grilla2, marginTop: 16, marginBottom: 0 }}>
             <Campo etiqueta="Ubicación">
               <input
@@ -242,15 +240,32 @@ function NuevoActivo() {
 
           {crearMantenimiento && (
             <div style={{ marginTop: 14 }}>
-              <Campo etiqueta="Frecuencia (en meses)" ayuda="Ej: 12 = una vez por año.">
-                <input
-                  type="number"
-                  min="1"
-                  style={{ ...cs.input, maxWidth: 160 }}
-                  value={frecuenciaMeses}
-                  onChange={(e) => setFrecuenciaMeses(e.target.value)}
-                />
-              </Campo>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ maxWidth: 160 }}>
+                  <Campo etiqueta="Frecuencia (en meses)" ayuda="Ej: 12 = una vez por año.">
+                    <input
+                      type="number"
+                      min="1"
+                      style={cs.input}
+                      value={frecuenciaMeses}
+                      onChange={(e) => setFrecuenciaMeses(e.target.value)}
+                    />
+                  </Campo>
+                </div>
+                <div style={{ maxWidth: 200 }}>
+                  <Campo
+                    etiqueta="Mes de la primera orden"
+                    ayuda="La orden se abre siempre el día 1 de ese mes."
+                  >
+                    <input
+                      type="month"
+                      style={cs.input}
+                      value={primerMes}
+                      onChange={(e) => setPrimerMes(e.target.value)}
+                    />
+                  </Campo>
+                </div>
+              </div>
 
               {!tipoEquipoId && (
                 <p style={estilos.ayuda}>Elegí primero el tipo de equipo para saber qué checklist le corresponde.</p>

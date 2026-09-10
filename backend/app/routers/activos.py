@@ -1,14 +1,11 @@
 """Endpoints de activos (equipos médicos)."""
 
-from datetime import date
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import re
 from sqlalchemy import or_
 
 from ..database import get_db
-from ..fechas import sumar_meses
 from ..models import Activo, Usuario, GrupoTipoEquipo, GrupoTecnico, Usuario, TipoEquipo, Servicio, PlantillaMP
 from ..schemas import ActivoOut, ActivoDetalle, ActivoCreate
 from ..security import get_current_user, requiere_rol
@@ -136,11 +133,17 @@ def crear_activo(
     todo el hospital sin importar el área — así el próximo desfibrilador sigue
     la numeración de los desfibriladores, no la del área donde va a estar.
 
+    La descripción tampoco la escribe la persona: queda igual al nombre del
+    tipo de equipo elegido (ej. tipo "Monitor multiparamétrico" → descripción
+    "Monitor multiparamétrico"). Antes era un texto libre y terminaba siendo
+    casi lo mismo pero escrito distinto en cada alta.
+
     Si vino crear_mantenimiento=True, además:
       1. Busca el plan de mantenimiento (checklist) de este tipo de equipo (o
          el genérico, si no hay uno específico para el tipo).
-      2. Calcula la primera 'próxima fecha' sumándole la frecuencia (en meses)
-         a la fecha de instalación (o a hoy, si no se cargó esa fecha).
+      2. Usa el mes que eligió la persona (payload.proxima_fecha_mp) como la
+         fecha de la primera orden — no se calcula sola a partir de la fecha
+         de instalación. La OT siempre se abre el día 1 de ese mes.
       3. Guarda la frecuencia en el activo: es lo que usa /preventivas/generar
          para reprogramar el ciclo siguiente cada vez que dispara la OT.
     """
@@ -186,6 +189,11 @@ def crear_activo(
                 status_code=400,
                 detail="Indicá cada cuántos meses se repite el mantenimiento.",
             )
+        if not payload.proxima_fecha_mp:
+            raise HTTPException(
+                status_code=400,
+                detail="Indicá en qué mes debería abrirse la primera orden de este mantenimiento.",
+            )
         plan = db.query(PlantillaMP).filter(
             PlantillaMP.tipo_equipo_id == payload.tipo_equipo_id
         ).first()
@@ -196,13 +204,15 @@ def crear_activo(
                 status_code=400,
                 detail=(
                     "No hay un checklist de mantenimiento para este tipo de equipo "
-                    "ni uno genérico. Pedile a jefatura que cargue un plan antes de "
-                    "programarle el mantenimiento a este equipo."
+                    "ni uno genérico. Pedile a coordinación que cargue un plan antes "
+                    "de programarle el mantenimiento a este equipo."
                 ),
             )
         plantilla_mp_id = plan.id
-        fecha_base = payload.fecha_instalacion or date.today()
-        proxima_fecha_mp = sumar_meses(fecha_base, payload.frecuencia_meses)
+        # El validador del schema ya normalizó el día a 1; el .replace de acá
+        # es solo un resguardo por si algún día se llama a este endpoint sin
+        # pasar por el schema (ej. un script).
+        proxima_fecha_mp = payload.proxima_fecha_mp.replace(day=1)
         frecuencia_mp_meses = payload.frecuencia_meses
 
     activo = Activo(
@@ -211,7 +221,7 @@ def crear_activo(
         tipo_equipo_id=payload.tipo_equipo_id,
         sector_id=payload.sector_id,
         grupo_id=grupo_id,
-        descripcion=payload.descripcion,
+        descripcion=tipo.nombre,
         ubicacion=payload.ubicacion,
         marca=payload.marca,
         modelo=payload.modelo,
@@ -263,5 +273,3 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
                 detalle.responsable_email = responsable.email
 
     return detalle
-    
-    return activo

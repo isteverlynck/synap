@@ -171,6 +171,23 @@ class OrdenTrabajo(Base):
         UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=True
     )
 
+    # ─── Tiempo real de parada del equipo ───
+    # Antes el "tiempo fuera de servicio" se ESTIMABA restando fechas
+    # (notificación/apertura → cierre). Para OT viejas de prueba (o cualquier
+    # OT que tarda en arrancar) esa cuenta daba números sin sentido, porque el
+    # equipo no está necesariamente parado todo ese tiempo. Ahora es un dato
+    # MEDIDO a mano: quien trabaja la OT aprieta "Iniciar parada" cuando el
+    # equipo deja de poder usarse, y "Finalizar parada" cuando vuelve a andar.
+    #
+    # parada_iniciada_en: cuándo arrancó la parada que está CORRIENDO ahora
+    # mismo (None si no hay ninguna corriendo — es lo que el frontend mira
+    # para saber si mostrar "Iniciar parada" o "Finalizar parada").
+    # tiempo_parada_segundos: la suma de todas las paradas ya CERRADAS. La que
+    # está corriendo se suma al vuelo (acá o en el frontend) cuando hace falta
+    # mostrar el total.
+    parada_iniciada_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tiempo_parada_segundos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     # ─── Relaciones ───
     activo: Mapped["Activo"] = relationship(back_populates="ordenes_de_trabajo")
     fallas: Mapped[list["Falla"]] = relationship(back_populates="orden")
