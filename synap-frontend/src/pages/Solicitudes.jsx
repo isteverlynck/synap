@@ -16,6 +16,7 @@ import { verActivo } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
 import { formatearFecha, agruparPorFecha } from "../utiles/fechas";
+import { normalizarCodigo } from "../utiles/codigos";
 
 const SOLAPAS = [
   { key: "crear", label: "Crear solicitud" },
@@ -49,9 +50,6 @@ function Solicitudes() {
         <Encabezado titulo="Solicitudes de servicio" subtitulo="Enfermería">
           <button style={boton("secundario")} onClick={() => navegar("/escanear")}>
             Escanear equipo (QR)
-          </button>
-          <button style={boton("fantasma")} onClick={cerrarSesion}>
-            Cerrar sesión
           </button>
         </Encabezado>
 
@@ -121,7 +119,7 @@ function CrearSolicitud({ onCreada, activoInicial }) {
   // apretar Enter, y al mandar el formulario si todavía no se había validado.
   // Devuelve el activo encontrado, o null si el ID no existe.
   async function validarCodigo(codigo) {
-    const limpio = codigo.trim();
+    const limpio = normalizarCodigo(codigo);
     if (!limpio) return null;
     setValidandoCodigo(true);
     setErrorCodigo("");
@@ -130,9 +128,16 @@ function CrearSolicitud({ onCreada, activoInicial }) {
       setActivoValidado(activo);
       setCodigoTexto(activo.codigo);
       return activo;
-    } catch {
+    } catch (e) {
       setActivoValidado(null);
-      setErrorCodigo(`No encontramos ningún equipo con el ID "${limpio}". Revisalo e intentá de nuevo.`);
+      // Un 404 es "ese código no existe". Cualquier otra cosa (sin conexión,
+      // token vencido, error del servidor) no es culpa de lo que escribió la
+      // persona: mandarla a revisar el código la hace buscar donde no es.
+      if (e?.response?.status === 404) {
+        setErrorCodigo(`No encontramos ningún equipo con el ID "${limpio}". Revisalo e intentá de nuevo.`);
+      } else {
+        setErrorCodigo("No pudimos verificar el código en este momento. Probá de nuevo en unos segundos.");
+      }
       return null;
     } finally {
       setValidandoCodigo(false);

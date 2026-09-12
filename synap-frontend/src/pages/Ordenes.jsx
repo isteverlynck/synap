@@ -113,7 +113,7 @@ function Ordenes() {
       } else if (esCoordinacion) {
         // "sin_asignar" se pide como recorte, no como estado.
         lista = filtro === "SIN_ASIGNAR"
-          ? await listarOrdenes({ misGrupos: true, sinAsignar: true, tipo: tipoFiltro || undefined, limite: 200 })
+          ? await listarOrdenes({ misGrupos: true, sinAsignar: true, tipo: tipoFiltro || "CORRECTIVA", limite: 200 })
           : await listarOrdenes({ misGrupos: true, estado: filtro || undefined, tipo: tipoFiltro || undefined, limite: 200 });
       } else {
         lista = await listarOrdenes({ estado: filtro || undefined, tipo: tipoFiltro || undefined, limite: 200 });
@@ -249,23 +249,15 @@ function Ordenes() {
                   <p style={estilos.codigo}>
                     {ot.activo_descripcion || "Equipo sin descripción"}
                     {ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
-                    {ot.prioridad && (
-                      <span className={`sy-prioridad sy-prioridad-${ot.prioridad.toLowerCase()}`}>
-                        {/* Crítica lleva triángulo en vez de punto: un cuarto
-                        color de rojo no se distinguiría del rojo de "alta". */}
-                        {ot.prioridad === "CRITICA"
-                          ? <AlertTriangle size={13} strokeWidth={2.4} style={{ marginRight: 5, flexShrink: 0 }} aria-hidden="true" />
-                          : <span className="sy-prioridad-punto" />}
-                        Prioridad {ot.prioridad.toLowerCase()}
-                      </span>
-                    )}
                   </p>
 
                   {esCoordinacion && (
-                    <p style={ot.tecnico_id ? estilos.asignacion : estilos.sinAsignar}>
+                    <p style={ot.tecnico_id || ot.tipo === "PREVENTIVA" ? estilos.asignacion : estilos.sinAsignar}>
                       {ot.tecnico_id
                         ? nombreTecnico(ot.tecnico_id)
-                        : "Sin técnico asignado"}
+                        : ot.tipo === "PREVENTIVA"
+                          ? "Asignada al grupo"
+                          : "Sin técnico asignado"}
                     </p>
                   )}
 
@@ -277,9 +269,24 @@ function Ordenes() {
                   )}
                 </div>
 
-                <span style={insignia(tonoEstadoOT(ot.estado))}>
-                  {textoEstado(ot.estado)}
-                </span>
+                <div style={estilos.columnaEstado}>
+                  <span style={insignia(tonoEstadoOT(ot.estado))}>
+                    {textoEstado(ot.estado)}
+                  </span>
+                  {ot.prioridad && (
+                    <span
+                      className={`sy-prioridad sy-prioridad-${ot.prioridad.toLowerCase()}`}
+                      style={estilos.prioridad}
+                    >
+                      {/* Crítica lleva triángulo en vez de punto: un cuarto
+                      color de rojo no se distinguiría del rojo de "alta". */}
+                      {ot.prioridad === "CRITICA"
+                        ? <AlertTriangle size={12} strokeWidth={2.4} style={{ marginRight: 4, flexShrink: 0 }} aria-hidden="true" />
+                        : <span className="sy-prioridad-punto" />}
+                      Prioridad {ot.prioridad.toLowerCase()}
+                    </span>
+                  )}
+                </div>
                 
               </div>
             ))}
@@ -355,7 +362,7 @@ const estilos = {
   // Mismo violeta que el filtro de tipo: un borde a la izquierda alcanza para
   // que se note incluso mirando la lista de reojo, sin cambiar la estructura
   // de tarjeta que ya usan las correctivas.
-  tarjetaPreventiva: { borderLeftColor: "#8B6CC9" },
+  tarjetaPreventiva: { borderLeftColor: color.primario },
   // El número de OT + el código del equipo van grandes y en monoespaciada
   // (son identificadores, mismo criterio que el código en la lista de
   // Equipos); el nombre del equipo abajo queda en "codigo" pese al nombre
@@ -367,11 +374,18 @@ const estilos = {
   etiquetaPreventiva: {
     display: "inline-flex", alignItems: "center", gap: 4,
     marginLeft: 8, padding: "2px 8px", borderRadius: 999,
-    background: "#EFE9FA", color: "#5A3E9E",
+    background: color.primarioClaro, color: color.primarioOscuro,
     fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.02em",
-    verticalAlign: "middle",
+    verticalAlign: "middle", position: "relative", top: -2,
   },
   codigo: { margin: "3px 0 0", fontSize: "0.85rem", color: color.textoSuave },
+  columnaEstado: {
+    display: "flex", flexDirection: "column", alignItems: "flex-end",
+    gap: 20, flexShrink: 0,
+  },
+  prioridad: {
+    fontSize: "0.72rem", marginLeft: 0, whiteSpace: "nowrap",
+  },
   asignacion: { margin: "4px 0 0", fontSize: "0.82rem", color: color.textoDebil },
   sinAsignar: {
     margin: "4px 0 0", fontSize: "0.82rem",

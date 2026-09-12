@@ -5,7 +5,7 @@
 // Igual que en la ficha del equipo, la parte de arriba es idéntica para todos
 // y lo único que cambia son las acciones de abajo.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   verOrden, cambiarEstado, cerrarOrden, asignarTecnico, listarNotas, agregarNota,
@@ -18,6 +18,7 @@ import { color, cs, boton, insignia } from "../tema";
 import Volver from "../componentes/Volver";
 import ChecklistPreventiva from "../componentes/ChecklistPreventiva";
 import { toast } from "sonner";
+import { diasHasta } from "../utiles/fechas";
 
 function DetalleOrden() {
   const { id } = useParams();
@@ -53,6 +54,10 @@ function DetalleOrden() {
   // el grupo se reparte el trabajo sin depender del coordinador para cada pase.
   const esDeMiGrupo = rol === "tecnico" && !!perfil?.grupo && ot?.grupo_id === perfil.grupo;
   const puedeAsignar = esCoordinacion || esDeMiGrupo;
+  // En una preventiva no hay dueño: la trabaja cualquiera del grupo.
+  // En una correctiva sí lo hay: solo su técnico asignado.
+  const puedeTrabajar = ot?.tipo === "PREVENTIVA" ? esDeMiGrupo : esMiOrden;
+  const avisoPreventivo = textoPreventivo(ot?.activo_proxima_fecha_mp);
 
   useEffect(() => {
     if (!puedeAsignar) return;
@@ -102,14 +107,11 @@ function DetalleOrden() {
 
   return (
     <>
-      <Volver a="/ordenes" />
+      <Volver />
       <Encabezado
         titulo={`OT-${String(ot.numero_ot).padStart(4, "0")}`}
         subtitulo={ot.tipo}
       >
-        <button style={boton("fantasma")} onClick={() => navegar("/ordenes")}>
-          Volver al listado
-        </button>
       </Encabezado>
 
       {/* Estado arriba de todo, igual que en la ficha del equipo. */}
@@ -121,7 +123,7 @@ function DetalleOrden() {
           </span>
         )}
         {ot.parada_iniciada_en && (
-          <span style={insignia("peligro")}>Equipo parado ahora</span>
+          <span style={insignia("peligro")}>Equipo parado momentáneamente</span>
         )}
       </div>
 
@@ -135,6 +137,7 @@ function DetalleOrden() {
         <p style={estilos.equipoCodigo}>
           {ot.activo_codigo}{ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
         </p>
+        {avisoPreventivo && <p style={estilos.equipoCodigo}>{avisoPreventivo}</p>}
       </div>
 
       {ot.descripcion && (
@@ -167,20 +170,22 @@ function DetalleOrden() {
       {/* ─── Acciones ─── */}
       {!cerrada && !accion && (
         <div style={estilos.acciones}>
-          {esMiOrden && ot.estado === "ABIERTA" && (
+          {puedeTrabajar && ot.estado === "ABIERTA" && (
             <button style={boton("primario")} onClick={arrancar}>Empezar a trabajar</button>
           )}
-          {esMiOrden && ot.estado === "EN_PROGRESO" && (
+          {puedeTrabajar && ot.estado === "EN_PROGRESO" && (
             <button style={boton("primario")} onClick={() => setAccion("cerrar")}>Cerrar la orden</button>
           )}
-          {puedeAsignar && (
+          {/* Las preventivas son del grupo entero: no se asignan a una
+          persona. Solo las correctivas tienen dueño. */}
+          {esCoordinacion && ot.tipo !== "PREVENTIVA" && (
             <button style={boton("secundario")} onClick={() => setAccion("asignar")}>
               {ot.tecnico_id ? "Reasignar técnico" : "Asignar técnico"}
             </button>
           )}
           {/* Solo tiene sentido desde una preventiva: es el "che, esto no
           funciona" que aparece haciendo el mantenimiento programado. */}
-          {ot.tipo === "PREVENTIVA" && puedeAsignar && (
+          {ot.tipo === "PREVENTIVA" && puedeTrabajar && (
             <button style={boton("secundario")} onClick={() => setAccion("correctiva")}>
               Algo no funciona: generar correctiva
             </button>
@@ -188,7 +193,7 @@ function DetalleOrden() {
           {/* Tiempo real de parada: se aprieta al momento en que el equipo
           deja (o vuelve) a poder usarse — no tiene por qué coincidir con
           abrir/cerrar la OT. */}
-          {(puedeAsignar || esMiOrden) && (
+          {puedeTrabajar && (
             ot.parada_iniciada_en ? (
               <button style={boton("peligro")} onClick={finalizarParadaClick}>
                 Finalizar parada del equipo
@@ -223,7 +228,8 @@ function DetalleOrden() {
         <ChecklistPreventiva
           ot={ot}
           perfil={perfil}
-          puedeCompletar={!cerrada && (puedeAsignar || esMiOrden)}
+          puedeCompletar={!cerrada && puedeTrabajar}
+          onCerrarOT={() => setAccion("cerrar")}
           onCorrectivaCreada={(nueva) => setCorrectivas((antes) => [...antes, nueva])}
           navegar={navegar}
         />
@@ -561,3 +567,11 @@ const estilos = {
 };
 
 export default DetalleOrden;
+
+function textoPreventivo(fecha) {
+  const dias = diasHasta(fecha);
+  if (dias === null) return "";
+  if (dias < 0) return `Preventivo vencido hace ${Math.abs(dias)} días`;
+  if (dias === 0) return "Preventivo programado para hoy";
+  return `Próximo preventivo en ${dias} días`;
+}

@@ -48,7 +48,7 @@ const MENUS = {
   ],
   jefatura: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
-    { id: "dashboard", texto: "Dashboard", ruta: "/dashboard", icono: "grafico", listo: false },
+    { id: "dashboard", texto: "Dashboard", ruta: "/dashboard", icono: "grafico", listo: true },
     { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: false },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },

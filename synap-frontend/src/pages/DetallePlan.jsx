@@ -26,7 +26,7 @@ function DetallePlan() {
 
   return (
     <>
-      <Volver a="/mantenimientos" />
+      <Volver />
       <Encabezado
         titulo={plan.nombre}
         subtitulo={`Cada ${plan.frecuencia_dias} días${plan.es_generica ? " · genérico" : ""}`}

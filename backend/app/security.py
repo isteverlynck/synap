@@ -98,6 +98,23 @@ def requiere_rol(*roles_permitidos: str):
         return current_user
     return verificar
 
+def requiere_rol_estricto(*roles_permitidos: str):
+    """Igual que requiere_rol, pero SIN la excepción de jefatura.
+
+    Se usa en los endpoints operativos: el detalle de una OT, marcar un ítem
+    del checklist. Jefatura tiene visión del servicio a través del dashboard,
+    que consulta la base directo y no pasa por acá; lo que no hace es entrar
+    al trabajo de una orden puntual.
+    """
+    def verificar(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+        if current_user.rol not in roles_permitidos:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Esta acción requiere rol: {', '.join(roles_permitidos)}.",
+            )
+        return current_user
+    return verificar
+
 def buscar_usuario_por_numero(db: Session, numero: str) -> Usuario | None:
     """Busca un usuario por su número de identificación, sin distinguir
     mayúsculas de minúsculas.

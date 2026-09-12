@@ -369,6 +369,7 @@ class OrdenTrabajoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     activo_descripcion: str | None = None
     activo_ubicacion: str | None = None
+    activo_proxima_fecha_mp: date | None = None
 
 
 class OrdenTrabajoCorrectivaCreate(BaseModel):
@@ -607,7 +608,15 @@ class ChecklistRespuestaCreate(BaseModel):
     completado: bool = False
     observacion: str | None = None
     completado_por: uuid.UUID | None = None
-    resultado: str | None = None
+    resultado: str
+    
+    @field_validator("resultado")
+    @classmethod
+    def validar_resultado(cls, v: str) -> str:
+        valor = (v or "").strip().upper()
+        if valor not in ("PASA", "NO_PASA"):
+            raise ValueError("El resultado debe ser PASA o NO_PASA.")
+        return valor
     
 
 class ChecklistItemCreate(BaseModel):

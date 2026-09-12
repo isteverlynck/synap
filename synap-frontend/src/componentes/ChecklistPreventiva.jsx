@@ -10,7 +10,7 @@
 //
 // Vive dentro de DetalleOrden.jsx, solo quando la OT es tipo PREVENTIVA.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Circle } from "lucide-react";
 import { mantenimientoDeOT } from "../api/mantenimientos";
@@ -20,7 +20,7 @@ import {
 } from "../api/checklists";
 import { color, cs, boton, insignia } from "../tema";
 
-function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, navegar }) {
+function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, onCerrarOT, navegar }) {
   const [cargando, setCargando] = useState(true);
   const [mp, setMp] = useState(null);
   const [items, setItems] = useState([]);
@@ -38,6 +38,8 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
   const [prioridad, setPrioridad] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [errorItem, setErrorItem] = useState("");
+  const [mostrarValidacion, setMostrarValidacion] = useState(false);
+  const yaSeAbrio = useRef(false);
 
   useEffect(() => {
     mantenimientoDeOT(ot.id)
@@ -53,8 +55,24 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
       .catch(() => setError("No pudimos cargar el checklist de esta orden."));
   }, [mp]);
 
+  const obligatorios = items.filter((it) => it.obligatorio);
+  const checklistCompleto =
+    obligatorios.length > 0 && obligatorios.every((it) => estaRespondido(it.id));
+
+  useEffect(() => {
+    if (checklistCompleto && puedeCompletar && !yaSeAbrio.current) {
+      yaSeAbrio.current = true;
+      setMostrarValidacion(true);
+    }
+  }, [checklistCompleto, puedeCompletar]);
+
   function respuestaDe(itemId) {
     return respuestas.find((r) => r.checklist_item_id === itemId);
+  }
+
+  function estaRespondido(itemId) {
+    const r = respuestaDe(itemId);
+    return !!r && !!r.resultado;
   }
 
   // respuestaPrevia: si se está EDITANDO una respuesta que ya existía, se
@@ -93,6 +111,11 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
   }
 
   async function marcarPasa(item) {
+    // Sin este bloqueo, dos clicks rápidos mandan dos POST antes de que el
+    // primero grabe: los dos consultan, los dos ven el ítem sin respuesta y
+    // los dos insertan. Así aparecieron filas duplicadas.
+    if (enviando) return;
+    setEnviando(true);
     try {
       const nueva = await registrarRespuesta({
         mpId: mp.id, checklistItemId: item.id, resultado: "PASA", completadoPor: perfil?.id,
@@ -101,6 +124,8 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
       setItemEditando(null);
     } catch (e) {
       toast.error(e.response?.data?.detail || "No pudimos guardar la respuesta.");
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -156,7 +181,7 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
     );
   }
 
-  const completados = items.filter((it) => respuestaDe(it.id)).length;
+  const completados = items.filter((it) => estaRespondido(it.id)).length;
 
   return (
     <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
@@ -171,7 +196,7 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
           const editando = itemEditando === item.id;
           // Se muestran los botones Pasa/No pasa cuando el ítem todavía no
           // tiene respuesta, O cuando se apretó "Cambiar" para esta.
-          const mostrarBotones = puedeCompletar && itemAbierto !== item.id && (!r || editando);
+          const mostrarBotones = puedeCompletar && itemAbierto !== item.id && (!estaRespondido(item.id) || editando);
           return (
             <div key={item.id} style={estilos.item}>
               <div style={estilos.filaItem}>
@@ -183,10 +208,10 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
 
                 {mostrarBotones && (
                   <div style={estilos.botonesItem}>
-                    <button style={{ ...boton("secundario"), padding: "6px 12px" }} onClick={() => marcarPasa(item)}>
+                    <button style={{ ...boton("secundario"), padding: "6px 12px" }} onClick={() => marcarPasa(item)} disabled={enviando}>
                       Pasa
                     </button>
-                    <button style={{ ...boton("peligro"), padding: "6px 12px" }} onClick={() => abrirNoPasa(item, r)}>
+                    <button style={{ ...boton("peligro"), padding: "6px 12px" }} onClick={() => abrirNoPasa(item, r)} disabled={enviando}>
                       No pasa
                     </button>
                     {editando && (
@@ -199,8 +224,8 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
 
                 {r && !editando && itemAbierto !== item.id && (
                   <>
-                    <span style={insignia(r.resultado === "PASA" ? "exito" : "peligro")}>
-                      {r.resultado === "PASA" ? "Pasa" : "No pasa"}
+                    <span style={insignia(r.resultado === "PASA" ? "exito" : r.resultado === "NO_PASA" ? "peligro" : "neutro")}>
+                      {r.resultado === "PASA" ? "Pasa" : r.resultado === "NO_PASA" ? "No pasa" : "Sin resultado"}
                     </span>
                     {puedeCompletar && (
                       <button style={estilos.linkCambiar} onClick={() => cambiarRespuesta(item)}>
@@ -259,6 +284,62 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, n
           );
         })}
       </div>
+
+      {checklistCompleto && puedeCompletar && (
+        <button
+          style={{ ...boton("primario"), marginTop: 14, width: "100%" }}
+          onClick={() => setMostrarValidacion(true)}
+        >
+          Revisar y cerrar la orden
+        </button>
+      )}
+
+      {mostrarValidacion && (
+        <div style={estilos.fondoModal} onClick={() => setMostrarValidacion(false)}>
+          <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
+            <p style={estilos.panelTitulo}>Validación de datos</p>
+            <p style={estilos.modalAyuda}>
+              Revisá lo que cargaste antes de cerrar la orden. Si algo quedó mal,
+              cancelá y corregilo con el botón "Cambiar".
+            </p>
+
+            <div style={estilos.listaItems}>
+              {items.map((item) => {
+                const r = respuestaDe(item.id);
+                return (
+                  <div key={item.id} style={estilos.filaResumen}>
+                    <IconoEstado resultado={r?.resultado} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={estilos.itemTexto}>{item.descripcion}</div>
+                      {r?.observacion && (
+                        <div style={estilos.detalleResumen}>{r.observacion}</div>
+                      )}
+                      {!r && <div style={estilos.detalleResumen}>Sin responder</div>}
+                    </div>
+                    {r && (
+                      <span style={insignia(r.resultado === "PASA" ? "exito" : "peligro")}>
+                        {r.resultado === "PASA" ? "Pasa" : "No pasa"}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={estilos.accionesModal}>
+              <button style={boton("fantasma")} onClick={() => setMostrarValidacion(false)}>
+                Cancelar
+              </button>
+              <button
+                style={boton("primario")}
+                onClick={() => { setMostrarValidacion(false); onCerrarOT?.(); }}
+              >
+                Cerrar OT
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -268,6 +349,7 @@ function IconoEstado({ resultado }) {
   if (resultado === "NO_PASA") return <XCircle size={18} strokeWidth={2} color={color.peligro} aria-hidden="true" />;
   return <Circle size={18} strokeWidth={1.6} color={color.textoDebil} aria-hidden="true" />;
 }
+
 
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "6px 0" },
@@ -289,6 +371,19 @@ const estilos = {
   formNoPasa: { marginTop: 12, paddingTop: 12, borderTop: `1px solid ${color.bordeSuave}` },
   checkboxFila: { display: "flex", alignItems: "center", gap: 8, fontSize: "0.86rem", color: color.texto, cursor: "pointer" },
   error: { color: color.peligro, fontSize: "0.82rem", margin: "10px 0 0" },
+  fondoModal: {
+    position: "fixed", inset: 0, background: "rgba(15, 23, 32, 0.45)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: 16, zIndex: 50,
+  },
+  modal: {
+    ...cs.tarjeta, padding: 20, width: "100%", maxWidth: 560,
+    maxHeight: "80vh", overflowY: "auto",
+  },
+  modalAyuda: { margin: "4px 0 14px", fontSize: "0.85rem", color: color.textoSuave },
+  filaResumen: { display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0" },
+  detalleResumen: { fontSize: "0.8rem", color: color.textoSuave, marginTop: 2 },
+  accionesModal: { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 },
 };
 
 export default ChecklistPreventiva;

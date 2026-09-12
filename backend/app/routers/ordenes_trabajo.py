@@ -30,7 +30,8 @@ from ..schemas import (
     NotaOTOut,
     NotaOTCrear,
 )
-from ..security import get_current_user, requiere_rol, grupos_del_coordinador
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto
+from .preventivas import _grupo_de_activo
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 
@@ -93,7 +94,7 @@ def listar_ordenes(
     mis_grupos: bool = False,
     limit: int = 50,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Listar OTs (hasta 'limit'), con filtros opcionales y combinables.
 
@@ -177,12 +178,17 @@ def mis_ordenes(
 def ver_orden(
     ot_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
-    """Ver una OT puntual por su id (el uuid de la orden)."""
+    """Ver una OT puntual por su id (el uuid de la orden).
+
+    Jefatura y enfermería no entran: la primera sigue el servicio por el
+    dashboard, la segunda por sus solicitudes.
+    """
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    _validar_permiso_sobre_ot(current_user, db, orden)
     return orden
 
 
@@ -215,6 +221,27 @@ def crear_orden(
     #    Tomamos el máximo actual y sumamos 1. Alcanza para el prototipo.
     ultimo = db.query(func.max(OrdenTrabajo.numero_ot)).scalar()
     numero_ot = (ultimo or 0) + 1
+    grupo_id = payload.grupo_id or _grupo_de_activo(db, activo)
+    
+    if payload.tipo and payload.tipo.upper() == "PREVENTIVA":
+        preventiva_abierta = (
+            db.query(OrdenTrabajo)
+            .filter(
+                OrdenTrabajo.activo_codigo == payload.activo_codigo,
+                OrdenTrabajo.tipo == "PREVENTIVA",
+                OrdenTrabajo.estado != "CERRADA",
+            )
+            .first()
+        )
+        if preventiva_abierta:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"El equipo ya tiene una preventiva abierta "
+                    f"(OT-{str(preventiva_abierta.numero_ot).zfill(4)}). "
+                    "Cerrala antes de abrir otra."
+                ),
+            )
 
     # 3. Crear la orden. El backend completa lo automático; el resto del payload.
     orden = OrdenTrabajo(
@@ -225,7 +252,7 @@ def crear_orden(
         prioridad=payload.prioridad,
         descripcion=payload.descripcion,
         tecnico_id=payload.tecnico_id,
-        grupo_id=payload.grupo_id,
+        grupo_id=grupo_id,
         sector_solicitante_id=payload.sector_solicitante_id,
         observaciones=payload.observaciones,
         fecha_notificacion=payload.fecha_notificacion,   # opcional

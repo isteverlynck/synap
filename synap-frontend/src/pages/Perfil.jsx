@@ -41,6 +41,9 @@ function Perfil() {
         <div style={{ minWidth: 0 }}>
           <p style={estilos.nombre}>{perfil.nombre} {perfil.apellido}</p>
           <p style={estilos.dato}>{perfil.email}</p>
+          {perfil.numero_identificacion && (
+            <p style={estilos.dato}>Usuario {perfil.numero_identificacion}</p>
+          )}
           <p style={estilos.datoTenue}>
             {etiquetaRol(perfil.rol)}
             {perfil.grupo ? ` · Grupo ${perfil.grupo}` : ""}

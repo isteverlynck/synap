@@ -200,6 +200,17 @@ export function estadoDelEquipo(activo) {
 
   // 2. Con OT abierta: ya lo están mirando, no hace falta otra solicitud.
   if (abiertas.length > 0) {
+    // Con más de una OT abierta no hay forma de elegir desde el equipo: saltar
+    // a "la primera" esconde las otras. Ahí el cartel informa y la elección se
+    // hace en el historial, que las lista todas.
+    if (abiertas.length > 1) {
+      return {
+        tono: "advertencia",
+        titulo: "Con órdenes de trabajo abiertas",
+        detalle: `${abiertas.length} órdenes abiertas sobre este equipo.`,
+        accion: "elegir_ot",
+      };
+    }
     const ot = abiertas[0];
     // "En reparación", no "En mantenimiento": mantenimiento en este sistema
     // significa preventivo, y confundirlos hace pensar que el equipo está en

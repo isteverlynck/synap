@@ -209,6 +209,15 @@ class OrdenTrabajo(Base):
     def activo_ubicacion(self) -> str | None:
         """Dónde está el equipo. El técnico necesita saber adónde ir."""
         return self.activo.ubicacion if self.activo else None
+    
+    @property
+    def activo_proxima_fecha_mp(self):
+        """Cuándo le toca el próximo preventivo al equipo de esta OT.
+
+        Sirve para saber cuánto margen hay para resolver una correctiva antes
+        de que caiga el mantenimiento programado.
+        """
+        return self.activo.proxima_fecha_mp if self.activo else None
 
     # notas: la bitácora de la OT — se define después de NotaOT (más abajo en
     # este archivo) porque SQLAlchemy necesita que la clase ya exista para

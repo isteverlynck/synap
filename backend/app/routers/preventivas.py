@@ -22,6 +22,7 @@ from datetime import datetime, date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, extract
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -79,15 +80,20 @@ def generar_preventivas_core(db: Session, anio: int, mes: int) -> PreventivasGen
     ya_existian = 0
     codigos = []
     descripcion_mp = _descripcion_mp(anio, mes)
-
+        
     for activo in equipos:
         # ¿ya hay una OT preventiva para este equipo en ese mes? (no duplicar)
+        # o una preventiva de un mes anterior que todavía sigue abierta: un
+        # equipo no puede tener dos preventivas abiertas a la vez.
         existente = (
             db.query(OrdenTrabajo)
             .filter(
                 OrdenTrabajo.activo_codigo == activo.codigo,
                 OrdenTrabajo.tipo == "PREVENTIVA",
-                OrdenTrabajo.descripcion == descripcion_mp,
+                or_(
+                    OrdenTrabajo.descripcion == descripcion_mp,
+                    OrdenTrabajo.estado != "CERRADA",
+                ),
             )
             .first()
         )

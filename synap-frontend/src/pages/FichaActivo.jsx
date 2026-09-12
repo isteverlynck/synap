@@ -1,171 +1,3 @@
-// // FichaActivo.jsx — ficha básica de un equipo: sus datos + historial de
-// // órdenes de trabajo, fallas y mantenimientos.
-// //
-// // Por ahora la usan técnicos, coordinación y jefatura al escanear un QR (esos
-// // roles todavía no tienen una pantalla de inicio propia). Es un placeholder
-// // simple: cuando armemos las pantallas definitivas de cada rol, esta ficha va
-// // a servir de base para agregarles las acciones que le correspondan a cada uno
-// // (ej: técnico marca la OT en progreso, coordinación asigna, etc.).
-
-// import { useEffect, useState } from "react";
-// import { useNavigate, useParams } from "react-router-dom";
-// import { logout } from "../api/auth";
-// import { verActivoDetalle } from "../api/activos";
-// import Encabezado from "../componentes/Encabezado";
-// import { color, cs, boton, insignia, tonoEstadoActivo } from "../tema";
-
-// function FichaActivo() {
-//   const { codigo } = useParams();
-//   const navegar = useNavigate();
-//   const [activo, setActivo] = useState(null);
-//   const [cargando, setCargando] = useState(true);
-//   const [error, setError] = useState("");
-
-//   useEffect(() => {
-//     setCargando(true);
-//     setError("");
-//     verActivoDetalle(codigo)
-//       .then(setActivo)
-//       .catch(() => setError(`No encontramos el equipo "${codigo}".`))
-//       .finally(() => setCargando(false));
-//   }, [codigo]);
-
-//   function cerrarSesion() {
-//     logout();
-//     navegar("/");
-//   }
-
-//   if (cargando) {
-//     return (
-//       <div style={cs.pagina}>
-//         <div style={cs.contenido}><p style={estilos.mensaje}>Cargando ficha del equipo...</p></div>
-//       </div>
-//     );
-//   }
-
-//   if (error) {
-//     return (
-//       <div style={cs.pagina}>
-//         <div style={cs.contenido}>
-//           <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>
-//           <button style={boton("secundario")} onClick={() => navegar("/escanear")}>
-//             Escanear de nuevo
-//           </button>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div style={cs.pagina}>
-//       <div style={cs.contenido}>
-//         <Encabezado titulo={activo.codigo} subtitulo={activo.descripcion}>
-//           <button style={boton("secundario")} onClick={() => navegar("/escanear")}>Escanear otro</button>
-//           <button style={boton("fantasma")} onClick={cerrarSesion}>Cerrar sesión</button>
-//         </Encabezado>
-
-//         <div style={estilos.tarjetaDatos}>
-//           <Dato etiqueta="Estado" valor={<span style={insignia(tonoEstadoActivo(activo.estado))}>{activo.estado}</span>} />
-//           <Dato etiqueta="Marca / Modelo" valor={[activo.marca, activo.modelo].filter(Boolean).join(" ") || "—"} />
-//           <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
-//           <Dato etiqueta="Ubicación" valor={activo.ubicacion || "—"} />
-//         </div>
-
-//         <Seccion titulo={`Órdenes de trabajo (${activo.ordenes_de_trabajo.length})`}>
-//           {activo.ordenes_de_trabajo.length === 0 && <p style={estilos.vacio}>Sin órdenes de trabajo registradas.</p>}
-//           {activo.ordenes_de_trabajo.map((ot) => (
-//             <div key={ot.id} style={estilos.item}>
-//               <span><strong>OT #{ot.numero_ot}</strong> — {ot.tipo}</span>
-//               <span style={insignia("primario")}>{ot.estado}</span>
-//               {ot.prioridad && <span style={estilos.detalle}>Prioridad: {ot.prioridad}</span>}
-//             </div>
-//           ))}
-//         </Seccion>
-
-//         <Seccion titulo={`Fallas (${activo.fallas.length})`}>
-//           {activo.fallas.length === 0 && <p style={estilos.vacio}>Sin fallas registradas.</p>}
-//           {activo.fallas.map((f) => (
-//             <div key={f.id} style={estilos.item}>
-//               <span>{f.tipo_falla || "Falla"}</span>
-//               <span style={insignia("advertencia")}>{f.estado}</span>
-//               {f.severidad && <span style={estilos.detalle}>Severidad: {f.severidad}</span>}
-//             </div>
-//           ))}
-//         </Seccion>
-
-//         <Seccion titulo={`Mantenimientos (${activo.mantenimientos.length})`}>
-//           {activo.mantenimientos.length === 0 && <p style={estilos.vacio}>Sin mantenimientos registrados.</p>}
-//           {activo.mantenimientos.map((m) => (
-//             <div key={m.id} style={estilos.item}>
-//               <span>Programado: {m.fecha_programada}</span>
-//               <span style={insignia("neutro")}>{m.estado}</span>
-//               {m.fecha_realizada && <span style={estilos.detalle}>Realizado: {m.fecha_realizada}</span>}
-//             </div>
-//           ))}
-//         </Seccion>
-//       </div>
-//     </div>
-//   );
-// }
-
-// function Dato({ etiqueta, valor }) {
-//   return (
-//     <div style={estilos.dato}>
-//       <div style={estilos.datoEtiqueta}>{etiqueta}</div>
-//       <div style={estilos.datoValor}>{valor}</div>
-//     </div>
-//   );
-// }
-
-// function Seccion({ titulo, children }) {
-//   return (
-//     <div style={estilos.seccion}>
-//       <h2 style={estilos.tituloSeccion}>{titulo}</h2>
-//       <div style={estilos.listaItems}>{children}</div>
-//     </div>
-//   );
-// }
-
-// const estilos = {
-//   mensaje: { color: color.textoSuave, padding: "20px 0" },
-//   tarjetaDatos: {
-//     ...cs.tarjeta,
-//     padding: 22,
-//     marginBottom: 26,
-//     display: "grid",
-//     gridTemplateColumns: "1fr 1fr",
-//     gap: 18,
-//   },
-//   dato: { fontSize: "0.95rem" },
-//   datoEtiqueta: { fontSize: "0.72rem", color: color.textoDebil, textTransform: "uppercase", letterSpacing: "0.02em", marginBottom: 4, fontWeight: 600 },
-//   datoValor: { color: color.texto, fontWeight: 500 },
-//   seccion: { marginBottom: 24 },
-//   tituloSeccion: { fontSize: "1rem", color: color.texto, marginBottom: 10, fontWeight: 700 },
-//   listaItems: { display: "flex", flexDirection: "column", gap: 8 },
-//   item: {
-//     ...cs.tarjeta,
-//     padding: "12px 16px",
-//     fontSize: "0.9rem",
-//     color: color.texto,
-//     display: "flex",
-//     alignItems: "center",
-//     gap: 12,
-//     flexWrap: "wrap",
-//   },
-//   detalle: { color: color.textoSuave, fontSize: "0.82rem" },
-//   vacio: { color: color.textoSuave, fontSize: "0.9rem" },
-// };
-
-// export default FichaActivo;
-
-// FichaActivo.jsx — la ficha del equipo. Es la pantalla central del sistema:
-// cualquier rol llega acá al escanear un QR, y desde acá hace lo que su rol le
-// permita.
-//
-// La estructura es siempre la misma para todos (aviso de estado, datos,
-// responsable, historial). Lo único que cambia según quién mira son los botones
-// de abajo — igual que requiere_rol() en el backend, pero en pantalla.
-
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { logout, rolActual } from "../api/auth";
@@ -173,6 +5,7 @@ import { verActivoDetalle } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, estadoDelEquipo } from "../tema";
 import Volver from "../componentes/Volver";
+import { diasHasta } from "../utiles/fechas";
 
 function FichaActivo() {
   const { codigo } = useParams();
@@ -222,6 +55,9 @@ function FichaActivo() {
   const situacion = estadoDelEquipo(activo);
   const abiertas = activo.ordenes_de_trabajo.filter((ot) => ot.estado !== "CERRADA");
   const cerradas = activo.ordenes_de_trabajo.filter((ot) => ot.estado === "CERRADA");
+  // Mismo criterio que en Acciones: jefatura y enfermería no entran al detalle
+  // de una OT, así que para ellas el historial no es clickeable.
+  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
 
   return (
     <div style={cs.pagina}>
@@ -242,7 +78,7 @@ function FichaActivo() {
           <Dato etiqueta="Marca y modelo" valor={[activo.marca, activo.modelo].filter(Boolean).join(" ") || "—"} />
           <Dato etiqueta="Ubicación" valor={activo.ubicacion || "—"} />
           <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
-          <Dato etiqueta="Próximo preventivo" valor={formatearFecha(activo.proxima_fecha_mp)} />
+          <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
         </div>
 
         {/* El responsable no es un dato más: es una acción. Cumple el objetivo
@@ -276,6 +112,7 @@ function FichaActivo() {
               detalle={`Abierta el ${formatearFecha(ot.fecha_apertura)}`}
               tono="advertencia"
               estado={ot.estado}
+              onClick={veOrdenes ? () => navegar(`/ordenes/${ot.id}`) : undefined}
             />
           ))}
           {cerradas.slice(0, 5).map((ot) => (
@@ -285,6 +122,7 @@ function FichaActivo() {
               detalle={`Cerrada`}
               tono="neutro"
               estado={ot.estado}
+              onClick={veOrdenes ? () => navegar(`/ordenes/${ot.id}`) : undefined}
             />
           ))}
           {activo.mantenimientos.slice(0, 5).map((m) => (
@@ -348,7 +186,7 @@ function AvisoEstado({ situacion }) {
 
 function Acciones({ rol, situacion, activo, navegar }) {
   const acciones = [];
-
+  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
   // La acción principal la manda el ESTADO, no el rol: si el equipo está de
   // baja o ya tiene una OT abierta, nadie reporta un problema nuevo. Así no se
   // juntan cinco solicitudes del mismo monitor el mismo día.
@@ -359,7 +197,7 @@ function Acciones({ rol, situacion, activo, navegar }) {
       onClick: () => navegar(`/solicitudes?activo=${activo.codigo}`),
     });
   }
-  if (situacion.accion === "ver_ot") {
+  if (situacion.accion === "ver_ot" && veOrdenes) {
     acciones.push({
       texto: "Ver estado de la reparación",
       variante: "secundario",
@@ -367,14 +205,10 @@ function Acciones({ rol, situacion, activo, navegar }) {
     });
   }
 
-  // Acciones propias de cada rol, sobre las que ya decidió el estado.
-  if (rol === "tecnico" || rol === "junior") {
-    acciones.push({ texto: "Abrir OT", variante: "secundario", onClick: () => navegar(`/ordenes/nueva?activo=${activo.codigo}`) });
-  }
   if (rol === "coordinacion") {
-    acciones.push({ texto: "Abrir OT", variante: "secundario", onClick: () => navegar(`/ordenes/nueva?activo=${activo.codigo}`) });
     acciones.push({ texto: "Ver plan de mantenimiento", variante: "secundario", onClick: () => navegar(`/mantenimientos?activo=${activo.codigo}`) });
   }
+  
 
   if (acciones.length === 0) return null;
 
@@ -399,6 +233,16 @@ function formatearFecha(valor) {
   const f = new Date(valor);
   if (isNaN(f)) return "—";
   return f.toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function textoProximoMP(fecha) {
+  const base = formatearFecha(fecha);
+  const dias = diasHasta(fecha);
+  if (dias === null) return base;
+  if (dias < 0) return `${base} · vencido hace ${Math.abs(dias)} días`;
+  if (dias === 0) return `${base} · es hoy`;
+  if (dias === 1) return `${base} · mañana`;
+  return `${base} · en ${dias} días`;
 }
 
 // Los estados se guardan en mayúsculas y con guión bajo (así los espera el
@@ -432,9 +276,13 @@ function Seccion({ titulo, children }) {
   );
 }
 
-function ItemHistorial({ titulo, detalle, tono, estado }) {
+function ItemHistorial({ titulo, detalle, tono, estado, onClick }) {
   return (
-    <div style={estilos.item}>
+    <div
+      style={onClick ? { ...estilos.item, cursor: "pointer" } : estilos.item}
+      onClick={onClick}
+      className={onClick ? "sy-clickeable" : undefined}
+    >
       <div>
         <div style={{ color: color.texto, fontWeight: 500 }}>{titulo}</div>
         <div style={estilos.detalle}>{detalle}</div>

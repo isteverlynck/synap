@@ -191,14 +191,15 @@ function CalendarioMP() {
 
         <div style={estilos.mesActual}>
           <span style={estilos.mesTexto}>{MESES[mes - 1]} {anio}</span>
-          {!esMesActual && (
-            <button style={estilos.linkHoy} onClick={irAHoy}>Ir a hoy</button>
-          )}
         </div>
 
         <button style={estilos.flecha} onClick={() => cambiarMes(1)} aria-label="Mes siguiente">
           <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
         </button>
+
+        {!esMesActual && (
+          <button style={estilos.linkHoy} onClick={irAHoy}>Ir a hoy</button>
+        )}
 
         {puedeGenerar && (
           <button
@@ -331,12 +332,12 @@ const estilos = {
     display: "flex", alignItems: "center", justifyContent: "center",
     cursor: "pointer", color: color.texto,
   },
-  mesActual: { display: "flex", alignItems: "center", gap: 10, minWidth: 190 },
+  mesActual: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, minWidth: 190 },
   mesTexto: { fontSize: "1.05rem", fontWeight: 700, color: color.texto },
   linkHoy: {
     background: "transparent", border: "none", cursor: "pointer",
     color: color.primario, fontSize: "0.8rem", fontWeight: 600,
-    fontFamily: "inherit", padding: 0, textDecoration: "underline",
+    fontFamily: "inherit", padding: 0,
   },
   // Mismo aspecto que el buscador de Equipos/Órdenes, para que las tres
   // pantallas se sientan consistentes.

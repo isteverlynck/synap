@@ -43,7 +43,7 @@ from ..schemas import (
     OrdenTrabajoOut,
 )
 
-from ..security import get_current_user, requiere_rol, grupos_del_coordinador
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto
 
 
 def _validar_permiso_sobre_mp(db: Session, current_user: Usuario, mp: MantenimientoPreventivo) -> None:
@@ -129,7 +129,7 @@ def ver_respuestas_de_mp(
 def registrar_respuesta(
     payload: ChecklistRespuestaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior")),
 ):
     """Registrar (o cambiar) la respuesta a un ítem del checklist en un MP.
 
@@ -193,7 +193,7 @@ def registrar_respuesta(
 def generar_correctiva_desde_checklist(
     payload: GenerarCorrectivaDesdeChecklist,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior")),
 ):
     """Registra un ítem como NO_PASA y crea la OT correctiva para ese equipo.
 

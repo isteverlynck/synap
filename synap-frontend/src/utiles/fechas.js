@@ -9,6 +9,23 @@ export function formatearFecha(fechaISO) {
   });
 }
 
+// Días desde hoy hasta una fecha. Negativo = ya pasó. null si no hay dato.
+export function diasHasta(fecha) {
+  if (!fecha) return null;
+  const texto = String(fecha);
+  // Las fechas de solo día ("2026-10-29") las interpreta como UTC, y en
+  // Argentina eso las corre un día para atrás. Las armamos en hora local.
+  const soloDia = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const objetivo = soloDia
+    ? new Date(Number(soloDia[1]), Number(soloDia[2]) - 1, Number(soloDia[3]))
+    : new Date(texto);
+  if (isNaN(objetivo.getTime())) return null;
+  const hoy = new Date();
+  objetivo.setHours(0, 0, 0, 0);
+  hoy.setHours(0, 0, 0, 0);
+  return Math.round((objetivo - hoy) / 86400000);
+}
+
 // Agrupa una lista en bloques por día, del más reciente al más viejo.
 // "obtenerFecha" le dice cómo sacarle la fecha a cada elemento (útil porque a
 // veces el elemento es { solicitud, ot } y no la solicitud directamente).
