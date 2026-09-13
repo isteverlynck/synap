@@ -302,6 +302,7 @@ class OrdenTrabajoResumen(BaseModel):
     # está abierta y quién la tiene.
     fecha_apertura: datetime | None = None
     tecnico_id: uuid.UUID | None = None
+    puedo_abrir: bool = True
     model_config = ConfigDict(from_attributes=True)
 
 

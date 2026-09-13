@@ -88,7 +88,10 @@ function DetalleOrden() {
   function nombreTecnico(id) {
     if (!id) return null;
     const t = tecnicos.find((x) => x.id === id);
-    return t ? `${t.nombre} ${t.apellido}` : "Asignada";
+    if (t) return `${t.nombre} ${t.apellido}`;
+    // Si no está en la lista (otro grupo, usuario dado de baja), usamos el
+    // nombre que ya manda el backend antes de rendirnos.
+    return ot?.tecnico_nombre || "Técnico no identificado";
   }
 
   function nombreInsumo(insumoId) {
@@ -159,7 +162,7 @@ function DetalleOrden() {
         <p style={estilos.equipoCodigo}>
           {ot.activo_codigo}{ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
         </p>
-        {avisoPreventivo && <p style={estilos.equipoCodigo}>{avisoPreventivo}</p>}
+        {avisoPreventivo && !cerrada && <p style={estilos.equipoCodigo}>{avisoPreventivo}</p>}
       </div>
 
       {ot.descripcion && (
@@ -172,10 +175,12 @@ function DetalleOrden() {
         <div style={estilos.datos}>
           <Dato
             etiqueta="Asignado a"
-            valor={
+            valor={ 
               ot.tecnico_id
                 ? nombreTecnico(ot.tecnico_id)
-                : ot.tipo === "PREVENTIVA" ? "Asignada al grupo" : "Sin asignar"
+                : ot.tipo === "PREVENTIVA"
+                  ? `Asignada al grupo ${ot.grupo_id || "sin definir"}`
+                  : "Sin asignar"
           }
         />
         <Dato etiqueta="Notificada" valor={fechaHora(ot.fecha_notificacion)} />
@@ -675,7 +680,7 @@ function fechaHora(valor) {
   if (!valor) return "—";
   const f = new Date(valor);
   if (isNaN(f)) return "—";
-  return f.toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return f.toLocaleString("es-AR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 // Azul = hay que hacerla. Violeta = alguien la está haciendo. Gris = terminada,

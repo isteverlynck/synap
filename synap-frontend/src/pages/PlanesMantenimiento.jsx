@@ -7,7 +7,7 @@
 // (no está en su menú).
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, ClipboardCheck } from "lucide-react";
 import { listarPlanes } from "../api/planes";
 import { catalogosParaAlta } from "../api/activos";
@@ -19,6 +19,8 @@ const PUEDE_CREAR = ["coordinacion", "jefatura"];
 
 function PlanesMantenimiento() {
   const navegar = useNavigate();
+  const [parametros] = useSearchParams();
+  const tipoFiltrado = parametros.get("tipo");
   const puedeCrear = PUEDE_CREAR.includes(rolActual());
   const [planes, setPlanes] = useState([]);
   const [tipos, setTipos] = useState([]);
@@ -39,11 +41,19 @@ function PlanesMantenimiento() {
     return tipos.find((t) => t.id === tipoEquipoId)?.nombre || tipoEquipoId;
   }
 
+    // Cuando venís desde la ficha de un equipo, mostramos el plan que le aplica:
+  // el de su tipo si existe, y si no el genérico, que es el que efectivamente
+  // se le asigna a un equipo sin checklist propio.
+  const propios = planes.filter((p) => p.tipo_equipo_id === tipoFiltrado && !p.es_generica);
+  const planesVisibles = !tipoFiltrado
+    ? planes
+    : (propios.length > 0 ? propios : planes.filter((p) => p.es_generica));
+
   return (
     <>
       <Encabezado
         titulo="Mantenimientos"
-        subtitulo={cargando ? "Cargando..." : `${planes.length} checklist${planes.length === 1 ? "" : "s"} de mantenimiento`}
+        subtitulo={cargando ? "Cargando..." : `${planesVisibles.length} checklist${planesVisibles.length === 1 ? "" : "s"} de mantenimiento`}
       >
         {puedeCrear && (
           <button style={{ ...boton("primario"), gap: 7 }} onClick={() => navegar("/mantenimientos/nuevo")}>
@@ -52,6 +62,21 @@ function PlanesMantenimiento() {
           </button>
         )}
       </Encabezado>
+
+      {tipoFiltrado && !cargando && (
+        <p style={estilos.mensaje}>
+          {propios.length > 0
+            ? `Plan de ${nombreDeTipo(tipoFiltrado)}.`
+            : `${nombreDeTipo(tipoFiltrado)} no tiene checklist propio: se le aplica el genérico.`}
+          {" "}
+          <button
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: color.primario, fontFamily: "inherit", fontSize: "inherit", fontWeight: 600 }}
+            onClick={() => navegar("/mantenimientos")}
+          >
+            Ver todos
+          </button>
+        </p>
+      )}
 
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
@@ -63,7 +88,7 @@ function PlanesMantenimiento() {
       )}
 
       <div style={estilos.lista}>
-        {planes.map((p) => (
+        {planesVisibles.map((p) => (
           <div
             key={p.id}
             className="sy-clickeable"

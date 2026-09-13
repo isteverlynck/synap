@@ -7,17 +7,8 @@ from sqlalchemy import or_
 
 from ..database import get_db
 from ..models import Activo, Usuario, GrupoTipoEquipo, GrupoTecnico, Usuario, TipoEquipo, Servicio, PlantillaMP
-from ..schemas import (
-    ActivoOut,
-    ActivoDetalle,
-    ActivoCreate,
-    TipoEquipoCreate,
-    TipoEquipoOut,
-    ServicioCreate,
-    ServicioOut,
-    ResponsableOut,
-)
-from ..security import get_current_user, requiere_rol
+from ..schemas import ActivoOut, ActivoDetalle, ActivoCreate, ResponsableOut
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador
 
 router = APIRouter(prefix="/activos", tags=["activos"])
 
@@ -67,10 +58,7 @@ def listar_activos(
     if grupo_id:
         q = q.filter(Activo.grupo_id == grupo_id)
 
-    # Ordenado por código: es el identificador que se usa para ubicar un
-    # equipo puntual (QR, etiqueta física), así que conviene que la lista
-    # quede en ese orden en vez de por nombre.
-    return q.order_by(Activo.codigo).limit(limit).all()
+    return q.order_by(Activo.descripcion, Activo.codigo).limit(limit).all()
 
 @router.get("/filtros")
 def opciones_de_filtro(
@@ -121,62 +109,14 @@ def catalogos_para_alta(
     poder elegirse igual al dar de alta el primero.
     """
     tipos = [
-        {"id": t.id, "nombre": t.nombre, "descripcion": t.descripcion}
+        {"id": t.id, "nombre": t.nombre}
         for t in db.query(TipoEquipo).order_by(TipoEquipo.nombre).all()
     ]
     sectores = [
-        {"id": s.id, "nombre": s.nombre, "centro_costos": s.centro_costos, "descripcion": s.descripcion}
+        {"id": s.id, "nombre": s.nombre}
         for s in db.query(Servicio).order_by(Servicio.nombre).all()
     ]
     return {"tipos": tipos, "sectores": sectores}
-
-
-@router.post("/tipos-equipo", response_model=TipoEquipoOut, status_code=201)
-def crear_tipo_equipo(
-    payload: TipoEquipoCreate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("coordinacion")),
-):
-    """Dar de alta un tipo de equipo nuevo en el catálogo (ej: llegó un robot
-    quirúrgico y todavía no había un tipo para eso). Lo hace coordinación
-    (jefatura también, por requiere_rol), para no depender de tocar la base a
-    mano cada vez que aparece un tipo de equipo nuevo en el hospital.
-    """
-    if db.query(TipoEquipo).filter(TipoEquipo.id == payload.id).first():
-        raise HTTPException(
-            status_code=409,
-            detail=f"Ya existe un tipo de equipo con el código {payload.id}.",
-        )
-    tipo = TipoEquipo(id=payload.id, nombre=payload.nombre, descripcion=payload.descripcion)
-    db.add(tipo)
-    db.commit()
-    db.refresh(tipo)
-    return tipo
-
-
-@router.post("/servicios", response_model=ServicioOut, status_code=201)
-def crear_servicio(
-    payload: ServicioCreate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("coordinacion")),
-):
-    """Dar de alta un servicio/área nueva del hospital en el catálogo (mismo
-    caso que crear_tipo_equipo, pero para servicios)."""
-    if db.query(Servicio).filter(Servicio.id == payload.id).first():
-        raise HTTPException(
-            status_code=409,
-            detail=f"Ya existe un servicio con el código {payload.id}.",
-        )
-    servicio = Servicio(
-        id=payload.id,
-        nombre=payload.nombre,
-        centro_costos=payload.centro_costos,
-        descripcion=payload.descripcion,
-    )
-    db.add(servicio)
-    db.commit()
-    db.refresh(servicio)
-    return servicio
 
 
 @router.post("", response_model=ActivoOut, status_code=201)
@@ -239,9 +179,7 @@ def crear_activo(
     ).first()
     grupo_id = rel_grupo.grupo_id if rel_grupo else None
 
-    # 3. Mantenimiento preventivo (opcional). Solo se busca/asigna un plan si
-    #    este equipo REQUIERE mantenimiento (crear_mantenimiento=True) — si
-    #    no lo requiere, queda sin checklist asociado, a propósito.
+    # 3. Mantenimiento preventivo (opcional).
     plantilla_mp_id = None
     proxima_fecha_mp = None
     frecuencia_mp_meses = None
@@ -316,8 +254,8 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
     activo = db.query(Activo).filter(Activo.codigo == codigo).first()
     if activo is None:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
-    
-        # Cadena para llegar al grupo responsable: activo → tipo de equipo →
+
+    # Cadena para llegar al grupo responsable: activo → tipo de equipo →
     # grupo. Es la misma que usa solicitudes para el ruteo. Se muestra a
     # TODO el grupo (no solo a quien lo coordina): cualquiera de ellos puede
     # atender el contacto directo del bioingeniero.
@@ -338,7 +276,51 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
             for m in miembros
         ]
 
+    if current_user.rol == "coordinacion":
+        mios = set(grupos_del_coordinador(db, current_user))
+    elif current_user.rol in ("tecnico", "junior"):
+        mios = {current_user.grupo} if current_user.grupo else set()
+    else:
+        mios = set()
+
+    for resumen, orden in zip(detalle.ordenes_de_trabajo, activo.ordenes_de_trabajo):
+        resumen.puedo_abrir = orden.grupo_id in mios
+
     return detalle
-    
-    
+
+@router.patch("/{codigo}/programar-segun-plan", response_model=ActivoOut)
+def programar_segun_plan(
+    codigo: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Carga la frecuencia de mantenimiento del equipo tomándola de su plan.
+
+    La frecuencia vive en dos capas: el plan la define para todo un tipo de
+    equipo, y el activo guarda la suya. Sin la del activo, la próxima fecha
+    nunca avanza y el equipo queda vencido para siempre. Este endpoint copia
+    una en la otra: coordinación no elige el número, sale del plan.
+    """
+    activo = db.query(Activo).filter(Activo.codigo == codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    plan = db.query(PlantillaMP).filter(
+        PlantillaMP.tipo_equipo_id == activo.tipo_equipo_id
+    ).first()
+    if plan is None:
+        plan = db.query(PlantillaMP).filter(PlantillaMP.es_generica == True).first()  # noqa: E712
+    if plan is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Este tipo de equipo no tiene un checklist de mantenimiento, "
+                "ni hay uno genérico. Cargá el plan antes de programarlo."
+            ),
+        )
+
+    meses = max(1, round(plan.frecuencia_dias / 30))
+    activo.frecuencia_mp_meses = meses
+    db.commit()
+    db.refresh(activo)
     return activo

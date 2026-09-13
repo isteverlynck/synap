@@ -246,7 +246,10 @@ const estilos = {
   itemLateral: {
     display: "flex", alignItems: "center", gap: 12,
     padding: "11px 22px", color: color.lateralTexto, fontSize: "0.88rem",
-    borderLeft: "3px solid transparent",
+    // Las tres por separado, no el atajo `borderLeft`: si mezclás atajo y
+    // propiedad suelta, React deja el borde con el color anterior al
+    // desactivar el ítem y queda una línea clara al costado.
+    borderLeftWidth: 3, borderLeftStyle: "solid", borderLeftColor: "transparent",
   },
   itemLateralActivo: {
     background: color.lateralActivo, color: "#fff", borderLeftColor: color.primario,

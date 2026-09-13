@@ -6,6 +6,8 @@ import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, estadoDelEquipo } from "../tema";
 import Volver from "../componentes/Volver";
 import { diasHasta, parsearFecha } from "../utiles/fechas";
+import { programarSegunPlan } from "../api/activos";
+import { toast } from "sonner";
 
 function FichaActivo() {
   const { codigo } = useParams();
@@ -14,6 +16,22 @@ function FichaActivo() {
   const [activo, setActivo] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [programando, setProgramando] = useState(false);
+  const [avisoRestringido, setAvisoRestringido] = useState(false);
+
+  async function programarMP() {
+    if (programando) return;
+    setProgramando(true);
+    try {
+      const actualizado = await programarSegunPlan(activo.codigo);
+      setActivo({ ...activo, frecuencia_mp_meses: actualizado.frecuencia_mp_meses });
+      toast.success(`Queda programado cada ${actualizado.frecuencia_mp_meses} meses.`);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "No pudimos programarlo.");
+    } finally {
+      setProgramando(false);
+    }
+  }
 
   useEffect(() => {
     setCargando(true);
@@ -74,6 +92,23 @@ function FichaActivo() {
         <h2 style={estilos.nombreEquipo}>{activo.descripcion}</h2>
         <p style={estilos.codigo}>{activo.codigo}</p>
 
+        {rol === "coordinacion" && activo.proxima_fecha_mp && !activo.frecuencia_mp_meses && (
+          <div style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12 }}>
+            <p style={{ margin: 0, fontSize: "0.88rem", color: color.texto }}>
+              Este equipo tiene mantenimiento programado pero no tiene definido cada
+              cuánto se repite. Sin eso, la próxima fecha no avanza y el equipo
+              queda vencido de forma permanente.
+            </p>
+            <button
+              style={{ ...boton("primario"), marginTop: 12 }}
+              onClick={programarMP}
+              disabled={programando}
+            >
+              {programando ? "Programando..." : "Programar según su plan"}
+            </button>
+          </div>
+        )}
+
         <div style={estilos.tarjetaDatos}>
           <Dato etiqueta="Marca y modelo" valor={[activo.marca, activo.modelo].filter(Boolean).join(" ") || "—"} />
           <Dato etiqueta="Ubicación" valor={activo.ubicacion || "—"} />
@@ -115,7 +150,7 @@ function FichaActivo() {
               detalle={`Abierta el ${formatearFecha(ot.fecha_apertura)}`}
               tono="advertencia"
               estado={ot.estado}
-              onClick={veOrdenes ? () => navegar(`/ordenes/${ot.id}`) : undefined}
+              onClick={veOrdenes ? () => (ot.puedo_abrir ? navegar(`/ordenes/${ot.id}`) : setAvisoRestringido(true)) : undefined}
             />
           ))}
           {cerradas.slice(0, 5).map((ot) => (
@@ -125,7 +160,7 @@ function FichaActivo() {
               detalle={`Cerrada`}
               tono="neutro"
               estado={ot.estado}
-              onClick={veOrdenes ? () => navegar(`/ordenes/${ot.id}`) : undefined}
+              onClick={veOrdenes ? () => (ot.puedo_abrir ? navegar(`/ordenes/${ot.id}`) : setAvisoRestringido(true)) : undefined}
             />
           ))}
           {activo.mantenimientos.slice(0, 5).map((m) => (
@@ -142,6 +177,36 @@ function FichaActivo() {
           )}
         </Seccion>
       </div>
+
+      {avisoRestringido && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15, 23, 32, 0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, zIndex: 50,
+          }}
+          onClick={() => setAvisoRestringido(false)}
+        >
+          <div
+            style={{ ...cs.tarjeta, padding: 22, width: "100%", maxWidth: 380 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: color.texto }}>
+              Acceso restringido
+            </p>
+            <p style={{ margin: "8px 0 0", fontSize: "0.88rem", color: color.textoSuave }}>
+              Esta orden pertenece a otro grupo técnico. Podés ver que existe en el
+              historial del equipo, pero no su detalle.
+            </p>
+            <button
+              style={{ ...boton("primario"), marginTop: 16, width: "100%" }}
+              onClick={() => setAvisoRestringido(false)}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -209,7 +274,7 @@ function Acciones({ rol, situacion, activo, navegar }) {
   }
 
   if (rol === "coordinacion") {
-    acciones.push({ texto: "Ver plan de mantenimiento", variante: "secundario", onClick: () => navegar(`/mantenimientos?activo=${activo.codigo}`) });
+    acciones.push({ texto: "Ver plan de mantenimiento", variante: "secundario", onClick: () => navegar(`/mantenimientos?tipo=${activo.tipo_equipo_id}`) });
   }
   
 

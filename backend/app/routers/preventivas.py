@@ -19,6 +19,7 @@ pronóstico — para poder organizarse.
 """
 
 from datetime import datetime, date
+from calendar import monthrange
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, extract
@@ -66,12 +67,16 @@ def generar_preventivas_core(db: Session, anio: int, mes: int) -> PreventivasGen
     Por eso es seguro llamarla de más (al arrancar el backend, todos los días
     a la madrugada, o a mano): nunca duplica.
     """
-    # Equipos cuya próxima MP cae en ese mes/año.
+    # Equipos cuya próxima MP cae en ese mes/año O ya venció antes. Comparar
+    # por mes exacto dejaba huérfano a cualquier equipo que se saltease un mes:
+    # su proxima_fecha_mp quedaba en el pasado y ninguna corrida posterior
+    # volvía a preguntar por él.
+    ultimo_dia = date(anio, mes, monthrange(anio, mes)[1])
     equipos = (
         db.query(Activo)
         .filter(
-            extract("year", Activo.proxima_fecha_mp) == anio,
-            extract("month", Activo.proxima_fecha_mp) == mes,
+            Activo.proxima_fecha_mp.isnot(None),
+            Activo.proxima_fecha_mp <= ultimo_dia,
         )
         .all()
     )

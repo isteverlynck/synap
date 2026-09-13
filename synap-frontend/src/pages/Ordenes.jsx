@@ -134,10 +134,10 @@ function Ordenes() {
     tecnicosDisponibles().then(setTecnicos).catch(() => setTecnicos([]));
   }, [esCoordinacion]);
 
-  function nombreTecnico(id) {
-    if (!id) return null;
-    const t = tecnicos.find((x) => x.id === id);
-    return t ? `${t.nombre} ${t.apellido}` : "Asignada";
+  function nombreTecnico(ot) {
+    const t = tecnicos.find((x) => x.id === ot.tecnico_id);
+    if (t) return `${t.nombre} ${t.apellido}`;
+    return ot.tecnico_nombre || "Técnico no identificado";
   }
 
   const filtros = esCoordinacion
@@ -254,10 +254,10 @@ function Ordenes() {
                   {esCoordinacion && (
                     <p style={ot.tecnico_id || ot.tipo === "PREVENTIVA" ? estilos.asignacion : estilos.sinAsignar}>
                       {ot.tecnico_id
-                        ? nombreTecnico(ot.tecnico_id)
+                        ? nombreTecnico(ot)
                         : ot.tipo === "PREVENTIVA"
-                          ? "Asignada al grupo"
-                          : "Sin técnico asignado"}
+                          ? `Asignada al grupo ${ot.grupo_id || "sin definir"}`
+                          : "Sin técnico asignado"}                  
                     </p>
                   )}
 
@@ -333,7 +333,10 @@ const estilos = {
   },
   filtros: { display: "flex", gap: 7, marginBottom: 18, flexWrap: "wrap" },
   filtro: {
-    padding: "6px 14px", borderRadius: 999, border: `1px solid ${color.borde}`,
+    padding: "6px 14px", borderRadius: 999,
+    // Separadas y no el atajo `border`: mezclarlo con el `borderColor` de
+    // filtroActivo hace que al desactivarse quede el borde oscuro.
+    borderWidth: 1, borderStyle: "solid", borderColor: color.borde,
     background: color.tarjeta, color: color.textoSuave, fontSize: "0.83rem",
     cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
   },
@@ -341,11 +344,9 @@ const estilos = {
     background: color.primarioClaro, color: color.primarioOscuro,
     borderColor: color.primarioClaro,
   },
-  // Mismo aspecto que el filtro de estado, pero en violeta — para que el ojo
-  // separe "en qué estado está" de "qué tipo de OT es": son dos preguntas
-  // distintas, no queremos que parezcan la misma fila de opciones.
   filtroTipo: {
-    padding: "6px 14px", borderRadius: 999, border: `1px solid ${color.borde}`,
+    padding: "6px 14px", borderRadius: 999,
+    borderWidth: 1, borderStyle: "solid", borderColor: color.borde,
     background: color.tarjeta, color: color.textoSuave, fontSize: "0.83rem",
     cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
   },

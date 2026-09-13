@@ -64,3 +64,8 @@ export async function crearServicio(datos) {
   const res = await cliente.post("/activos/servicios", datos);
   return res.data;
 }
+
+export async function programarSegunPlan(codigo) {
+  const { data } = await cliente.patch(`/activos/${codigo}/programar-segun-plan`);
+  return data;
+}
