@@ -321,17 +321,23 @@ class MantenimientoResumen(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ResponsableOut(BaseModel):
+    """Un miembro del grupo técnico a cargo del equipo — nombre y mail para
+    contactarlo directo desde la ficha."""
+    nombre: str
+    email: str | None = None
+
+
 class ActivoDetalle(ActivoOut):
     """La ficha completa del activo: sus datos + su historial relacionado."""
     ordenes_de_trabajo: list[OrdenTrabajoResumen] = []
     fallas: list[FallaResumen] = []
     mantenimientos: list[MantenimientoResumen] = []
-    
-    # Bioingeniero a cargo del equipo. No es una columna del activo: se deduce
-    # de qué grupo atiende su tipo de equipo, y quién coordina ese grupo. Lo
-    # calcula el endpoint (ver activos.py).
-    responsable_nombre: str | None = None
-    responsable_email: str | None = None
+
+    # Todo el grupo técnico a cargo del equipo (no una sola persona): se
+    # deduce de qué grupo atiende su tipo de equipo. Lo calcula el endpoint
+    # (ver activos.py).
+    responsables: list[ResponsableOut] = []
     
 # ─── Órdenes de trabajo ───
 class OrdenTrabajoOut(BaseModel):
@@ -400,22 +406,6 @@ class NotaOTCrear(BaseModel):
     texto: str
 
 
-class OrdenTrabajoCreate(BaseModel):
-    """Lo que el frontend manda para ABRIR una OT nueva (POST).
-    Ojo: acá NO pedimos id, numero_ot, fecha_apertura ni created_at. Esos los
-    genera el backend (ver TODO en el router). El frontend solo manda lo que la
-    persona realmente elige/escribe al abrir la orden.
-    """
-    activo_codigo: str
-    tipo: str                              # correctiva / preventiva
-    prioridad: str | None = None
-    descripcion: str | None = None
-    tecnico_id: uuid.UUID | None = None
-    grupo_id: str | None = None
-    sector_solicitante_id: str | None = None
-    observaciones: str | None = None
-    fecha_notificacion: datetime | None = None   # cuándo avisó el servicio (opcional)
-
 # ─── Fallas ───
 class FallaOut(BaseModel):
     """Datos completos de una falla que devolvemos al frontend.
@@ -465,6 +455,9 @@ class MantenimientoPreventivoOut(BaseModel):
     tecnico_id: uuid.UUID | None = None
     estado: str
     generado_automaticamente: bool | None = None
+    # Motivo del desvío, si se cerró fuera del mes en que se abrió. Nulo si se
+    # cumplió en tiempo y forma (ver ordenes_trabajo.cerrar_orden).
+    justificacion_retraso: str | None = None
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -496,7 +489,22 @@ class InsumoOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class InsumoCreate(BaseModel):
+    """Dar de alta un insumo/repuesto nuevo en el catálogo de stock.
 
+    stock_actual es el conteo inicial (lo que ya hay hoy, si se está cargando
+    algo que ya existía físicamente) — no es una compra, así que no genera
+    ninguna fila en 'compras'. tipo_equipo_id es opcional: no todo insumo es
+    específico de un tipo de equipo (ej. guantes, alcohol en gel).
+    """
+    nombre: str
+    descripcion: str | None = None
+    unidad: str | None = None
+    stock_actual: int = 0
+    stock_minimo: int = 0
+    punto_reorden: int = 0
+    tipo_equipo_id: str | None = None
+    
 class InsumoConAlerta(InsumoOut):
     """Insumo + estado de stock calculado por el backend.
 
@@ -683,8 +691,15 @@ class OrdenTrabajoCambioEstado(BaseModel):
 
 
 class OrdenTrabajoCierre(BaseModel):
-    """Para cerrar una OT. observaciones es opcional (ej: qué se hizo)."""
+    """Para cerrar una OT. observaciones es opcional (ej: qué se hizo).
+
+    justificacion_retraso: SOLO hace falta si esta OT es una preventiva que se
+    cierra en un mes distinto al que se abrió (hubo un desvío) — el backend
+    devuelve 400 pidiéndola si corresponde y no vino. En cualquier otro caso
+    se ignora.
+    """
     observaciones: str | None = None
+    justificacion_retraso: str | None = None
     
 class GenerarCorrectivaDesdeChecklist(BaseModel):
     """Registrar un ítem NO_PASA y generar la OT correctiva asociada, de una.

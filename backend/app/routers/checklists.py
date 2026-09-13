@@ -83,7 +83,7 @@ router = APIRouter(prefix="/checklists", tags=["checklists"])
 def ver_checklist_de_plantilla(
     plantilla_mp_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Ver los ítems de checklist de una plantilla de MP, ordenados por paso.
 
@@ -107,7 +107,7 @@ def ver_checklist_de_plantilla(
 def ver_respuestas_de_mp(
     mp_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+        current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Ver las respuestas registradas en un mantenimiento concreto.
 

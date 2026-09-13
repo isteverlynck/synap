@@ -55,9 +55,10 @@ export async function cambiarEstado(otId, estado) {
 
 // Cerrar la OT. Las observaciones son opcionales pero es donde queda registrado
 // qué se hizo: es lo que después alimenta el análisis de patrones de falla.
-export async function cerrarOrden(otId, observaciones) {
+export async function cerrarOrden(otId, observaciones, justificacionRetraso) {
   const res = await cliente.patch(`/ordenes-trabajo/${otId}/cerrar`, {
     observaciones: observaciones || null,
+    justificacion_retraso: justificacionRetraso || null,
   });
   return res.data;
 }

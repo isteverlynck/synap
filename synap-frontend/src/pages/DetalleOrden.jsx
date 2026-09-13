@@ -12,6 +12,7 @@ import {
   listarCorrectivasAsociadas, crearCorrectivaAsociada, iniciarParada, finalizarParada,
 } from "../api/ordenes";
 import { tecnicosDisponibles } from "../api/coordinacion";
+import { listarInsumos, registrarConsumo, listarConsumos } from "../api/stock";
 import { obtenerPerfil } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
@@ -31,6 +32,8 @@ function DetalleOrden() {
   const [accion, setAccion] = useState(null);   // 'cerrar' | 'asignar' | 'correctiva' | null
   const [notas, setNotas] = useState([]);
   const [correctivas, setCorrectivas] = useState([]);
+  const [insumos, setInsumos] = useState([]);
+  const [consumosOT, setConsumosOT] = useState([]);
 
   useEffect(() => {
     Promise.all([verOrden(id), obtenerPerfil()])
@@ -43,6 +46,10 @@ function DetalleOrden() {
     // total da una lista vacía sin uso — igual la pedimos siempre acá porque
     // todavía no sabemos el tipo hasta que responde verOrden.
     listarCorrectivasAsociadas(id).then(setCorrectivas).catch(() => {});
+    // Insumos consumidos en esta OT (y el catálogo, para poder elegir uno
+    // nuevo y para mostrar el nombre en vez del id en el historial).
+    listarInsumos().then(setInsumos).catch(() => {});
+    listarConsumos({ otId: id }).then(setConsumosOT).catch(() => {});
   }, [id]);
 
   const rol = perfil?.rol === "junior" ? "tecnico" : perfil?.rol;
@@ -73,6 +80,21 @@ function DetalleOrden() {
     return () => clearInterval(intervalo);
   }, [ot?.parada_iniciada_en]);
 
+  // "tecnicos" ya se pide más arriba (para el desplegable de asignar/
+  // reasignar) cuando puedeAsignar es true — que cubre a coordinación y a
+  // cualquier técnico del grupo de esta OT, o sea a todo el que llega hasta
+  // acá (jefatura no ve el detalle de una OT). La reusamos para mostrar el
+  // nombre en vez de pedirle más al backend.
+  function nombreTecnico(id) {
+    if (!id) return null;
+    const t = tecnicos.find((x) => x.id === id);
+    return t ? `${t.nombre} ${t.apellido}` : "Asignada";
+  }
+
+  function nombreInsumo(insumoId) {
+    const i = insumos.find((x) => x.id === insumoId);
+    return i ? i.nombre : "Insumo";
+  }
   async function arrancar() {
     try {
       setOt(await cambiarEstado(id, "EN_PROGRESO"));
@@ -147,7 +169,15 @@ function DetalleOrden() {
         </div>
       )}
 
-      <div style={estilos.datos}>
+        <div style={estilos.datos}>
+          <Dato
+            etiqueta="Asignado a"
+            valor={
+              ot.tecnico_id
+                ? nombreTecnico(ot.tecnico_id)
+                : ot.tipo === "PREVENTIVA" ? "Asignada al grupo" : "Sin asignar"
+          }
+        />
         <Dato etiqueta="Notificada" valor={fechaHora(ot.fecha_notificacion)} />
         <Dato etiqueta="Abierta" valor={fechaHora(ot.fecha_apertura)} />
         <Dato etiqueta="Cerrada" valor={fechaHora(ot.fecha_cierre)} />
@@ -190,6 +220,13 @@ function DetalleOrden() {
               Algo no funciona: generar correctiva
             </button>
           )}
+          {/* Consumo de repuestos: aplica a cualquier OT (preventiva o
+          correctiva), no solo a las preventivas. */}
+          {puedeTrabajar && (
+            <button style={boton("secundario")} onClick={() => setAccion("consumo")}>
+              Registrar consumo de insumo
+            </button>
+          )}
           {/* Tiempo real de parada: se aprieta al momento en que el equipo
           deja (o vuelve) a poder usarse — no tiene por qué coincidir con
           abrir/cerrar la OT. */}
@@ -213,12 +250,21 @@ function DetalleOrden() {
       {accion === "asignar" && (
         <PanelAsignar ot={ot} setOt={setOt} tecnicos={tecnicos} cerrar={() => setAccion(null)} />
       )}
-      {accion === "correctiva" && (
+            {accion === "correctiva" && (
         <PanelCorrectivaAsociada
           ot={ot}
           setCorrectivas={setCorrectivas}
           cerrar={() => setAccion(null)}
           navegar={navegar}
+        />
+      )}
+      {accion === "consumo" && (
+        <PanelConsumoInsumo
+          ot={ot}
+          perfil={perfil}
+          insumos={insumos}
+          setConsumosOT={setConsumosOT}
+          cerrar={() => setAccion(null)}
         />
       )}
 
@@ -252,6 +298,24 @@ function DetalleOrden() {
                   <span style={insignia(tonoEstadoOT(c.estado))}>{textoEstado(c.estado)}</span>
                 </div>
                 <p style={estilos.texto}>{c.descripcion}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Insumos consumidos en esta OT ─── */}
+      {consumosOT.length > 0 && (
+        <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
+          <p style={estilos.panelTitulo}>Insumos consumidos en esta OT</p>
+          <div style={estilos.listaNotas}>
+            {consumosOT.map((c) => (
+              <div key={c.id} style={estilos.nota}>
+                <div style={estilos.notaCabecera}>
+                  <span style={estilos.notaAutor}>{nombreInsumo(c.insumo_id)}</span>
+                  <span style={estilos.notaFecha}>{fechaHora(c.fecha)}</span>
+                </div>
+                <p style={estilos.texto}>Cantidad: {c.cantidad}</p>
               </div>
             ))}
           </div>
@@ -337,8 +401,21 @@ function PanelBitacora({ ot, notas, setNotas, puedeEscribir }) {
 
 function PanelCerrar({ ot, setOt, cerrar }) {
   const [observaciones, setObservaciones] = useState("");
+  const [justificacionRetraso, setJustificacionRetraso] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
+
+  // Si es una preventiva y hoy ya no estamos en el mes en que se abrió, se
+  // está cerrando con desvío: el backend va a pedir el motivo del retraso,
+  // así que se lo mostramos de una en vez de que se entere por un error.
+  // (fecha_apertura siempre cae dentro del mes programado del MP, así que
+  // compararla con hoy alcanza — no hace falta traer el MP acá.)
+  const hoy = new Date();
+  const apertura = ot.fecha_apertura ? new Date(ot.fecha_apertura) : null;
+  const esPreventivaConDesvio =
+    ot.tipo === "PREVENTIVA" &&
+    apertura &&
+    (apertura.getFullYear() !== hoy.getFullYear() || apertura.getMonth() !== hoy.getMonth());
 
   async function confirmar() {
     // No es obligatorio para el backend, pero lo pedimos igual: sin esto el
@@ -348,9 +425,13 @@ function PanelCerrar({ ot, setOt, cerrar }) {
       setError("Contá qué se hizo: es lo que queda en el historial del equipo.");
       return;
     }
+    if (esPreventivaConDesvio && !justificacionRetraso.trim()) {
+      setError("Este mantenimiento se cierra fuera del mes en que se abrió: contá el motivo del retraso.");
+      return;
+    }
     setEnviando(true);
     try {
-      setOt(await cerrarOrden(ot.id, observaciones.trim()));
+      setOt(await cerrarOrden(ot.id, observaciones.trim(), justificacionRetraso.trim()));
       toast.success(`OT-${String(ot.numero_ot).padStart(4, "0")} cerrada`, {
         description: "Ya figura en el historial del equipo.",
       });
@@ -377,6 +458,20 @@ function PanelCerrar({ ot, setOt, cerrar }) {
         value={observaciones}
         onChange={(e) => setObservaciones(e.target.value)}
       />
+      {esPreventivaConDesvio && (
+        <>
+          <p style={estilos.bitacoraAyuda}>
+            Este mantenimiento se abrió en {apertura.toLocaleDateString("es-AR", { month: "2-digit", year: "numeric" })} y se está cerrando fuera de ese mes: hubo un desvío.
+          </p>
+          <label style={cs.label}>Motivo del retraso</label>
+          <textarea
+            style={{ ...cs.input, minHeight: 70, marginBottom: 12, resize: "vertical" }}
+            placeholder="Ej: se esperó un repuesto que tardó en llegar."
+            value={justificacionRetraso}
+            onChange={(e) => setJustificacionRetraso(e.target.value)}
+          />
+        </>
+      )}
       {error && <p style={estilos.error}>{error}</p>}
       <div style={estilos.acciones}>
         <button style={boton("primario")} onClick={confirmar} disabled={enviando}>
@@ -493,7 +588,69 @@ function PanelCorrectivaAsociada({ ot, setCorrectivas, cerrar, navegar }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// ─── Consumo de insumo ───
 
+function PanelConsumoInsumo({ ot, perfil, insumos, setConsumosOT, cerrar }) {
+  const [insumoId, setInsumoId] = useState("");
+  const [cantidad, setCantidad] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function confirmar() {
+    if (!insumoId) { setError("Elegí el insumo."); return; }
+    const cant = Number(cantidad);
+    if (!cant || cant <= 0) { setError("Indicá una cantidad mayor a 0."); return; }
+    setEnviando(true);
+    setError("");
+    try {
+      const resultado = await registrarConsumo({
+        otId: ot.id, insumoId, cantidad: cant, tecnicoId: perfil?.id,
+      });
+      setConsumosOT((antes) => [...antes, resultado.consumo]);
+      if (resultado.aviso) {
+        toast.warning(resultado.aviso);
+      } else {
+        toast.success("Consumo registrado.");
+      }
+      cerrar();
+    } catch (e) {
+      setError(e.response?.data?.detail || "No pudimos registrar el consumo.");
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
+      <p style={estilos.panelTitulo}>Registrar consumo de insumo</p>
+      <label style={cs.label}>Insumo</label>
+      <select
+        style={{ ...cs.input, marginBottom: 12 }}
+        value={insumoId}
+        onChange={(e) => setInsumoId(e.target.value)}
+      >
+        <option value="">Elegir...</option>
+        {insumos.map((i) => (
+          <option key={i.id} value={i.id}>{i.nombre}{i.unidad ? ` (${i.unidad})` : ""}</option>
+        ))}
+      </select>
+      <label style={cs.label}>Cantidad</label>
+      <input
+        style={{ ...cs.input, marginBottom: 12 }}
+        type="number"
+        min="1"
+        value={cantidad}
+        onChange={(e) => setCantidad(e.target.value)}
+      />
+      {error && <p style={estilos.error}>{error}</p>}
+      <div style={estilos.acciones}>
+        <button style={boton("primario")} onClick={confirmar} disabled={enviando}>
+          {enviando ? "Registrando..." : "Registrar"}
+        </button>
+        <button style={boton("fantasma")} onClick={cerrar}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
 // Tiempo real que el equipo estuvo parado — medido con "Iniciar parada" /
 // "Finalizar parada", no calculado a partir de otras fechas. Suma todas las
 // paradas ya cerradas (ot.tiempo_parada_segundos) más, si hay una corriendo

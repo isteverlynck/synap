@@ -260,6 +260,11 @@ class MantenimientoPreventivo(Base):
     tecnico_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     estado: Mapped[str] = mapped_column(String, nullable=False)
     generado_automaticamente: Mapped[bool | None] = mapped_column(default=False, nullable=True)
+    # Por qué se cerró fuera del mes en que se abrió (fecha_realizada no cae en
+    # el mismo mes/año que fecha_programada). Se completa al cerrar la OT
+    # (ver ordenes_trabajo.cerrar_orden) — obligatoria SOLO cuando hubo desvío;
+    # nula si se cumplió en tiempo y forma.
+    justificacion_retraso: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
     
     # ─── Relaciones ───

@@ -14,6 +14,7 @@
 // botones de "Nuevo..." quedan ocultos para cualquier otro rol.
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Boxes, Building2 } from "lucide-react";
 import { catalogosParaAlta, crearTipoEquipo, crearServicio } from "../api/activos";
@@ -123,6 +124,7 @@ function Seccion({ icono, titulo, ayuda, items, cargando, puedeCrear, onNuevo, t
 // ─── Modal de alta: mismo formulario para tipo de equipo o servicio, con el
 // campo de centro de costos aparte (solo aplica a servicios). ───
 function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
+  const navegar = useNavigate();
   const esServicio = variante === "servicio";
   const [id, setId] = useState("");
   const [nombre, setNombre] = useState("");
@@ -130,6 +132,10 @@ function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
   const [descripcion, setDescripcion] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
+  // Un tipo de equipo nace SIEMPRE sin checklist propio (recién se está
+  // creando). Guardamos acá el que acaba de crearse para, en vez de cerrar
+  // el modal de una, preguntar si quiere armarle el checklist ahora mismo.
+  const [tipoRecienCreado, setTipoRecienCreado] = useState(null);
 
   async function crear() {
     setError("");
@@ -151,8 +157,12 @@ function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
             nombre: nombre.trim(),
             descripcion: descripcion.trim() || null,
           });
-      toast.success(`${esServicio ? "Servicio" : "Tipo de equipo"} creado: ${creado.id} — ${creado.nombre}`);
-      onCreado();
+            toast.success(`${esServicio ? "Servicio" : "Tipo de equipo"} creado: ${creado.id} — ${creado.nombre}`);
+      if (esServicio) {
+        onCreado();
+      } else {
+        setTipoRecienCreado(creado);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || "No se pudo crear.");
     } finally {
@@ -160,11 +170,37 @@ function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
     }
   }
 
+  function irACrearChecklist() {
+    navegar("/mantenimientos/nuevo", { state: { tipoEquipoId: tipoRecienCreado.id } });
+  }
+
+  if (tipoRecienCreado) {
+    return (
+      <div style={estilos.overlay} onClick={onCancelar}>
+        <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
+          <p style={estilos.modalTitulo}>¿Crear su checklist de mantenimiento?</p>
+          <p style={estilos.seccionAyuda}>
+            "{tipoRecienCreado.nombre}" todavía no tiene un checklist de
+            mantenimiento preventivo asociado. Sin uno, los equipos de este
+            tipo no van a poder tener mantenimiento programado.
+          </p>
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+            <button style={boton("primario")} onClick={irACrearChecklist}>
+              Sí, crear checklist ahora
+            </button>
+            <button style={boton("secundario")} onClick={onCreado}>
+              Ahora no
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={estilos.overlay} onClick={onCancelar}>
       <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
         <p style={estilos.modalTitulo}>{esServicio ? "Nuevo servicio / área" : "Nuevo tipo de equipo"}</p>
-
         <Campo
           etiqueta="Código"
           ayuda={

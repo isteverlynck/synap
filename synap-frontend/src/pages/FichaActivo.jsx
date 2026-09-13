@@ -5,7 +5,7 @@ import { verActivoDetalle } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, estadoDelEquipo } from "../tema";
 import Volver from "../componentes/Volver";
-import { diasHasta } from "../utiles/fechas";
+import { diasHasta, parsearFecha } from "../utiles/fechas";
 
 function FichaActivo() {
   const { codigo } = useParams();
@@ -81,19 +81,22 @@ function FichaActivo() {
           <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
         </div>
 
-        {/* El responsable no es un dato más: es una acción. Cumple el objetivo
-        de contacto directo con el bioingeniero. */}
-        {activo.responsable_nombre && (
+                {/* El responsable no es un dato más: es una acción. Cumple el objetivo
+        de contacto directo con el bioingeniero. Es TODO el grupo a cargo del
+        equipo, no una sola persona — cualquiera de ellos puede atender. */}
+        {activo.responsables && activo.responsables.length > 0 && (
           <div style={estilos.responsable}>
-            <div>
-              <div style={estilos.datoEtiqueta}>Bioingeniero responsable</div>
-              <div style={estilos.datoValor}>{activo.responsable_nombre}</div>
-            </div>
-            {activo.responsable_email && (
-              <a href={`mailto:${activo.responsable_email}`} style={{ ...boton("secundario"), textDecoration: "none" }}>
-                Contactar
-              </a>
-            )}
+            <div style={estilos.datoEtiqueta}>Bioingeniería responsable</div>
+            {activo.responsables.map((r, i) => (
+              <div key={i} style={estilos.filaResponsable}>
+                <div style={estilos.datoValor}>{r.nombre}</div>
+                {r.email && (
+                  <a href={`mailto:${r.email}`} style={{ ...boton("secundario"), textDecoration: "none" }}>
+                    Contactar
+                  </a>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
@@ -230,7 +233,7 @@ function Acciones({ rol, situacion, activo, navegar }) {
 // Las fechas vienen del backend en UTC: las mostramos en formato local.
 function formatearFecha(valor) {
   if (!valor) return "—";
-  const f = new Date(valor);
+  const f = parsearFecha(valor);
   if (isNaN(f)) return "—";
   return f.toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
 }
@@ -306,10 +309,15 @@ const estilos = {
     gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
     gap: 18,
   },
-  responsable: {
+    responsable: {
     ...cs.tarjeta,
     padding: "14px 20px",
     marginTop: 12,
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
+  filaResponsable: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",

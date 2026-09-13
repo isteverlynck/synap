@@ -1,8 +1,19 @@
 // fechas.js — formateo y agrupación de fechas, compartido por las pantallas
 // que muestran listas cronológicas (solicitudes, pendientes, órdenes).
 
+// Las fechas de solo día ("2026-10-29") las interpreta como UTC, y en
+// Argentina eso las corre un día para atrás. Si viene así, la armamos en
+// hora local; si trae hora, se parsea tal cual.
+export function parsearFecha(valor) {
+  const texto = String(valor);
+  const soloDia = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return soloDia
+    ? new Date(Number(soloDia[1]), Number(soloDia[2]) - 1, Number(soloDia[3]))
+    : new Date(texto);
+}
+
 export function formatearFecha(fechaISO) {
-  return new Date(fechaISO).toLocaleDateString("es-AR", {
+  return parsearFecha(fechaISO).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -12,13 +23,7 @@ export function formatearFecha(fechaISO) {
 // Días desde hoy hasta una fecha. Negativo = ya pasó. null si no hay dato.
 export function diasHasta(fecha) {
   if (!fecha) return null;
-  const texto = String(fecha);
-  // Las fechas de solo día ("2026-10-29") las interpreta como UTC, y en
-  // Argentina eso las corre un día para atrás. Las armamos en hora local.
-  const soloDia = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  const objetivo = soloDia
-    ? new Date(Number(soloDia[1]), Number(soloDia[2]) - 1, Number(soloDia[3]))
-    : new Date(texto);
+  const objetivo = parsearFecha(fecha);
   if (isNaN(objetivo.getTime())) return null;
   const hoy = new Date();
   objetivo.setHours(0, 0, 0, 0);

@@ -19,10 +19,9 @@ from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Activo, OrdenTrabajo, NotaOT, Usuario
+from ..models import OrdenTrabajo, NotaOT, Usuario, MantenimientoPreventivo
 from ..schemas import (
     OrdenTrabajoOut,
-    OrdenTrabajoCreate,
     OrdenTrabajoAsignar,
     OrdenTrabajoCambioEstado,
     OrdenTrabajoCierre,
@@ -31,7 +30,6 @@ from ..schemas import (
     NotaOTCrear,
 )
 from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto
-from .preventivas import _grupo_de_activo
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 
@@ -192,77 +190,6 @@ def ver_orden(
     return orden
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CREACIÓN (POST) — abrir una OT nueva
-# ═══════════════════════════════════════════════════════════════════════════
-
-@router.post("", response_model=OrdenTrabajoOut, status_code=201)
-def crear_orden(
-    payload: OrdenTrabajoCreate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("coordinacion")),
-):
-    """Abrir una orden de trabajo nueva.
-
-    Sirve para el objetivo de mínima 'apertura de OT'. También es lo que se
-    llama cuando, desde un checklist, un ítem da NO_PASA y se quiere generar una
-    OT correctiva para ese equipo (activo_codigo + tipo='correctiva' + la falla
-    en la descripción).
-    """
-    # 1. El activo tiene que existir (no se abre OT de un equipo fantasma).
-    activo = db.query(Activo).filter(Activo.codigo == payload.activo_codigo).first()
-    if activo is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No existe el activo {payload.activo_codigo}.",
-        )
-
-    # 2. numero_ot: número correlativo legible (OT #1, #2, #3...).
-    #    Tomamos el máximo actual y sumamos 1. Alcanza para el prototipo.
-    ultimo = db.query(func.max(OrdenTrabajo.numero_ot)).scalar()
-    numero_ot = (ultimo or 0) + 1
-    grupo_id = payload.grupo_id or _grupo_de_activo(db, activo)
-    
-    if payload.tipo and payload.tipo.upper() == "PREVENTIVA":
-        preventiva_abierta = (
-            db.query(OrdenTrabajo)
-            .filter(
-                OrdenTrabajo.activo_codigo == payload.activo_codigo,
-                OrdenTrabajo.tipo == "PREVENTIVA",
-                OrdenTrabajo.estado != "CERRADA",
-            )
-            .first()
-        )
-        if preventiva_abierta:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"El equipo ya tiene una preventiva abierta "
-                    f"(OT-{str(preventiva_abierta.numero_ot).zfill(4)}). "
-                    "Cerrala antes de abrir otra."
-                ),
-            )
-
-    # 3. Crear la orden. El backend completa lo automático; el resto del payload.
-    orden = OrdenTrabajo(
-        numero_ot=numero_ot,
-        activo_codigo=payload.activo_codigo,
-        tipo=payload.tipo,
-        estado="ABIERTA",                      # toda OT nace abierta
-        prioridad=payload.prioridad,
-        descripcion=payload.descripcion,
-        tecnico_id=payload.tecnico_id,
-        grupo_id=grupo_id,
-        sector_solicitante_id=payload.sector_solicitante_id,
-        observaciones=payload.observaciones,
-        fecha_notificacion=payload.fecha_notificacion,   # opcional
-        fecha_apertura=datetime.utcnow(),                # ahora
-    )
-    db.add(orden)
-    db.commit()
-    db.refresh(orden)
-    return orden
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ASIGNACIÓN (PATCH) — asignar el técnico de una OT "sin asignar"
@@ -388,8 +315,33 @@ def cerrar_orden(
     if orden.estado == "CERRADA":
         raise HTTPException(status_code=400, detail="Esta OT ya está cerrada.")
 
+    ahora = datetime.utcnow()
+
+    # Si es una preventiva con MP enganchado, resolvemos el desvío ANTES de
+    # tocar nada más: si hace falta justificación y no vino, cortamos acá con
+    # el 400 sin haber marcado la OT como cerrada.
+    mp = None
+    if orden.tipo == "PREVENTIVA":
+        mp = db.query(MantenimientoPreventivo).filter(
+            MantenimientoPreventivo.ot_id == orden.id
+        ).first()
+    if mp is not None:
+        a_tiempo = (ahora.year, ahora.month) == (mp.fecha_programada.year, mp.fecha_programada.month)
+        if not a_tiempo and not (payload.justificacion_retraso and payload.justificacion_retraso.strip()):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Esta orden se está cerrando fuera del mes en que se programó "
+                    f"({mp.fecha_programada.strftime('%m/%Y')}). Contá el motivo del "
+                    "retraso para poder cerrarla."
+                ),
+            )
+        mp.fecha_realizada = ahora.date()
+        mp.estado = "REALIZADO"
+        mp.justificacion_retraso = payload.justificacion_retraso.strip() if not a_tiempo else None
+
     orden.estado = "CERRADA"
-    orden.fecha_cierre = datetime.utcnow()
+    orden.fecha_cierre = ahora
     _cerrar_parada_si_quedo_abierta(orden, orden.fecha_cierre)
     # si mandan observaciones del cierre, las sumamos (sin pisar las que hubiera)
     if payload.observaciones:

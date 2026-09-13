@@ -4,7 +4,7 @@
 // botón que trae a esta pantalla (ver PlanesMantenimiento.jsx).
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
 import { crearPlan } from "../api/planes";
@@ -15,13 +15,18 @@ import { color, cs, boton } from "../tema";
 
 function NuevoPlan() {
   const navegar = useNavigate();
+  const location = useLocation();
+  // Si venimos desde "Nuevo tipo de equipo" (Catalogos.jsx) aceptando crearle
+  // ya mismo el checklist, llega el id del tipo recién creado acá y arranca
+  // preseleccionado — así no hay que volver a buscarlo en el desplegable.
+  const tipoPreseleccionado = location.state?.tipoEquipoId || "";
 
   const [tipos, setTipos] = useState([]);
   const [cargandoTipos, setCargandoTipos] = useState(true);
 
   const [nombre, setNombre] = useState("");
   const [esGenerica, setEsGenerica] = useState(false);
-  const [tipoEquipoId, setTipoEquipoId] = useState("");
+  const [tipoEquipoId, setTipoEquipoId] = useState(tipoPreseleccionado);
   const [frecuenciaDias, setFrecuenciaDias] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [items, setItems] = useState([{ descripcion: "", obligatorio: true }]);
@@ -87,8 +92,14 @@ function NuevoPlan() {
   return (
     <div style={cs.pagina}>
       <div style={cs.contenido}>
-        <Volver a="/mantenimientos" />
+                <Volver a="/mantenimientos" />
         <Encabezado titulo="Nuevo checklist" subtitulo="Plan de mantenimiento preventivo" />
+
+        {tipoPreseleccionado && (
+          <p style={estilos.avisoPreseleccion}>
+            Este tipo de equipo todavía no tiene un checklist propio — completá los datos para crearle uno.
+          </p>
+        )}
 
         <div style={estilos.tarjeta}>
           <div style={estilos.grilla2}>
@@ -216,6 +227,10 @@ function Campo({ etiqueta, ayuda, children }) {
 }
 
 const estilos = {
+  avisoPreseleccion: {
+    fontSize: "0.85rem", color: color.primarioOscuro, background: color.primarioClaro,
+    padding: "10px 14px", borderRadius: 10, margin: "0 0 16px",
+  },
   tarjeta: { ...cs.tarjeta, padding: 22, marginBottom: 16 },
   grilla2: {
     display: "grid",

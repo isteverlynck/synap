@@ -15,6 +15,7 @@ from ..schemas import (
     TipoEquipoOut,
     ServicioCreate,
     ServicioOut,
+    ResponsableOut,
 )
 from ..security import get_current_user, requiere_rol
 
@@ -238,7 +239,9 @@ def crear_activo(
     ).first()
     grupo_id = rel_grupo.grupo_id if rel_grupo else None
 
-    # 3. Mantenimiento preventivo (opcional).
+    # 3. Mantenimiento preventivo (opcional). Solo se busca/asigna un plan si
+    #    este equipo REQUIERE mantenimiento (crear_mantenimiento=True) — si
+    #    no lo requiere, queda sin checklist asociado, a propósito.
     plantilla_mp_id = None
     proxima_fecha_mp = None
     frecuencia_mp_meses = None
@@ -314,23 +317,28 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
     if activo is None:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
     
-    # Cadena para llegar al responsable: activo → tipo de equipo → grupo →
-    # coordinador del grupo. Es la misma que usa solicitudes para el ruteo.
+        # Cadena para llegar al grupo responsable: activo → tipo de equipo →
+    # grupo. Es la misma que usa solicitudes para el ruteo. Se muestra a
+    # TODO el grupo (no solo a quien lo coordina): cualquiera de ellos puede
+    # atender el contacto directo del bioingeniero.
     detalle = ActivoDetalle.model_validate(activo)
 
     rel = db.query(GrupoTipoEquipo).filter(
         GrupoTipoEquipo.tipo_equipo_id == activo.tipo_equipo_id
     ).first()
     if rel:
-        grupo = db.query(GrupoTecnico).filter(GrupoTecnico.id == rel.grupo_id).first()
-        if grupo and grupo.coordinador_id:
-            responsable = db.query(Usuario).filter(
-                Usuario.id == grupo.coordinador_id
-            ).first()
-            if responsable:
-                detalle.responsable_nombre = f"{responsable.nombre} {responsable.apellido}"
-                detalle.responsable_email = responsable.email
+        miembros = (
+            db.query(Usuario)
+            .filter(Usuario.grupo == rel.grupo_id)
+            .order_by(Usuario.apellido, Usuario.nombre)
+            .all()
+        )
+        detalle.responsables = [
+            ResponsableOut(nombre=f"{m.nombre} {m.apellido}", email=m.email)
+            for m in miembros
+        ]
 
     return detalle
+    
     
     return activo

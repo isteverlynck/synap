@@ -31,7 +31,7 @@ const MENUS = {
     { id: "ot", texto: "Mis órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
-    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: false },
+    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: true },
   ],
   coordinacion: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
@@ -40,7 +40,7 @@ const MENUS = {
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
-    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: false },
+    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: true },
     // Tipos de equipo y servicios/áreas: antes solo se cargaban a mano en la
     // base. Coordinación es quien los da de alta (ej: entra un tipo de
     // equipo nuevo), por eso vive en su menú y en el de jefatura.
@@ -49,10 +49,10 @@ const MENUS = {
   jefatura: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
     { id: "dashboard", texto: "Dashboard", ruta: "/dashboard", icono: "grafico", listo: true },
-    { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: false },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
+    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: true },
     { id: "catalogos", texto: "Catálogos", ruta: "/catalogos", icono: "catalogos", listo: true },
   ],
 };

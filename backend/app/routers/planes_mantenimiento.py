@@ -30,6 +30,12 @@ from ..security import get_current_user, requiere_rol
 
 router = APIRouter(prefix="/planes-mantenimiento", tags=["planes_mantenimiento"])
 
+# Estos dos ítems van SÍ O SÍ en todo checklist de mantenimiento, nuevo o
+# existente (pedido de Cami): "Necesidad de correctivo" (si no pasa, ahí mismo
+# se puede generar la correctiva, igual que con cualquier otro ítem) y "Equipo
+# operativo". Se agregan solos al final de cada plan, no hace falta que
+# coordinación los tipee al armar el checklist.
+ITEMS_OBLIGATORIOS_TODO_PLAN = ["Necesidad de correctivo", "Equipo operativo"]
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LISTAR PLANES (GET)
@@ -146,6 +152,19 @@ def crear_plan(
             obligatorio=it.obligatorio,
         )
         db.add(item)
+
+    # 2.b. Los dos ítems obligatorios de todo plan (ver ITEMS_OBLIGATORIOS_TODO_PLAN),
+    # al final, después de los propios del plan.
+    orden_siguiente = max((it.orden for it in payload.items), default=0)
+    for offset, descripcion_fija in enumerate(ITEMS_OBLIGATORIOS_TODO_PLAN, start=1):
+        db.add(ChecklistItem(
+            plantilla_mp_id=plan.id,
+            orden=orden_siguiente + offset,
+            descripcion=descripcion_fija,
+            obligatorio=True,
+        ))
+
+    # 3. Un solo commit: el plan y todos sus ítems se guardan juntos.
 
     # 3. Un solo commit: el plan y todos sus ítems se guardan juntos.
     db.commit()

@@ -23,6 +23,7 @@ import DetalleOrden from "./pages/DetalleOrden";
 import Dashboard from "./pages/Dashboard";
 import CalendarioMP from "./pages/CalendarioMP";
 import Catalogos from "./pages/Catalogos";
+import Stock from "./pages/Stock";
 import { Toaster } from "sonner";
 import Perfil from "./pages/Perfil";
 
@@ -63,6 +64,7 @@ function App() {
           <Route path="/ordenes/:id" element={<DetalleOrden />} />
           <Route path="/calendario-mp" element={<CalendarioMP />} />
           <Route path="/catalogos" element={<Catalogos />} />
+          <Route path="/insumos" element={<Stock />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/perfil" element={<Perfil />} />
         </Route>

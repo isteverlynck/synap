@@ -62,14 +62,22 @@ def obtener_kpis(
 ):
     """Devuelve todos los KPIs del panel de jefatura en una sola respuesta."""
 
-    # ─── KPI 1: cumplimiento de MP ───
-    # Criterio ACTUAL: 'realizado' = tiene fecha_realizada (se hizo alguna vez).
-    # TODO (con Cami): decidir si 'cumplido' es "se hizo" o "se hizo a tiempo"
-    #                  (fecha_realizada <= fecha_programada), o mostrar ambos.
+        # ─── KPI 1: cumplimiento de MP ───
+    # Definición (con Cami): un MP se cumplió "en tiempo y forma" si se
+    # realizó Y la OT se cerró dentro del mismo mes en que se abrió (el mes
+    # de fecha_programada). Si se cerró en un mes posterior, hubo un desvío
+    # (queda registrado en justificacion_retraso) y NO cuenta como cumplido
+    # para este %, aunque sí quede como 'realizado'. Se marca en
+    # ordenes_trabajo.cerrar_orden al cerrar la OT preventiva.
     mps = db.query(MantenimientoPreventivo).all()
     mp_totales = len(mps)
     mp_realizados = sum(1 for m in mps if m.fecha_realizada is not None)
-    cumplimiento = round(100 * mp_realizados / mp_totales, 1) if mp_totales else None
+    mp_cumplidos_en_tiempo = sum(
+        1 for m in mps
+        if m.fecha_realizada is not None
+        and (m.fecha_realizada.year, m.fecha_realizada.month) == (m.fecha_programada.year, m.fecha_programada.month)
+    )
+    cumplimiento = round(100 * mp_cumplidos_en_tiempo / mp_totales, 1) if mp_totales else None
 
     # ─── KPI 2: tiempo de inactividad (correctivas: cierre - notificación) ───
     correctivas = db.query(OrdenTrabajo).filter(OrdenTrabajo.tipo == "CORRECTIVA").all()

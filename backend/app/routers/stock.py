@@ -23,19 +23,19 @@ Reglas de negocio (definidas con el equipo, reflejan el flujo real del hospital)
 
 Todos los endpoints están protegidos con login (get_current_user).
 
-Estado:
-  - GET (seguimiento + alertas de 3 niveles): funcionando.
-  - POST/PATCH (que tocan la base): ESCRITOS PERO DESACTIVADOS hasta cargar datos.
+Estado: todo funcionando (GET de seguimiento/alertas, alta de insumo, pedido y
+recepción de compra, y consumo vinculado a OT).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, date
 
 from ..database import get_db
 from ..models import Insumo, Compra, ConsumoInsumo, OrdenTrabajo, Usuario
 from ..schemas import (
     InsumoOut,
+    InsumoCreate,
     InsumoConAlerta,
     CompraOut,
     CompraCreate,
@@ -101,6 +101,39 @@ def ver_insumo(
     insumo = db.query(Insumo).filter(Insumo.id == insumo_id).first()
     if insumo is None:
         raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    return insumo
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ALTA DE INSUMO (POST) — nuevo, no existía forma de cargar uno desde la app
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/insumos", response_model=InsumoOut, status_code=201)
+def crear_insumo(
+    payload: InsumoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Dar de alta un insumo/repuesto nuevo en el catálogo de stock.
+
+    Solo coordinación (y jefatura, que siempre pasa) — igual criterio que dar
+    de alta un tipo de equipo o un servicio en Catálogos.jsx: es carga de
+    catálogo, no una acción del día a día de cualquier técnico.
+    """
+    if payload.stock_minimo < 0 or payload.punto_reorden < 0 or payload.stock_actual < 0:
+        raise HTTPException(status_code=400, detail="Las cantidades no pueden ser negativas.")
+    insumo = Insumo(
+        nombre=payload.nombre,
+        descripcion=payload.descripcion,
+        unidad=payload.unidad,
+        stock_actual=payload.stock_actual,
+        stock_minimo=payload.stock_minimo,
+        punto_reorden=payload.punto_reorden,
+        tipo_equipo_id=payload.tipo_equipo_id or None,
+    )
+    db.add(insumo)
+    db.commit()
+    db.refresh(insumo)
     return insumo
 
 
@@ -181,17 +214,16 @@ def listar_consumos(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# REGISTRAR PEDIDO DE COMPRA (POST) — TODO: ACTIVAR CON DATOS
+# REGISTRAR PEDIDO DE COMPRA (POST) — activado (ya hay insumos cargados)
 # ═══════════════════════════════════════════════════════════════════════════
 # Crea la compra como 'pedida'. NO toca el stock (el insumo todavía no llegó).
-# Para activar: descomentá el bloque y probá en /docs con un insumo existente.
 # ═══════════════════════════════════════════════════════════════════════════
-"""
+
 @router.post("/compras", response_model=CompraOut, status_code=201)
 def registrar_pedido_compra(
     payload: CompraCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
     if insumo is None:
@@ -213,24 +245,20 @@ def registrar_pedido_compra(
     db.commit()
     db.refresh(compra)
     return compra
-"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# RECIBIR UNA COMPRA (PATCH) — TODO: ACTIVAR CON DATOS
+# RECIBIR UNA COMPRA (PATCH) — activado (ya hay insumos cargados)
 # ═══════════════════════════════════════════════════════════════════════════
 # Marca la compra como 'recibida' y RECIÉN AHÍ sube el stock. Es el momento en
 # que el insumo llegó físicamente y el encargado lo confirma.
-# Para activar: descomentá el bloque.
 # ═══════════════════════════════════════════════════════════════════════════
-"""
-from datetime import date as _date
 
 @router.patch("/compras/{compra_id}/recibir", response_model=CompraOut)
 def recibir_compra(
     compra_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     compra = db.query(Compra).filter(Compra.id == compra_id).first()
     if compra is None:
@@ -244,30 +272,26 @@ def recibir_compra(
 
     # Marcar recibida y subir el stock, juntos (un solo commit).
     compra.estado = "recibida"
-    compra.fecha_recepcion = _date.today()
+    compra.fecha_recepcion = date.today()
     insumo.stock_actual = (insumo.stock_actual or 0) + compra.cantidad
 
     db.commit()
     db.refresh(compra)
     return compra
-"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# REGISTRAR CONSUMO (POST) — TODO: ACTIVAR CON DATOS · NUNCA SE RECHAZA
+# REGISTRAR CONSUMO (POST) — funcionando · NUNCA SE RECHAZA
 # ═══════════════════════════════════════════════════════════════════════════
 # Descuento automático vinculado a OT. Siempre descuenta y devuelve un aviso con
 # el nivel resultante. Si queda bajo el mínimo, se registra igual y avisa crítico.
-# Para activar: descomentá el bloque y probá con OT + insumo existentes.
 # ═══════════════════════════════════════════════════════════════════════════
-
-
 
 @router.post("/consumos", response_model=ConsumoResultado, status_code=201)
 def registrar_consumo(
     payload: ConsumoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == payload.ot_id).first()
     if orden is None:

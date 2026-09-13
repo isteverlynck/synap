@@ -265,7 +265,9 @@ function Ordenes() {
                   todavía no es "suya": es del grupo entero (ej. una
                   preventiva recién generada) y la puede tomar cualquiera. */}
                   {esTecnico && !ot.tecnico_id && (
-                    <p style={estilos.sinAsignar}>Sin asignar · disponible para tu grupo</p>
+                    <p style={ot.tipo === "PREVENTIVA" ? estilos.asignacion : estilos.sinAsignar}>
+                      {ot.tipo === "PREVENTIVA" ? "Asignada al grupo" : "Sin asignar · disponible para tu grupo"}
+                    </p>
                   )}
                 </div>
 
