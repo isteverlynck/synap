@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock, checklists, planes_mantenimiento, dashboard, solicitudes, preventivas, usuarios
 from fastapi.middleware.cors import CORSMiddleware
-
+from .scheduler import iniciar_scheduler, detener_scheduler
 
 app = FastAPI(
     title="SYNAP API",
@@ -60,7 +60,23 @@ app.include_router(solicitudes.router)
 app.include_router(preventivas.router)
 app.include_router(usuarios.router)
 
+
 @app.get("/health", tags=["health"])
 def health():
     """Endpoint simple para chequear que el backend está vivo."""
     return {"status": "ok"}
+
+
+# ─── Scheduler de preventivas ───
+# Genera las OT preventivas del mes sin que nadie tenga que apretar nada:
+# una vez al levantar el backend y todos los días a las 00:05, por si hoy
+# es día 1. Sin esto, la generación depende de que alguien llame al endpoint
+# a mano — y ese fue el motivo de que 33 equipos quedaran vencidos.
+@app.on_event("startup")
+def _arrancar_scheduler():
+    iniciar_scheduler()
+
+
+@app.on_event("shutdown")
+def _apagar_scheduler():
+    detener_scheduler()

@@ -79,4 +79,4 @@ app.include_router(usuarios.router)
 @app.get("/health", tags=["health"])
 def health():
     """Endpoint simple para chequear que el backend está vivo."""
-    return {"status": "ok"}
+    return {"status": "ok"}APScheduler==3.11.3
