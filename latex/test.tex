@@ -1,0 +1,277 @@
+\documentclass[10pt]{article}
+\usepackage[
+    letterpaper,
+    top=19mm,
+    bottom=25.4mm,
+    left=17.3mm,
+    right=17.3mm,
+    includefoot,
+    footskip=14mm
+]{geometry}
+
+
+\usepackage{amsmath}
+\usepackage[utf8]{inputenx}
+\usepackage[spanish]{babel}
+\usepackage[pdftex]{graphicx} 	%  uso de graficos en general		%  poder poner dos graficos como parte de uno
+\usepackage{fancyhdr} 		%  encabezado diferente para pag pares e impares
+\usepackage{epstopdf} 		%  Convertir .eps a .pdf (si fuera necesario)
+\usepackage{titling}
+\usepackage{fancyvrb,fancybox,calc} 
+\usepackage[svgnames]{xcolor} 
+\usepackage{enumerate}
+\usepackage{adjustbox}
+\usepackage{tabu}
+\usepackage{multicol}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{setspace}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{url}
+
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+% Secciones preliminares (antes de "Introducción"): sin número, pero
+% igualmente listadas en el índice.
+\newcommand{\prefsection}[1]{%
+  \phantomsection
+  \section*{#1}%
+  \addcontentsline{toc}{section}{#1}%
+}
+% \prefsectionnotitle agrega la entrada de nivel "section" solo al índice,
+% sin imprimir ningún título en la página (usado para "Prefacio").
+\newcommand{\prefsectionnotitle}[1]{%
+  \phantomsection
+  \addcontentsline{toc}{section}{#1}%
+}
+\newcommand{\prefsubsection}[1]{%
+  \phantomsection
+  \subsection*{#1}%
+  \addcontentsline{toc}{subsection}{#1}%
+}
+%\usepackage[usenames,dvipsnames]{color}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg} % busca en este orden! 
+
+% Texto de párrafo en 12pt (los títulos usan \Large/\huge/etc. y no cambian)
+\renewcommand{\normalsize}{\fontsize{12}{14.5}\selectfont}
+\normalsize
+
+\setlength{\parskip}{6pt}
+\parindent=2em          % sangría de primera línea
+\setlength{\parskip}{6pt} % espacio después de cada párrafo
+\onehalfspacing  % interlineado 1.5
+
+\definecolor{light-gray}{gray}{0.94}
+\definecolor{textgray}{gray}{0.5}
+\newenvironment{verbcode}{\VerbatimEnvironment
+    \begin{Sbox} \color{textgray}\scriptsize
+    \begin{minipage}{\linewidth+2\fboxsep-2\fboxrule-12pt}    
+    \begin{Verbatim}
+}{\end{Verbatim}  
+    \end{minipage}   
+    \end{Sbox} \color{black}\normalsize
+    \fcolorbox{black}{light-gray}{\TheSbox} 
+} 
+
+
+\begin{document}
+\begin{center}
+
+% Title
+{ \huge \bfseries  SYNAP \\[0.5cm] }
+{ \Large \emph  { Desarrollo de un sistema de gestión de equipamiento médico basado \\[0.1cm]
+en el Hospital Alemán} \\[0.2cm] }
+
+\vspace{1cm}
+
+\includegraphics[width=10cm]{fotos/logo_itba.png}
+
+\vspace{1cm}
+
+\emph {\Large Proyecto final de Carrera para la obtención del título de Bioingeniero}\\[0.2cm]
+\vspace{0.5cm}
+
+% Integrantes
+\textsc{Autoras:}\  Inés María  Steverlynck (63667), \ Camila Barbagelata (6.....)\\[0.2cm]
+
+\vspace{0.5cm}
+
+% Author and supervisor
+\textsc{Tutor:}\  Siomara Figuereo\\[0.2cm]
+
+\textsc{Co-tutor:}\  Carlos Lazzarino\\[0.5cm]
+
+\large \textsc{Octubre 2026}\\[0.1cm]
+
+\vspace{0.5cm}
+
+
+\end{center}
+
+\vspace{0.2cm}
+
+
+\pagestyle{fancy}
+\headheight=60pt 	%para cambiar el tamaño del encabezado
+\fancyhead[L]	{	Proyecto final de carrera - 94.16 	}
+\fancyhead[R] 	{	ITBA  }
+\fancyfoot[C]	{	\thepage  }
+\thispagestyle{empty}
+
+\pagenumbering{roman}
+
+%=======================================================================================================
+\newpage
+\prefsectionnotitle{Prefacio}
+
+\prefsubsection{Agradecimientos}
+A la cátedra de Proyecto Final de Carrera, por acompañarnos a lo largo de todo el proyecto.
+
+A nuestro tutor, Nicolás Barrera, por todas las herramientas y asesoramiento que nos brindó para poder desarrollarlo.
+
+A Pablo y Eugenia Murad, que nos presentaron esta problemática y nos permitieron trabajar en conjunto con el Centro Médico Roca.
+
+Al Instituto Tecnológico de Buenos Aires, que fue nuestra casa de estudios por los últimos 6 años y nos formó para convertirnos en las profesionales que seremos en esta próxima etapa.
+
+A nuestras familias, que nos acompañaron incondicionalmente en este proceso y a lo largo de toda la carrera. Siempre estuvieron para apoyarnos, ya sea con unas palabras motivadoras, un abrazo o un brindis por esos finales aprobados. Nunca les faltó recordarnos lo orgullosos que estaban de nosotras.
+
+A Juan Manuel Cerviño por su compañía y apoyo incondicional.
+
+A nuestros amigos, que caminaron con nosotras en este proceso y que celebraran con nosotras este triunfo. Siempre supieron dar el apoyo y la inspiración que necesitábamos en el momento correcto.
+
+%=======================================================================================================
+\newpage
+\prefsubsection{Resumen}
+
+bla bla bla resumen 
+
+%=======================================================================================================
+\newpage
+{\centering\normalfont\scshape\LARGE Tabla de contenidos\par}
+\addcontentsline{toc}{section}{Tabla de contenidos}
+
+\renewcommand{\contentsname}{}
+\vspace{-\baselineskip}
+\tableofcontents
+
+%=======================================================================================================
+\newpage
+\prefsubsection{Lista de Figuras}
+\renewcommand{\listfigurename}{}
+\vspace{-\baselineskip}
+\listoffigures
+
+%=======================================================================================================
+\newpage
+\prefsubsection{Lista de Tablas}
+\renewcommand{\listtablename}{}
+\vspace{-\baselineskip}
+\listoftables
+
+%=======================================================================================================
+\newpage
+\prefsubsection{Índice de abreviaturas}
+\textbf{AUC:} \textit{Area Under the Curve} (área bajo la curva)
+
+\textbf{ERM:} \textit{Eccentric Rotating Mass} (masa rotativa excéntrica)
+
+\textbf{ESP32:} microcontrolador ESP32
+
+\textbf{F1:} \textit{F1-score} (media armónica entre precisión y recall)
+
+
+%=======================================================================================================
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\fancyfoot[C]	{	Página \thepage\ de \pageref{LastPage}  }
+
+\section{Introducción}
+\subsection{Contexto y planteamiento del problema}
+El equipamiento médico de un centro de salud forma parte de la infraestructura sobre la que se apoya la atención clínica. Un respirador, un monitor multiparamétrico o un ecógrafo no son un bien administrativo más dentro del patrimonio de una institución, sino recursos cuya disponibilidad condiciona de manera directa qué prestaciones puede ofrecer un hospital y en qué tiempos. Cuando un equipo queda fuera de servicio, el efecto se traslada al paciente en forma de estudios postergados, prácticas derivadas a otro sector o procedimientos reprogramados, obstaculizando el flujo de atención del centro. Esa disponibilidad se define a lo largo de toda la vida útil del equipo, y depende en gran parte de cómo se administra su mantenimiento [4].
+
+Por esa razón, las instituciones de salud cuentan con servicios de Bioingeniería o ingeniería clínica, responsables de sostener el parque tecnológico mediante una gestión efectiva: planificación de los mantenimientos preventivos, la respuesta ante fallas, el control del inventario y la trazabilidad de cada activo [5]. Una gran parte de esta tarea es efectivamente trabajo sobre información que debería estar disponible; un servicio necesita saber qué equipos tiene, a qué área pertenecen, en qué estado se encuentran, cuándo se intervino cada uno, a cargo de quien estuvo y qué ocurrió en esa intervención. Cuando esos datos se encuentran incompletos, dispersos entre planillas o resultan difíciles de recuperar, la gestión termina apoyándose en la memoria y la experiencia de quienes integran el área, limitando la eficiencia de la misma.
+
+Para ordenar este trabajo en las instituciones existen los sistemas de gestión de mantenimiento, conocidos como CMMS, que centralizan el inventario de equipos, la programación de las intervenciones y el registro de lo realizado sobre cada uno. Lo que suele ocurrir en el ámbito hospitalario es que se adopta un sistema que nunca fue concebido para un hospital, ya que lo incorpora el área de mantenimiento edilicio para administrar ascensores, calderas e instalaciones, y una vez implementado se lo extiende al equipamiento médico. De esta forma, aparecen desajustes por el simple hecho de ser un sistema que no tiene en cuenta el traslado entre sectores de un equipo médico, que las fallas deben ser reportadas por personal médico en medio de un turno, o que cualquier intervención tiene que organizarse de acuerdo a la disponibilidad clínica. De ahí que desde hace años distintos trabajos vengan proponiendo sistemas diseñados específicamente para la gestión de equipamiento médico [2], [6], [7].
+
+El Hospital Alemán, institución privada de alta complejidad de la Ciudad Autónoma de Buenos Aires, actualmente gestiona su equipamiento médico con IBM Máximo. A partir del trabajo conjunto con el servicio de Bioingeniería se identificaron una serie de limitaciones que condicionan la tarea diaria del área, cuyo detalle se presenta en el Capítulo X. Ese diagnóstico constituye el punto de partida del presente proyecto.
+
+\subsection{Propuesta y justificación}
+Frente a ese escenario, el presente proyecto propone el desarrollo de SYNAP, un sistema web de gestión de equipamiento médico pensado específicamente para un servicio hospitalario de Bioingeniería, que reúne en una única plataforma la información de cada activo, las órdenes de trabajo preventivas y correctivas, el stock de insumos y repuestos y los indicadores de desempeño del área. El nombre remite a la sinapsis neuronal, ya que lo que el sistema busca aportar son justamente las conexiones que hoy faltan o funcionan de manera débil entre el equipo registrado, la falla que se le reporta, la orden de trabajo que esa falla genera y el repuesto que se consume para resolverla.
+
+El trabajo se plantea como un prototipo funcional y no como un producto terminado, de manera que el sistema debe estar operativo y resolver de punta a punta los circuitos que aborda, aunque sin las tareas de despliegue institucional, soporte y capacitación que demandaría su adopción definitiva. Tanto el desarrollo como la validación se llevan adelante junto al equipo de Bioingeniería del Hospital Alemán, que es a la vez el destinatario del sistema y la fuente de los requerimientos que definieron el prototipo y estructura, lo que permitió incorporar sus observaciones y necesidades reales a lo largo del proceso y no una vez que el sistema ya estaba cerrado. Se presenta como una herramienta que el equipo pueda adoptar de forma natural y que agregue valor desde el primer día de uso.
+
+Los objetivos que guiaron el desarrollo se presentan a continuación, separados entre aquellos que el sistema debe cumplir necesariamente y aquellos que amplían su alcance en caso de que el avance del trabajo lo permita.
+
+\subsection{Objetivos}
+\subsubsection{Objetivo general}
+Desarrollar un prototipo funcional de sistema web para la gestión de equipos médicos en el Hospital
+Alemán, que centralice su información y funcione como herramienta de soporte para el servicio de
+Bioingeniería.
+
+\subsubsection{Objetivos de mínima}
+\begin{itemize}
+    \item Desarrollar una interfaz web responsive para la gestión del equipamiento médico, que
+permita consultar la información de cada activo y registrar y clasificar las fallas
+reportadas.
+    \item Proveer un entorno para la apertura, seguimiento y cierre de órdenes de trabajo del área de
+Bioingeniería, y la consulta de los mantenimientos preventivos programados.
+    \item Incorporar al sistema un módulo de gestión de stock de insumos y repuestos
+vinculado a las órdenes de trabajo del servicio de Bioingeniería.
+    \item Implementar un panel de gestión (\emph {dashboard}) para perfiles de jefatura que permita la
+visualización de indicadores clave de desempeño (\emph {KPIs}).
+    \item Migrar e integrar la información existente en las bases de datos del Hospital Alemán
+al sistema, validando su funcionamiento en un caso de uso real.
+\end{itemize}
+
+\subsubsection{Objetivos de máxima}
+\begin{itemize}
+    \item Permitir el contacto directo del bioingeniero responsable del equipo, facilitando la
+comunicación entre usuarios y el servicio de Bioingeniería.
+    \item Integrar un sistema de notificaciones que centralice las órdenes de trabajo correctivas
+en bandejas de entrada específicas.
+    \item Analizar el historial de órdenes de trabajo para identificar patrones de fallas y tiempos
+de resolución, generando información de soporte para la toma de decisiones sobre el
+parque tecnológico.
+\end{itemize}
+
+\subsection{Estructura del documento}
+El informe continúa con el estado del arte y el marco teórico, que reúnen los antecedentes en sistemas de gestión de equipamiento médico y los conceptos que sustentan las decisiones de diseño. El diseño y desarrollo del sistema describe el relevamiento realizado en el servicio de Bioingeniería junto con el diseño de la base de datos, la arquitectura y el desarrollo de los módulos, mientras que los resultados presentan los hallazgos de ese relevamiento como línea de base, el sistema obtenido con los entregables correspondientes a cada objetivo, la integración de los datos del hospital y las pruebas de usabilidad. El trabajo cierra con la discusión de esos resultados frente a los antecedentes, las perspectivas futuras y las conclusiones.
+
+%=======================================================================================================
+\newpage
+\section{Estado del arte}
+hola gola golaaaaaaaaa
+
+%=======================================================================================================
+\newpage
+\section{Marco teórico}
+hola gola golaaaaaaaaa
+
+%=======================================================================================================
+\newpage
+\section{Diseño y desarrollo del sistema}
+hola gola golaaaaaaaaa
+
+\subsection{Descripción general del sistema}
+
+\subsection{Análisis de requerimientos}
+
+
+
+\newpage
+\section{Resultados}
+4.3 Análisis de resultados
+4.3.1 Métricas evaluadas
+4.3.2 Métodos estadísticos y software
+
+\newpage
+\section{Discusión}
+
+\label{LastPage}
+
+\end{document}

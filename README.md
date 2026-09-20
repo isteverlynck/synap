@@ -24,6 +24,9 @@ En desarrollo. Implementado hasta ahora:
   automático vinculado a OT, y alertas de reposición en tres niveles.
 - Dashboard de KPIs (jefatura): cumplimiento de MP, tiempo de inactividad,
   fallas por equipo y tipo, MTTR y MTBF.
+- Solicitudes de servicio: tabla propia, con ruteo automático a coordinadores
+  según el tipo de equipo.
+- Permisos por rol (enfermería / técnico / jefatura), validados en cada endpoint.
 
 **Frontend (React) — en desarrollo:**
 - Estructura base con Vite.
@@ -34,9 +37,8 @@ En desarrollo. Implementado hasta ahora:
 **Pendiente:**
 - Frontend: resto de las pantallas (ficha de activo, escaneo integrado, OT,
   stock, dashboard, reporte de fallas).
-- Permisos por rol (técnico / jefatura / enfermería) — requiere análisis del
-  flujo de responsabilidades del hospital.
-- Migración de datos reales del Hospital Alemán (objetivo de máxima).
+- Migración e integración de los datos reales del Hospital Alemán (objetivo de
+  mínima, en etapa posterior a la validación del prototipo).
 
 ## Tecnologías
 
@@ -76,6 +78,7 @@ En desarrollo. Implementado hasta ahora:
     │       ├── components/      # Piezas reutilizables (escáner QR, etc.)
     │       └── App.jsx          # Mapa de navegación (rutas → pantallas)
     ├── bases/                   # Datos de ejemplo (CSV) para desarrollo
+    ├── latex/                   # Informe final de la tesis (fuentes LaTeX)
     ├── requirements.txt         # Librerías de Python
     └── README.md
 
@@ -149,6 +152,12 @@ El frontend queda en la dirección que muestre la terminal (normalmente
 
 **Importante:** el frontend necesita el backend corriendo para funcionar (le
 pide los datos). Tener siempre las dos terminales activas al desarrollar.
+
+## Informe de tesis
+
+Las fuentes del informe final viven en `latex/`. Se compilan con cualquier
+distribución de LaTeX (TeX Live, MacTeX) o desde VS Code con la extensión
+LaTeX Workshop. Los archivos intermedios de compilación no se versionan.
 
 ## Notas
 
