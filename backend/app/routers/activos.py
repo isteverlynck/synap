@@ -88,7 +88,7 @@ def opciones_de_filtro(
         if s.id in sectores_usados
     ]
     grupos = [
-        {"nombre": f"{g.id} — {g.descripcion}"}
+        {"id": g.id, "nombre": f"{g.id} — {g.descripcion}"}
         for g in db.query(GrupoTecnico).order_by(GrupoTecnico.id).all()
     ]
 

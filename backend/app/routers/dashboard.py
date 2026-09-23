@@ -27,6 +27,17 @@ salió de un ítem de checklist en una preventiva), se usa la fecha de
 notificación/apertura de la OT como fallback.
 
 Protegido con login. (Pendiente: restringir a rol jefatura con permisos por rol.)
+
+Filtros (grupo_id / tipo_equipo_id): opcionales, se pueden combinar. Cuando se
+pasan, TODOS los KPIs se recalculan solo sobre los activos que matchean ese
+filtro (y lo que cuelga de ellos — sus OT, sus MP, sus solicitudes). Sin
+filtro, es la vista global de siempre. Las opciones para los desplegables del
+frontend son las mismas que ya usa la pantalla de activos: GET /activos/filtros
+(devuelve tipos y grupos existentes).
+
+Filtro de mes (anio / mes): opcional, van siempre juntos. A diferencia del de
+grupo/tipo, este SOLO afecta al cumplimiento de MP (KPI 1) — ver el porqué en
+el docstring del endpoint.
 """
 
 from fastapi import APIRouter, Depends
@@ -70,10 +81,42 @@ def _mtbf_de_fechas(fechas):
 
 @router.get("/kpis", response_model=DashboardKPIs)
 def obtener_kpis(
+    grupo_id: str | None = None,
+    tipo_equipo_id: str | None = None,
+    anio: int | None = None,
+    mes: int | None = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("jefatura")),
 ):
-    """Devuelve todos los KPIs del panel de jefatura en una sola respuesta."""
+    """Devuelve todos los KPIs del panel de jefatura en una sola respuesta.
+
+    grupo_id / tipo_equipo_id: filtros opcionales y combinables (ver nota del
+    módulo).
+
+    anio / mes: van siempre juntos (si falta uno de los dos, se ignoran).
+    A diferencia de grupo/tipo, este filtro NO afecta a todos los KPIs: solo
+    al cumplimiento de MP (KPI 1), sobre el mes de `fecha_programada`. Se
+    decidió así porque el resto (fallas, MTTR, MTBF) son indicadores que
+    necesitan varios eventos para tener sentido, y acotarlos a un solo mes
+    los deja casi siempre en "sin datos"."""
+
+    # ─── Filtro por grupo/tipo de equipo (aplica a TODOS los KPIs) ───
+    activos_q = db.query(Activo)
+    if grupo_id:
+        activos_q = activos_q.filter(Activo.grupo_id == grupo_id)
+    if tipo_equipo_id:
+        activos_q = activos_q.filter(Activo.tipo_equipo_id == tipo_equipo_id)
+    activos_filtrados = activos_q.all()
+    codigos_filtrados = {a.codigo for a in activos_filtrados}
+    hay_filtro = bool(grupo_id or tipo_equipo_id)
+
+    def filtrar(items, obtener_codigo):
+        """Si hay un filtro de grupo/tipo activo, deja solo los items cuyo
+        activo cae dentro del subconjunto filtrado. Sin filtro, no toca nada
+        (mismo comportamiento que antes de que existiera este filtro)."""
+        if not hay_filtro:
+            return items
+        return [i for i in items if obtener_codigo(i) in codigos_filtrados]
 
         # ─── KPI 1: cumplimiento de MP ───
     # Definición (con Cami): un MP se cumplió "en tiempo y forma" si se
@@ -82,7 +125,12 @@ def obtener_kpis(
     # (queda registrado en justificacion_retraso) y NO cuenta como cumplido
     # para este %, aunque sí quede como 'realizado'. Se marca en
     # ordenes_trabajo.cerrar_orden al cerrar la OT preventiva.
-    mps = db.query(MantenimientoPreventivo).all()
+    mps = filtrar(db.query(MantenimientoPreventivo).all(), lambda m: m.activo_codigo)
+    if anio and mes:
+        mps = [
+            m for m in mps
+            if m.fecha_programada and m.fecha_programada.year == anio and m.fecha_programada.month == mes
+        ]
     mp_totales = len(mps)
     mp_realizados = sum(1 for m in mps if m.fecha_realizada is not None)
     mp_cumplidos_en_tiempo = sum(
@@ -93,7 +141,10 @@ def obtener_kpis(
     cumplimiento = round(100 * mp_cumplidos_en_tiempo / mp_totales, 1) if mp_totales else None
 
     # ─── KPI 2: tiempo de inactividad (correctivas: cierre - notificación) ───
-    correctivas = db.query(OrdenTrabajo).filter(OrdenTrabajo.tipo == "CORRECTIVA").all()
+    correctivas = filtrar(
+        db.query(OrdenTrabajo).filter(OrdenTrabajo.tipo == "CORRECTIVA").all(),
+        lambda o: o.activo_codigo,
+    )
     inactividades = []
     for o in correctivas:
         d = _dias_entre(o.fecha_notificacion, o.fecha_cierre)
@@ -122,7 +173,7 @@ def obtener_kpis(
     # Solo correctivas: mide cuánto se tarda en resolver una FALLA, y una
     # preventiva no es una falla (es mantenimiento programado) — mezclarlas
     # infla o achica el promedio sin reflejar la capacidad de respuesta real.
-    todas_ot = db.query(OrdenTrabajo).all()
+    todas_ot = filtrar(db.query(OrdenTrabajo).all(), lambda o: o.activo_codigo)
     reparaciones = []
     for o in correctivas:
         d = _dias_entre(o.fecha_apertura, o.fecha_cierre)
@@ -133,7 +184,7 @@ def obtener_kpis(
     # ─── KPI 5: MTBF — tiempo medio entre fallas ───
     # Necesitamos las fechas de cada falla, agrupadas por equipo y por tipo.
     # Para el tipo, mapeamos cada activo a su tipo_equipo_id.
-    tipo_de_activo = {a.codigo: a.tipo_equipo_id for a in db.query(Activo).all()}
+    tipo_de_activo = {a.codigo: a.tipo_equipo_id for a in activos_filtrados}
 
     # La fecha de "cuándo pasó la falla" es la de la SOLICITUD que la originó
     # (si vino de una), no la de la OT — así lo pidió Cami: es el momento real
@@ -179,7 +230,7 @@ def obtener_kpis(
     activos = list(tipo_de_activo.keys())
     activos_totales = len(activos)
     activos_en_baja = sum(
-        1 for a in db.query(Activo).all() if str(a.estado).upper() == "BAJA"
+        1 for a in activos_filtrados if str(a.estado).upper() == "BAJA"
     )
 
     return DashboardKPIs(

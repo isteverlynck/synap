@@ -6,24 +6,44 @@
 // sobre el parque de equipos.
 
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { obtenerKPIs } from "../api/dashboard";
+import { opcionesDeFiltro } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
-import { color, cs } from "../tema";
+import { color, cs, boton } from "../tema";
 
 function Dashboard() {
   const [kpis, setKpis] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
+  // Filtro por grupo técnico / tipo de equipo: recalcula TODOS los KPIs solo
+  // sobre los activos que matchean. Mismas opciones que usa la pantalla de
+  // Activos, para no duplicar catálogos.
+  const [opciones, setOpciones] = useState({ tipos: [], grupos: [] });
+  const [filtros, setFiltros] = useState({ grupoId: "", tipoEquipoId: "" });
+  const filtrosActivos = Object.values(filtros).filter(Boolean).length;
+
+  // Filtro de mes: aparte de grupo/tipo porque no afecta a todo el panel,
+  // solo a la tarjeta de cumplimiento de preventivos (ver dashboard.js).
+  const [mesMP, setMesMP] = useState("");
+
   useEffect(() => {
-    obtenerKPIs()
+    opcionesDeFiltro().then(setOpciones).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setCargando(true);
+    setError("");
+    obtenerKPIs({ ...filtros, mes: mesMP })
       .then(setKpis)
       .catch(() => setError("No pudimos cargar los indicadores."))
       .finally(() => setCargando(false));
-  }, []);
+  }, [filtros, mesMP]);
 
-  if (cargando) return <p style={estilos.mensaje}>Calculando indicadores...</p>;
-  if (error) return <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>;
+  function limpiarFiltros() {
+    setFiltros({ grupoId: "", tipoEquipoId: "" });
+  }
 
   return (
     <>
@@ -31,6 +51,35 @@ function Dashboard() {
         titulo="Panel de indicadores"
         subtitulo="Calculado en el momento, sobre los datos actuales"
       />
+
+      {/* ─── Filtro por grupo técnico / tipo de equipo ─── */}
+      <div style={{ ...cs.tarjeta, padding: 18, marginBottom: 14 }}>
+        <div style={estilos.grillaFiltros}>
+          <Filtro
+            etiqueta="Grupo técnico"
+            valor={filtros.grupoId}
+            onChange={(v) => setFiltros({ ...filtros, grupoId: v })}
+            opciones={opciones.grupos}
+          />
+          <Filtro
+            etiqueta="Tipo de equipo"
+            valor={filtros.tipoEquipoId}
+            onChange={(v) => setFiltros({ ...filtros, tipoEquipoId: v })}
+            opciones={opciones.tipos}
+          />
+        </div>
+        {filtrosActivos > 0 && (
+          <button style={{ ...boton("fantasma"), marginTop: 12, gap: 6 }} onClick={limpiarFiltros}>
+            <X size={15} strokeWidth={2.2} aria-hidden="true" />
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {cargando && <p style={estilos.mensaje}>Calculando indicadores...</p>}
+      {!cargando && error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
+      {!cargando && !error && kpis && (
+        <>
 
       {/* ─── Fila 1: el estado del parque hoy ─── */}
       <div style={estilos.grilla}>
@@ -49,9 +98,29 @@ function Dashboard() {
           etiqueta="Cumplimiento de preventivos"
           valor={kpis.cumplimiento_mp_pct !== null ? `${kpis.cumplimiento_mp_pct}%` : null}
           nota={kpis.mp_totales > 0
-            ? `${kpis.mp_realizados} de ${kpis.mp_totales} realizados`
-            : "No hay preventivos cargados"}
+            ? `${kpis.mp_realizados} de ${kpis.mp_totales} realizados${mesMP ? " ese mes" : ""}`
+            : (mesMP ? "Sin preventivos programados ese mes" : "No hay preventivos cargados")}
           tono={tonoCumplimiento(kpis.cumplimiento_mp_pct)}
+          extra={
+            <div style={estilos.filtroMes}>
+              <input
+                type="month"
+                value={mesMP}
+                onChange={(e) => setMesMP(e.target.value)}
+                style={estilos.inputMes}
+              />
+              {mesMP && (
+                <button
+                  style={estilos.botonLimpiarMes}
+                  onClick={() => setMesMP("")}
+                  aria-label="Quitar filtro de mes"
+                  title="Quitar filtro de mes"
+                >
+                  <X size={13} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          }
         />
       </div>
 
@@ -138,6 +207,8 @@ function Dashboard() {
           </div>
         ))}
       </Seccion>
+        </>
+      )}
     </>
   );
 }
@@ -153,7 +224,7 @@ function tonoCumplimiento(pct) {
   return "peligro";
 }
 
-function Tarjeta({ etiqueta, valor, nota, tono }) {
+function Tarjeta({ etiqueta, valor, nota, tono, extra }) {
   const colores = {
     exito: color.exito,
     advertencia: color.advertencia,
@@ -173,6 +244,23 @@ function Tarjeta({ etiqueta, valor, nota, tono }) {
         {sinDatos ? "Sin datos" : valor}
       </p>
       {nota && <p style={estilos.nota}>{nota}</p>}
+      {extra}
+    </div>
+  );
+}
+
+// Mismo componente que usa la pantalla de Activos para sus filtros, para que
+// se vean y se comporten igual.
+function Filtro({ etiqueta, valor, onChange, opciones }) {
+  return (
+    <div>
+      <label style={cs.label}>{etiqueta}</label>
+      <select style={cs.input} value={valor} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Todos</option>
+        {opciones.map((o) => (
+          <option key={o.id} value={o.id}>{o.nombre}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -206,6 +294,11 @@ function Barra({ etiqueta, valor, maximo, sufijo }) {
 
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "18px 0" },
+  grillaFiltros: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+    gap: 14,
+  },
   grilla: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
@@ -218,6 +311,14 @@ const estilos = {
   },
   valor: { margin: "8px 0 0", fontWeight: 700, lineHeight: 1.1 },
   nota: { margin: "6px 0 0", fontSize: "0.78rem", color: color.textoSuave },
+  filtroMes: { display: "flex", alignItems: "center", gap: 6, marginTop: 10 },
+  inputMes: {
+    ...cs.input, padding: "6px 8px", fontSize: "0.8rem", width: "auto",
+  },
+  botonLimpiarMes: {
+    background: "transparent", border: "none", cursor: "pointer",
+    color: color.textoDebil, display: "flex", padding: 2,
+  },
   tituloSeccion: { margin: 0, fontSize: "1rem", color: color.texto, fontWeight: 700 },
   ayuda: { margin: "4px 0 0", fontSize: "0.8rem", color: color.textoSuave, lineHeight: 1.5 },
   vacio: { color: color.textoSuave, fontSize: "0.87rem", margin: 0, lineHeight: 1.5 },
