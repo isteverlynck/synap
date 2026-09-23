@@ -14,36 +14,52 @@ desde el código (no usamos Base.metadata.create_all): las tablas ya existen en
 Supabase. El backend solo se conecta a ellas.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock, checklists, planes_mantenimiento, dashboard, solicitudes, preventivas, usuarios
-from fastapi.middleware.cors import CORSMiddleware
 from .scheduler import iniciar_scheduler, detener_scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Al arrancar: prende el scheduler que genera solo las OT preventivas
+    # (ver scheduler.py — antes esto era 100% manual, por Swagger).
+    iniciar_scheduler()
+    yield
+    # Al apagar (Ctrl+C, o --reload recargando por un cambio de archivo):
+    # lo apaga prolijo, para no dejar el hilo del scheduler colgado.
+    detener_scheduler()
+
 
 app = FastAPI(
     title="SYNAP API",
     description="Backend del sistema de gestión de equipamiento médico (PFC Bioingeniería).",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS: define desde qué direcciones el frontend puede hablarle al backend.
-# Los orígenes permitidos están en config.py (cors_origins).
+# Antes había DOS CORSMiddleware, y el segundo tenía el puerto de Vite
+# hardcodeado a 5173 — el día que ese puerto estaba ocupado (Vite se corría
+# solo a 5174) el navegador bloqueaba todos los pedidos al backend, y el login
+# mostraba "Número o contraseña incorrectos" aunque el problema no tuviera
+# nada que ver con la contraseña (Login.jsx muestra ese mismo texto para
+# CUALQUIER error, incluido un bloqueo de CORS).
+#
+# Con allow_origin_regex alcanza un solo middleware: deja pasar cualquier
+# puerto de localhost/127.0.0.1 (el que sea que Vite elija) más lo que venga
+# de config.py, así no vuelve a pasar.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # la dirección de tu frontend
-    allow_credentials=True,
-    allow_methods=["*"],    # permite GET, POST, PATCH, etc.
-    allow_headers=["*"],    # permite el token y demás
 )
 
 # Conectar los endpoints de autenticación (login, activar, estado).
@@ -51,7 +67,7 @@ app.include_router(auth.router)
 app.include_router(activos.router)
 app.include_router(ordenes_trabajo.router)
 app.include_router(fallas.router)
-app.include_router(mantenimientos.router)  
+app.include_router(mantenimientos.router)
 app.include_router(stock.router)
 app.include_router(checklists.router)
 app.include_router(planes_mantenimiento.router)
@@ -65,18 +81,3 @@ app.include_router(usuarios.router)
 def health():
     """Endpoint simple para chequear que el backend está vivo."""
     return {"status": "ok"}
-
-
-# ─── Scheduler de preventivas ───
-# Genera las OT preventivas del mes sin que nadie tenga que apretar nada:
-# una vez al levantar el backend y todos los días a las 00:05, por si hoy
-# es día 1. Sin esto, la generación depende de que alguien llame al endpoint
-# a mano — y ese fue el motivo de que 33 equipos quedaran vencidos.
-@app.on_event("startup")
-def _arrancar_scheduler():
-    iniciar_scheduler()
-
-
-@app.on_event("shutdown")
-def _apagar_scheduler():
-    detener_scheduler()

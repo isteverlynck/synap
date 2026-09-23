@@ -6,12 +6,25 @@ más los estándar de la industria (MTTR, MTBF):
   1. Cumplimiento de mantenimiento preventivo (% realizados vs total).
   2. Tiempo de inactividad del equipamiento (cierre - notificación, correctivas).
   3. Frecuencia y tipo de fallas por equipo.
-  4. MTTR — tiempo medio de reparación (apertura - cierre).
+  4. MTTR — tiempo medio de reparación (apertura - cierre), solo correctivas.
   5. MTBF — tiempo medio entre fallas (confiabilidad), por equipo y por tipo.
 
 Es solo LECTURA: no modifica nada. Se calcula bajo demanda, apropiado para la
 escala del servicio (decenas/cientos de equipos). A mayor escala se migraría a
 un cálculo programado (ej: nocturno).
+
+Sobre "fallas" (KPI 3 y 5): el reporte de fallas del anteproyecto lo cubre el
+flujo de solicitudes de servicio (una solicitud aceptada por coordinación se
+convierte en OT correctiva) — la tabla `Falla` quedó sin usar, nada la
+escribe. Por eso estos dos KPI leen de OT tipo CORRECTIVA, no de `Falla`:
+"por tipo" agrupa por `prioridad` (baja/media/alta/urgente), que es la
+clasificación que sí existe en el sistema. Para el MTBF, la fecha del evento
+es la de la SOLICITUD que originó la correctiva (cuándo se avisó del
+problema) — no la de la OT — y cuenta apenas esa solicitud fue ACEPTADA, sin
+importar si la OT sigue abierta o ya se cerró (una rechazada no cuenta: nunca
+llega a tener OT asociada). Si la correctiva no vino de una solicitud (ej:
+salió de un ítem de checklist en una preventiva), se usa la fecha de
+notificación/apertura de la OT como fallback.
 
 Protegido con login. (Pendiente: restringir a rol jefatura con permisos por rol.)
 """
@@ -20,7 +33,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import OrdenTrabajo, MantenimientoPreventivo, Falla, Activo, Usuario
+from ..models import OrdenTrabajo, MantenimientoPreventivo, SolicitudServicio, Activo, Usuario
 from ..schemas import (
     DashboardKPIs,
     FallasPorEquipo,
@@ -88,26 +101,30 @@ def obtener_kpis(
             inactividades.append(d)
     inactividad_prom = round(sum(inactividades) / len(inactividades), 1) if inactividades else None
 
-    # ─── KPI 3: fallas ───
-    fallas = db.query(Falla).all()
-    fallas_totales = len(fallas)
+    # ─── KPI 3: fallas (= OT correctivas; ver nota del módulo) ───
+    fallas_totales = len(correctivas)
     cuenta_equipo = {}
     cuenta_tipo = {}
-    for f in fallas:
-        cuenta_equipo[f.activo_codigo] = cuenta_equipo.get(f.activo_codigo, 0) + 1
-        t = f.tipo_falla or "SIN_TIPO"
+    for o in correctivas:
+        cuenta_equipo[o.activo_codigo] = cuenta_equipo.get(o.activo_codigo, 0) + 1
+        t = o.prioridad or "SIN_PRIORIDAD"
         cuenta_tipo[t] = cuenta_tipo.get(t, 0) + 1
     top_equipos = sorted(cuenta_equipo.items(), key=lambda x: x[1], reverse=True)[:10]
     fallas_por_equipo = [FallasPorEquipo(activo_codigo=k, cantidad=v) for k, v in top_equipos]
+    # El campo se sigue llamando "tipo_falla" en el schema para no tocar el
+    # frontend, pero ahora trae la prioridad de la correctiva.
     fallas_por_tipo = [
         FallasPorTipo(tipo_falla=k, cantidad=v)
         for k, v in sorted(cuenta_tipo.items(), key=lambda x: x[1], reverse=True)
     ]
 
     # ─── KPI 4: MTTR — tiempo medio de reparación (apertura - cierre) ───
+    # Solo correctivas: mide cuánto se tarda en resolver una FALLA, y una
+    # preventiva no es una falla (es mantenimiento programado) — mezclarlas
+    # infla o achica el promedio sin reflejar la capacidad de respuesta real.
     todas_ot = db.query(OrdenTrabajo).all()
     reparaciones = []
-    for o in todas_ot:
+    for o in correctivas:
         d = _dias_entre(o.fecha_apertura, o.fecha_cierre)
         if d is not None and d >= 0:
             reparaciones.append(d)
@@ -118,14 +135,28 @@ def obtener_kpis(
     # Para el tipo, mapeamos cada activo a su tipo_equipo_id.
     tipo_de_activo = {a.codigo: a.tipo_equipo_id for a in db.query(Activo).all()}
 
+    # La fecha de "cuándo pasó la falla" es la de la SOLICITUD que la originó
+    # (si vino de una), no la de la OT — así lo pidió Cami: es el momento real
+    # en que se avisó el problema, antes de que coordinación la acepte.
+    fecha_solicitud_por_ot = {
+        s.ot_id: s.created_at
+        for s in db.query(SolicitudServicio).filter(SolicitudServicio.ot_id.isnot(None)).all()
+    }
+
     fechas_por_equipo = {}
     fechas_por_tipo = {}
-    for f in fallas:
-        fecha = f.fecha_reporte
+    for o in correctivas:
+        # Cuenta apenas la solicitud que la originó fue ACEPTADA (no importa
+        # si la OT sigue abierta o ya se cerró) — una rechazada nunca llega
+        # a tener ot_id, así que ya queda afuera de fecha_solicitud_por_ot.
+        # Si nació de una solicitud, la fecha del evento es cuándo se mandó
+        # esa solicitud. Si no (ej: salió de un ítem de checklist en una
+        # preventiva), fallback a la fecha de notificación/apertura de la OT.
+        fecha = fecha_solicitud_por_ot.get(o.id) or o.fecha_notificacion or o.fecha_apertura
         if fecha is None:
             continue
-        fechas_por_equipo.setdefault(f.activo_codigo, []).append(fecha)
-        tipo = tipo_de_activo.get(f.activo_codigo, "SIN_TIPO")
+        fechas_por_equipo.setdefault(o.activo_codigo, []).append(fecha)
+        tipo = tipo_de_activo.get(o.activo_codigo, "SIN_TIPO")
         fechas_por_tipo.setdefault(tipo, []).append(fecha)
 
     mtbf_por_equipo = []
