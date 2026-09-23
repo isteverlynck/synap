@@ -24,7 +24,8 @@ Reglas de negocio (definidas con el equipo, reflejan el flujo real del hospital)
 Todos los endpoints están protegidos con login (get_current_user).
 
 Estado: todo funcionando (GET de seguimiento/alertas, alta de insumo, pedido y
-recepción de compra, y consumo vinculado a OT).
+recepción de compra, consumo vinculado a OT, ajustes manuales y el historial
+unificado de movimientos).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -32,7 +33,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date
 
 from ..database import get_db
-from ..models import Insumo, Compra, ConsumoInsumo, OrdenTrabajo, Usuario
+from ..models import Insumo, Compra, ConsumoInsumo, AjusteInventario, OrdenTrabajo, Usuario
 from ..schemas import (
     InsumoOut,
     InsumoCreate,
@@ -42,6 +43,9 @@ from ..schemas import (
     ConsumoOut,
     ConsumoCreate,
     ConsumoResultado,
+    AjusteCreate,
+    AjusteOut,
+    MovimientoOut,
 )
 from ..security import get_current_user, requiere_rol
 
@@ -75,6 +79,25 @@ def _tiene_compra_pedida(db: Session, insumo_id) -> bool:
         .first()
     )
     return pendiente is not None
+
+
+def _siguiente_codigo_insumo(db: Session) -> str:
+    """Arma el próximo código correlativo de insumo (INS-0001, INS-0002...).
+
+    Mira los códigos existentes con el patrón INS-####, toma el número más
+    alto y le suma 1. Así no importa si algún insumo viejo quedó sin código
+    (de antes de que esto existiera) o con uno cargado a mano: el
+    correlativo sigue funcionando igual.
+    """
+    existentes = db.query(Insumo.codigo).filter(Insumo.codigo.like("INS-%")).all()
+    maximo = 0
+    for (codigo,) in existentes:
+        try:
+            numero = int(codigo.split("-", 1)[1])
+        except (ValueError, IndexError):
+            continue
+        maximo = max(maximo, numero)
+    return f"INS-{maximo + 1:04d}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -119,10 +142,15 @@ def crear_insumo(
     Solo coordinación (y jefatura, que siempre pasa) — igual criterio que dar
     de alta un tipo de equipo o un servicio en Catálogos.jsx: es carga de
     catálogo, no una acción del día a día de cualquier técnico.
+
+    El código lo asigna el backend solo (correlativo INS-0001, INS-0002...) —
+    no se pide en el formulario, así nunca queda vacío ni se repite por un
+    error de tipeo.
     """
     if payload.stock_minimo < 0 or payload.punto_reorden < 0 or payload.stock_actual < 0:
         raise HTTPException(status_code=400, detail="Las cantidades no pueden ser negativas.")
     insumo = Insumo(
+        codigo=_siguiente_codigo_insumo(db),
         nombre=payload.nombre,
         descripcion=payload.descripcion,
         unidad=payload.unidad,
@@ -335,3 +363,109 @@ def registrar_consumo(
         nivel=nivel,
         aviso=aviso,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AJUSTE MANUAL DE STOCK (POST) — nuevo, no existía forma de corregir a mano
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/ajustes", response_model=AjusteOut, status_code=201)
+def registrar_ajuste(
+    payload: AjusteCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+):
+    """Corregir el stock de un insumo a mano (merma, rotura, conteo físico,
+    stock encontrado sin registrar). No es ni compra ni consumo: no pasa por
+    el flujo de pedido/recepción ni queda atado a una OT."""
+    if payload.tipo not in ("entrada", "salida"):
+        raise HTTPException(status_code=400, detail="El tipo debe ser 'entrada' o 'salida'.")
+    if payload.cantidad <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0.")
+    if not payload.motivo.strip():
+        raise HTTPException(status_code=400, detail="Indicá el motivo del ajuste.")
+
+    insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
+    if insumo is None:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado.")
+
+    ajuste = AjusteInventario(
+        insumo_id=payload.insumo_id,
+        tipo=payload.tipo,
+        cantidad=payload.cantidad,
+        motivo=payload.motivo.strip(),
+        registrado_por=payload.registrado_por,
+    )
+    db.add(ajuste)
+    if payload.tipo == "entrada":
+        insumo.stock_actual = (insumo.stock_actual or 0) + payload.cantidad
+    else:
+        insumo.stock_actual = (insumo.stock_actual or 0) - payload.cantidad
+    db.commit()
+    db.refresh(ajuste)
+    return ajuste
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HISTORIAL UNIFICADO DE MOVIMIENTOS (GET) — nuevo, tipo kárdex
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/movimientos", response_model=list[MovimientoOut])
+def listar_movimientos(
+    insumo_id: str | None = None,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Historial de TODO lo que mueve stock: compras ya recibidas, consumos
+    en OT y ajustes manuales, ordenado del más reciente al más viejo. Antes
+    compras y consumos se veían en dos listas separadas."""
+    movimientos = []
+
+    compras_q = db.query(Compra).filter(Compra.estado == "recibida")
+    if insumo_id is not None:
+        compras_q = compras_q.filter(Compra.insumo_id == insumo_id)
+    for c in compras_q.all():
+        movimientos.append(MovimientoOut(
+            id=c.id,
+            origen="compra",
+            sentido="entrada",
+            insumo_id=c.insumo_id,
+            cantidad=c.cantidad,
+            fecha=datetime.combine(c.fecha_recepcion, datetime.min.time()) if c.fecha_recepcion else None,
+            referencia=c.proveedor or c.numero_orden,
+        ))
+
+    consumos_q = db.query(ConsumoInsumo)
+    if insumo_id is not None:
+        consumos_q = consumos_q.filter(ConsumoInsumo.insumo_id == insumo_id)
+    ots_por_id = {o.id: o for o in db.query(OrdenTrabajo).all()}
+    for co in consumos_q.all():
+        ot = ots_por_id.get(co.ot_id)
+        referencia = f"OT #{ot.numero_ot} · {ot.activo_codigo}" if ot else None
+        movimientos.append(MovimientoOut(
+            id=co.id,
+            origen="consumo",
+            sentido="salida",
+            insumo_id=co.insumo_id,
+            cantidad=co.cantidad,
+            fecha=co.fecha,
+            referencia=referencia,
+        ))
+
+    ajustes_q = db.query(AjusteInventario)
+    if insumo_id is not None:
+        ajustes_q = ajustes_q.filter(AjusteInventario.insumo_id == insumo_id)
+    for a in ajustes_q.all():
+        movimientos.append(MovimientoOut(
+            id=a.id,
+            origen="ajuste",
+            sentido=a.tipo,
+            insumo_id=a.insumo_id,
+            cantidad=a.cantidad,
+            fecha=a.fecha,
+            referencia=a.motivo,
+        ))
+
+    movimientos.sort(key=lambda m: m.fecha or datetime.min, reverse=True)
+    return movimientos[:limit]

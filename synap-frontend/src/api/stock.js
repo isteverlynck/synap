@@ -68,3 +68,20 @@ export async function registrarConsumo({ otId, insumoId, cantidad, tecnicoId }) 
   });
   return res.data;
 }
+
+// Registrar un ajuste manual de stock (merma, rotura, conteo físico, etc.).
+export async function registrarAjuste({ insumoId, tipo, cantidad, motivo, registradoPor }) {
+  const res = await cliente.post("/stock/ajustes", {
+    insumo_id: insumoId, tipo, cantidad, motivo, registrado_por: registradoPor || null,
+  });
+  return res.data;
+}
+
+// Historial unificado de movimientos: compras recibidas, consumos y
+// ajustes, todo junto y ordenado del más reciente al más viejo.
+export async function listarMovimientos({ insumoId } = {}) {
+  const params = {};
+  if (insumoId) params.insumo_id = insumoId;
+  const res = await cliente.get("/stock/movimientos", { params });
+  return res.data;
+}

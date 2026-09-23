@@ -236,6 +236,12 @@ const estilos = {
     display: "flex",
     flexDirection: "column",
     gap: 2,
+    // Fijo en pantalla: si el contenido de la derecha es más largo que la
+    // ventana, el menú se queda quieto en vez de scrollear con el resto.
+    position: "sticky",
+    top: 0,
+    height: "100vh",
+    overflowY: "auto",
   },
   marca: { display: "flex", alignItems: "center", gap: 10, padding: "0 22px 20px" },
   logoChico: {

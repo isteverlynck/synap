@@ -479,6 +479,7 @@ class MantenimientoPreventivoCreate(BaseModel):
 class InsumoOut(BaseModel):
     """Datos de un insumo/repuesto del stock para el frontend."""
     id: uuid.UUID
+    codigo: str | None = None
     nombre: str
     descripcion: str | None = None
     unidad: str | None = None
@@ -496,7 +497,9 @@ class InsumoCreate(BaseModel):
     stock_actual es el conteo inicial (lo que ya hay hoy, si se está cargando
     algo que ya existía físicamente) — no es una compra, así que no genera
     ninguna fila en 'compras'. tipo_equipo_id es opcional: no todo insumo es
-    específico de un tipo de equipo (ej. guantes, alcohol en gel).
+    específico de un tipo de equipo (ej. guantes, alcohol en gel). codigo NO
+    se manda: lo asigna el backend solo (correlativo INS-0001, INS-0002...),
+    para que nunca quede vacío ni se pueda repetir por error de tipeo.
     """
     nombre: str
     descripcion: str | None = None
@@ -578,7 +581,44 @@ class ConsumoResultado(BaseModel):
     stock_resultante: int
     nivel: str
     aviso: str | None = None
-    
+
+
+class AjusteCreate(BaseModel):
+    """Registrar un ajuste manual de stock (POST). tipo: 'entrada' o 'salida'.
+    motivo es obligatorio — un ajuste sin explicación no sirve para auditar."""
+    insumo_id: uuid.UUID
+    tipo: str
+    cantidad: int
+    motivo: str
+    registrado_por: uuid.UUID | None = None
+
+
+class AjusteOut(BaseModel):
+    """Un ajuste manual de stock ya registrado."""
+    id: uuid.UUID
+    insumo_id: uuid.UUID
+    tipo: str
+    cantidad: int
+    motivo: str
+    fecha: datetime | None = None
+    registrado_por: uuid.UUID | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MovimientoOut(BaseModel):
+    """Un movimiento de stock — compra recibida, consumo o ajuste —
+    unificados en un solo historial cronológico (tipo kárdex).
+    origen: 'compra' | 'consumo' | 'ajuste'. sentido: 'entrada' | 'salida'.
+    """
+    id: uuid.UUID
+    origen: str
+    sentido: str
+    insumo_id: uuid.UUID
+    cantidad: int
+    fecha: datetime | None = None
+    referencia: str | None = None
+
 
 class ChecklistItemOut(BaseModel):
     """Un punto a revisar dentro de una plantilla de MP (ej: 'verificar batería').
