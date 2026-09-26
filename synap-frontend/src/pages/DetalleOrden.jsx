@@ -10,6 +10,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   verOrden, cambiarEstado, cerrarOrden, asignarTecnico, listarNotas, agregarNota,
   listarCorrectivasAsociadas, crearCorrectivaAsociada, iniciarParada, finalizarParada,
+  listarAdjuntos, abrirAdjunto,
 } from "../api/ordenes";
 import { tecnicosDisponibles } from "../api/coordinacion";
 import { listarInsumos, registrarConsumo, listarConsumos } from "../api/stock";
@@ -19,7 +20,7 @@ import { color, cs, boton, insignia } from "../tema";
 import Volver from "../componentes/Volver";
 import ChecklistPreventiva from "../componentes/ChecklistPreventiva";
 import { toast } from "sonner";
-import { diasHasta } from "../utiles/fechas";
+import { diasHasta, formatearFechaOT } from "../utiles/fechas";
 
 function DetalleOrden() {
   const { id } = useParams();
@@ -34,6 +35,7 @@ function DetalleOrden() {
   const [correctivas, setCorrectivas] = useState([]);
   const [insumos, setInsumos] = useState([]);
   const [consumosOT, setConsumosOT] = useState([]);
+  const [adjuntos, setAdjuntos] = useState([]);
 
   useEffect(() => {
     Promise.all([verOrden(id), obtenerPerfil()])
@@ -50,6 +52,7 @@ function DetalleOrden() {
     // nuevo y para mostrar el nombre en vez del id en el historial).
     listarInsumos().then(setInsumos).catch(() => {});
     listarConsumos({ otId: id }).then(setConsumosOT).catch(() => {});
+    listarAdjuntos(id).then(setAdjuntos).catch(() => {});
   }, [id]);
 
   const rol = perfil?.rol === "junior" ? "tecnico" : perfil?.rol;
@@ -61,9 +64,15 @@ function DetalleOrden() {
   // el grupo se reparte el trabajo sin depender del coordinador para cada pase.
   const esDeMiGrupo = rol === "tecnico" && !!perfil?.grupo && ot?.grupo_id === perfil.grupo;
   const puedeAsignar = esCoordinacion || esDeMiGrupo;
-  // En una preventiva no hay dueño: la trabaja cualquiera del grupo.
-  // En una correctiva sí lo hay: solo su técnico asignado.
-  const puedeTrabajar = ot?.tipo === "PREVENTIVA" ? esDeMiGrupo : esMiOrden;
+  // Preventiva: mientras nadie la empezó, la puede trabajar cualquiera del
+  // grupo. Cuando alguien aprieta "Empezar a trabajar" (iniciada_por), solo
+  // esa persona; el resto del grupo la puede ver pero no tocar. Si está en
+  // progreso sin registro de quién la empezó (OT viejas o migradas), la
+  // sigue pudiendo trabajar cualquiera del grupo, para que no quede trabada.
+  // Correctiva: solo su técnico asignado.
+  const puedeTrabajar = ot?.tipo === "PREVENTIVA"
+    ? esDeMiGrupo && (!ot?.iniciada_por || ot.iniciada_por === perfil?.id)
+    : esMiOrden;
   const avisoPreventivo = textoPreventivo(ot?.activo_proxima_fecha_mp);
 
   useEffect(() => {
@@ -183,6 +192,46 @@ function DetalleOrden() {
                   : "Sin asignar"
           }
         />
+        {/* Quién reportó la falla (la persona que hizo la solicitud), con su
+        mail para que el técnico le pueda consultar algo. Solo en correctivas. */}
+        {ot.tipo === "CORRECTIVA" && (
+          <Dato
+            etiqueta="Falla reportada por"
+            valor={
+              ot.reportado_por_nombre ? (
+                <>
+                  {ot.reportado_por_nombre}
+                  {ot.reportado_por_email && (
+                    <a
+                      href={`mailto:${ot.reportado_por_email}`}
+                      style={{ display: "block", fontSize: "0.82rem", color: color.primario, wordBreak: "break-all" }}
+                    >
+                      {ot.reportado_por_email}
+                    </a>
+                  )}
+                </>
+              ) : ot.ot_origen_id ? (
+                "Detectada en un preventivo"
+              ) : (
+                "—"
+              )
+            }
+          />
+        )}
+        {/* Quién apretó "Empezar a trabajar". Las OT viejas o migradas del
+        hospital no tienen este dato: ahí se muestra "Sin registro". */}
+        <Dato
+          etiqueta="Iniciada por"
+          valor={
+            ot.tipo !== "PREVENTIVA"
+              ? "—"
+              : ot.iniciada_por_nombre
+                ? ot.iniciada_por_nombre
+                : ot.estado === "ABIERTA"
+                  ? "Todavía no se empezó"
+                  : "Sin registro"
+          }
+        />
         <Dato etiqueta="Notificada" valor={fechaHora(ot.fecha_notificacion)} />
         <Dato etiqueta="Abierta" valor={fechaHora(ot.fecha_apertura)} />
         <Dato etiqueta="Cerrada" valor={fechaHora(ot.fecha_cierre)} />
@@ -192,6 +241,29 @@ function DetalleOrden() {
         y en OT que tardan en arrancar eso daba números sin sentido). */}
         <Dato etiqueta="Tiempo parado" valor={tiempoDeParada(ot)} />
       </div>
+
+      {/* Adjuntos de la solicitud: solo el nombre; al tocarlo se abre. */}
+      {adjuntos.length > 0 && (
+        <div style={{ ...cs.tarjeta, padding: "14px 18px", marginTop: 12 }}>
+          <p style={estilos.etiqueta}>Archivos adjuntos</p>
+          {adjuntos.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() =>
+                abrirAdjunto(ot.id, a).catch(() => toast.error("No se pudo abrir el archivo."))
+              }
+              style={{
+                display: "block", background: "none", border: "none", padding: "4px 0",
+                cursor: "pointer", color: color.primario, fontSize: "0.9rem",
+                textAlign: "left", fontFamily: "inherit", wordBreak: "break-all",
+              }}
+            >
+              📎 {a.nombre_archivo}
+            </button>
+          ))}
+        </div>
+      )}
 
       {ot.observaciones && (
         <div style={{ ...cs.tarjeta, padding: "14px 18px", marginTop: 12 }}>
@@ -677,10 +749,7 @@ function tiempoDeParada(ot) {
 }
 
 function fechaHora(valor) {
-  if (!valor) return "—";
-  const f = new Date(valor);
-  if (isNaN(f)) return "—";
-  return f.toLocaleString("es-AR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return formatearFechaOT(valor, true);
 }
 
 // Azul = hay que hacerla. Violeta = alguien la está haciendo. Gris = terminada,
@@ -713,7 +782,10 @@ const estilos = {
   equipoCodigo: { margin: "3px 0 0", fontSize: "0.82rem", color: color.textoSuave, fontFamily: "ui-monospace, monospace" },
   datos: {
     ...cs.tarjeta, padding: 18,
-    display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 16,
+    // Cada dato ocupa lo que necesita, con una separación fija entre uno y
+    // otro (antes era una grilla que repartía el ancho en partes iguales:
+    // en pantallas anchas quedaban muy separados y el mail se cortaba).
+    display: "flex", flexWrap: "wrap", columnGap: 40, rowGap: 16,
   },
   etiqueta: { fontSize: "0.7rem", color: color.textoDebil, textTransform: "uppercase", letterSpacing: "0.02em", fontWeight: 600, marginBottom: 3 },
   texto: { margin: 0, fontSize: "0.9rem", color: color.texto, lineHeight: 1.5 },

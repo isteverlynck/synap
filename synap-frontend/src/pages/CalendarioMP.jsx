@@ -357,7 +357,10 @@ const estilos = {
   },
   filtros: { display: "flex", gap: 7, marginBottom: 10, flexWrap: "wrap" },
   filtro: {
-    padding: "6px 14px", borderRadius: 999, border: `1px solid ${color.borde}`,
+    padding: "6px 14px", borderRadius: 999,
+    // Separadas y no el atajo `border`: mezclarlo con el `borderColor` de
+    // filtroActivo hace que al desactivarse quede el borde oscuro.
+    borderWidth: 1, borderStyle: "solid", borderColor: color.borde,
     background: color.tarjeta, color: color.textoSuave, fontSize: "0.83rem",
     cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
   },

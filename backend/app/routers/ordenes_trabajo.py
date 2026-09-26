@@ -29,7 +29,7 @@ from ..schemas import (
     NotaOTOut,
     NotaOTCrear,
 )
-from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto, validar_a_cargo_de_preventiva
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 
@@ -269,6 +269,8 @@ def cambiar_estado(
         )
 
     orden.estado = nuevo
+    if nuevo == "EN_PROGRESO" and orden.iniciada_por is None:
+        orden.iniciada_por = current_user.id
     # Si se cierra por esta vía, igual completamos la fecha de cierre.
     if nuevo == "CERRADA" and orden.fecha_cierre is None:
         orden.fecha_cierre = datetime.utcnow()
@@ -314,6 +316,21 @@ def cerrar_orden(
 
     if orden.estado == "CERRADA":
         raise HTTPException(status_code=400, detail="Esta OT ya está cerrada.")
+    
+    validar_a_cargo_de_preventiva(current_user, orden)
+    # Nadie cierra OT de otro grupo (mismo chequeo que ya usan las paradas).
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    # Correctiva: un técnico solo cierra las que tiene asignadas.
+    if (
+        orden.tipo == "CORRECTIVA"
+        and current_user.rol == "tecnico"
+        and orden.tecnico_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo podés cerrar las órdenes que tenés asignadas.",
+        )
 
     ahora = datetime.utcnow()
 
@@ -339,6 +356,9 @@ def cerrar_orden(
         mp.fecha_realizada = ahora.date()
         mp.estado = "REALIZADO"
         mp.justificacion_retraso = payload.justificacion_retraso.strip() if not a_tiempo else None
+    
+    if orden.tipo == "PREVENTIVA" and orden.activo is not None:
+        orden.activo.ultima_fecha_mp = ahora.date()
 
     orden.estado = "CERRADA"
     orden.fecha_cierre = ahora
@@ -375,6 +395,7 @@ def iniciar_parada(
     if orden.estado == "CERRADA":
         raise HTTPException(status_code=400, detail="Esta OT ya está cerrada.")
     _validar_permiso_sobre_ot(current_user, db, orden)
+    validar_a_cargo_de_preventiva(current_user, orden)
     if orden.parada_iniciada_en is not None:
         raise HTTPException(status_code=400, detail="Ya hay una parada en curso para esta orden.")
 
@@ -397,6 +418,7 @@ def finalizar_parada(
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
     _validar_permiso_sobre_ot(current_user, db, orden)
+    validar_a_cargo_de_preventiva(current_user, orden)
     if orden.parada_iniciada_en is None:
         raise HTTPException(status_code=400, detail="No hay ninguna parada en curso para esta orden.")
 
@@ -447,7 +469,8 @@ def crear_correctiva_asociada(
             status_code=403,
             detail="Solo podés generar correctivas de OT de los grupos que coordinás.",
         )
-
+    
+    validar_a_cargo_de_preventiva(current_user, origen)
     descripcion = payload.descripcion.strip()
     if not descripcion:
         raise HTTPException(status_code=400, detail="Contá qué se encontró para generar la correctiva.")
@@ -555,3 +578,75 @@ def agregar_nota(
     db.commit()
     db.refresh(nota)
     return nota
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ADJUNTOS — los archivos de la solicitud que originó esta OT
+# ═══════════════════════════════════════════════════════════════════════════
+# Los sube enfermería al crear la solicitud; acá los ve cualquiera que tenga
+# acceso a la OT (mismo permiso que para abrir su detalle).
+# ═══════════════════════════════════════════════════════════════════════════
+
+from urllib.parse import quote
+
+from fastapi.responses import Response
+from sqlalchemy.orm import defer
+
+from ..models import AdjuntoSolicitud, SolicitudServicio
+from ..schemas import AdjuntoOut
+
+
+@router.get("/{ot_id}/adjuntos", response_model=list[AdjuntoOut])
+def listar_adjuntos(
+    ot_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+):
+    """Nombres de los archivos adjuntos (sin el archivo en sí)."""
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    return (
+        db.query(AdjuntoSolicitud)
+        # defer: no traer el archivo en sí, que puede pesar varios MB y para
+        # la lista solo hace falta el nombre.
+        .options(defer(AdjuntoSolicitud.contenido))
+        .join(SolicitudServicio, SolicitudServicio.id == AdjuntoSolicitud.solicitud_id)
+        .filter(SolicitudServicio.ot_id == orden.id)
+        .order_by(AdjuntoSolicitud.created_at)
+        .all()
+    )
+
+
+@router.get("/{ot_id}/adjuntos/{adjunto_id}")
+def ver_adjunto(
+    ot_id: str,
+    adjunto_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+):
+    """Devuelve el archivo en sí, para abrirlo o descargarlo."""
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    # El adjunto tiene que ser de la solicitud de ESTA OT (no de cualquier otra).
+    adjunto = (
+        db.query(AdjuntoSolicitud)
+        .join(SolicitudServicio, SolicitudServicio.id == AdjuntoSolicitud.solicitud_id)
+        .filter(AdjuntoSolicitud.id == adjunto_id, SolicitudServicio.ot_id == orden.id)
+        .first()
+    )
+    if adjunto is None:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    return Response(
+        content=adjunto.contenido,
+        media_type=adjunto.tipo_mime,
+        # inline: que el navegador lo abra (foto o PDF) en vez de forzar la descarga.
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(adjunto.nombre_archivo)}"},
+    )

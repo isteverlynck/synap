@@ -43,7 +43,7 @@ from ..schemas import (
     OrdenTrabajoOut,
 )
 
-from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto, validar_a_cargo_de_preventiva
 
 
 def _validar_permiso_sobre_mp(db: Session, current_user: Usuario, mp: MantenimientoPreventivo) -> None:
@@ -59,6 +59,8 @@ def _validar_permiso_sobre_mp(db: Session, current_user: Usuario, mp: Mantenimie
     if not mp.ot_id:
         return
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == mp.ot_id).first()
+    if orden is not None:
+        validar_a_cargo_de_preventiva(current_user, orden)
     if orden is None or orden.grupo_id is None:
         return
     if current_user.rol in ("tecnico", "junior") and current_user.grupo != orden.grupo_id:

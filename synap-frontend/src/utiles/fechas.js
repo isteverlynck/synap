@@ -34,14 +34,14 @@ export function diasHasta(fecha) {
 // Agrupa una lista en bloques por día, del más reciente al más viejo.
 // "obtenerFecha" le dice cómo sacarle la fecha a cada elemento (útil porque a
 // veces el elemento es { solicitud, ot } y no la solicitud directamente).
-export function agruparPorFecha(lista, obtenerFecha) {
+export function agruparPorFecha(lista, obtenerFecha, formato = formatearFecha) {
   const ordenada = [...lista].sort(
     (a, b) => new Date(obtenerFecha(b)) - new Date(obtenerFecha(a))
   );
   const grupos = [];
   for (const item of ordenada) {
     const fechaRaw = obtenerFecha(item);
-    const fecha = fechaRaw ? formatearFecha(fechaRaw) : "Sin fecha";
+    const fecha = fechaRaw ? formato(fechaRaw) : "Sin fecha";
     const ultimoGrupo = grupos[grupos.length - 1];
     if (ultimoGrupo && ultimoGrupo.fecha === fecha) {
       ultimoGrupo.items.push(item);
@@ -50,4 +50,17 @@ export function agruparPorFecha(lista, obtenerFecha) {
     }
   }
   return grupos;
+}
+
+const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+export function formatearFechaOT(valor, conHora = false) {
+  if (!valor) return "—";
+  const f = parsearFecha(valor);
+  if (isNaN(f.getTime())) return "—";
+  const fecha = `${f.getDate()}-${MESES[f.getMonth()]}-${f.getFullYear()}`;
+  if (!conHora) return fecha;
+  const horas = String(f.getHours()).padStart(2, "0");
+  const minutos = String(f.getMinutes()).padStart(2, "0");
+  return `${fecha} ${horas}:${minutos}hs`;
 }

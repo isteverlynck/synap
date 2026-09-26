@@ -12,7 +12,7 @@ reflejar el cambio acá también.
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, LargeBinary
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -187,6 +187,17 @@ class OrdenTrabajo(Base):
     # mostrar el total.
     parada_iniciada_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     tiempo_parada_segundos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    iniciada_por: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
+    iniciador = relationship("Usuario", foreign_keys=[iniciada_por])
+
+    @property
+    def iniciada_por_nombre(self) -> str | None:
+        """Nombre de quien empezó la OT, listo para mostrar (None si no hay registro)."""
+        if self.iniciador is None:
+            return None
+        return f"{self.iniciador.nombre} {self.iniciador.apellido}"
 
     # ─── Relaciones ───
     activo: Mapped["Activo"] = relationship(back_populates="ordenes_de_trabajo")
@@ -226,6 +237,26 @@ class OrdenTrabajo(Base):
     notas: Mapped[list["NotaOT"]] = relationship(
         back_populates="orden", order_by="NotaOT.created_at"
     )
+    solicitud = relationship(
+        "SolicitudServicio",
+        primaryjoin="OrdenTrabajo.id == foreign(SolicitudServicio.ot_id)",
+        uselist=False,
+        viewonly=True,
+    )
+
+    @property
+    def reportado_por_nombre(self) -> str | None:
+        """Quién hizo la solicitud (el reporte de la falla). None si la OT
+        no vino de una solicitud."""
+        return self.solicitud.solicitante_nombre if self.solicitud else None
+
+    @property
+    def reportado_por_email(self) -> str | None:
+        """Mail de quien hizo la solicitud, para que el técnico lo pueda
+        contactar si necesita consultarle algo."""
+        if self.solicitud is None or self.solicitud.solicitante is None:
+            return None
+        return self.solicitud.solicitante.email
 
 
 class Falla(Base):
@@ -568,6 +599,13 @@ class SolicitudServicio(Base):
     # sin eso, SQLAlchemy no sabe cuál usar para cada relación.
     solicitante = relationship("Usuario", foreign_keys=[solicitante_id])
     persona_afectada = relationship("Usuario", foreign_keys=[persona_afectada_id])
+    orden = relationship("OrdenTrabajo", foreign_keys=[ot_id])
+
+    @property
+    def ot_asignada(self) -> bool:
+        """True si la OT de esta solicitud ya tiene un técnico asignado.
+        Es lo único de la OT que ve enfermería."""
+        return self.orden is not None and self.orden.tecnico_id is not None
 
     @property
     def solicitante_nombre(self) -> str | None:
@@ -609,3 +647,25 @@ class PasswordResetToken(Base):
     usado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    
+class AdjuntoSolicitud(Base):
+    """Un archivo (foto o PDF) que se adjuntó a una solicitud de servicio.
+
+    El archivo se guarda entero en la base (columna contenido), así Inés y Cami
+    ven los mismos archivos sin configurar nada extra. Lo pueden ver quienes
+    tienen acceso a la OT que nació de esa solicitud.
+    """
+    __tablename__ = "adjuntos_solicitud"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    solicitud_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("solicitudes_servicio.id"), nullable=False
+    )
+    nombre_archivo: Mapped[str] = mapped_column(String, nullable=False)   # ej: foto_1.jpg
+    tipo_mime: Mapped[str] = mapped_column(String, nullable=False)        # ej: image/jpeg
+    tamano_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    contenido: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)  # el archivo en sí
+    subido_por: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)

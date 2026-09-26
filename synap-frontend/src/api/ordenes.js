@@ -116,3 +116,43 @@ export async function crearCorrectivaAsociada(otId, { descripcion, prioridad }) 
   });
   return res.data;
 }
+
+// ─── Adjuntos (fotos o PDFs de la solicitud que originó la OT) ───
+
+// Solo los nombres, para la lista. El archivo en sí se pide al tocarlo.
+export async function listarAdjuntos(otId) {
+  const res = await cliente.get(`/ordenes-trabajo/${otId}/adjuntos`);
+  return res.data;
+}
+
+// Abre un adjunto. No alcanza con un link común porque el backend pide el
+// token de sesión: lo pedimos con axios (que ya lo agrega), lo recibimos como
+// "blob" (el archivo en crudo) y armamos una dirección temporal para abrirlo.
+//
+// Las fotos JPG/PNG y los PDF se abren en una pestaña nueva. Las HEIC se
+// descargan con su nombre, porque la mayoría de los navegadores no las muestran.
+export async function abrirAdjunto(otId, adjunto) {
+  const esHeic = adjunto.tipo_mime === "image/heic" || adjunto.tipo_mime === "image/heif";
+  // La pestaña se abre ANTES de pedir el archivo: si se abre después de
+  // esperar la respuesta, algunos navegadores (Safari) la bloquean.
+  const pestana = esHeic ? null : window.open("", "_blank");
+  try {
+    const res = await cliente.get(`/ordenes-trabajo/${otId}/adjuntos/${adjunto.id}`, {
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(res.data);
+    if (pestana) {
+      pestana.location.href = url;
+    } else {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = adjunto.nombre_archivo;
+      link.click();
+    }
+    // La dirección temporal se libera al rato, cuando ya se abrió.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    if (pestana) pestana.close();
+    throw err;
+  }
+}

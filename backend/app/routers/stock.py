@@ -47,7 +47,7 @@ from ..schemas import (
     AjusteOut,
     MovimientoOut,
 )
-from ..security import get_current_user, requiere_rol
+from ..security import get_current_user, requiere_rol, validar_a_cargo_de_preventiva
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 
@@ -324,6 +324,7 @@ def registrar_consumo(
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == payload.ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="La orden de trabajo no existe.")
+    validar_a_cargo_de_preventiva(current_user, orden)
     insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
     if insumo is None:
         raise HTTPException(status_code=404, detail="Insumo no encontrado.")

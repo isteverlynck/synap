@@ -5,7 +5,7 @@ import { verActivoDetalle } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, estadoDelEquipo } from "../tema";
 import Volver from "../componentes/Volver";
-import { diasHasta, parsearFecha } from "../utiles/fechas";
+import { diasHasta, parsearFecha, formatearFechaOT } from "../utiles/fechas";
 import { programarSegunPlan } from "../api/activos";
 import { toast } from "sonner";
 
@@ -147,7 +147,7 @@ function FichaActivo() {
             <ItemHistorial
               key={ot.id}
               titulo={`OT-${String(ot.numero_ot).padStart(4, "0")} · ${ot.tipo}`}
-              detalle={`Abierta el ${formatearFecha(ot.fecha_apertura)}`}
+              detalle={`Abierta el ${formatearFechaOT(ot.fecha_apertura)}`}
               tono="advertencia"
               estado={ot.estado}
               onClick={veOrdenes ? () => (ot.puedo_abrir ? navegar(`/ordenes/${ot.id}`) : setAvisoRestringido(true)) : undefined}
@@ -168,7 +168,7 @@ function FichaActivo() {
               key={m.id}
               titulo="Mantenimiento preventivo"
               detalle={`Programado: ${formatearFecha(m.fecha_programada)}`}
-              tono={m.fecha_realizada ? "exito" : "neutro"}
+              tono="neutro"
               estado={m.estado}
             />
           ))}

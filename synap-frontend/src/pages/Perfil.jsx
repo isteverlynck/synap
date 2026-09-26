@@ -8,10 +8,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { LogOut, Lock } from "lucide-react";
+import { LogOut, Lock, Mail, IdCard, Users } from "lucide-react";
 import { obtenerPerfil, cambiarPassword, logout } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
-import { color, cs, boton } from "../tema";
+import { color, cs, boton, insignia } from "../tema";
 
 function Perfil() {
   const navegar = useNavigate();
@@ -33,21 +33,34 @@ function Perfil() {
       <Encabezado titulo="Mi cuenta" />
 
       {/* Tarjeta 1: quién sos. Los datos son de solo lectura: los carga
-      Bioingeniería, no el propio usuario. */}
-      <div style={{ ...cs.tarjeta, padding: 20, display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={estilos.avatarGrande}>
-          {`${perfil.nombre?.[0] || ""}${perfil.apellido?.[0] || ""}`.toUpperCase()}
+      Bioingeniería, no el propio usuario. Arriba el nombre y el rol (como
+      etiqueta, para que se lea de un vistazo); abajo, separados por una
+      línea, los datos de contacto, cada uno con su ícono. */}
+      <div style={{ ...cs.tarjeta, padding: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={estilos.avatarGrande}>
+            {`${perfil.nombre?.[0] || ""}${perfil.apellido?.[0] || ""}`.toUpperCase()}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={estilos.nombre}>{perfil.nombre} {perfil.apellido}</p>
+            <span style={{ ...insignia("primario"), marginTop: 8 }}>{etiquetaRol(perfil.rol)}</span>
+          </div>
         </div>
-        <div style={{ minWidth: 0 }}>
-          <p style={estilos.nombre}>{perfil.nombre} {perfil.apellido}</p>
-          <p style={estilos.dato}>{perfil.email}</p>
-          {perfil.numero_identificacion && (
-            <p style={estilos.dato}>Usuario {perfil.numero_identificacion}</p>
-          )}
-          <p style={estilos.datoTenue}>
-            {etiquetaRol(perfil.rol)}
-            {perfil.grupo ? ` · Grupo ${perfil.grupo}` : ""}
+
+        <div style={estilos.datos}>
+          <p style={estilos.datoConIcono}>
+            <Mail size={16} strokeWidth={1.8} aria-hidden="true" /> {perfil.email}
           </p>
+          {perfil.numero_identificacion && (
+            <p style={estilos.datoConIcono}>
+              <IdCard size={16} strokeWidth={1.8} aria-hidden="true" /> Usuario {perfil.numero_identificacion}
+            </p>
+          )}
+          {perfil.grupo && (
+            <p style={estilos.datoConIcono}>
+              <Users size={16} strokeWidth={1.8} aria-hidden="true" /> Grupo {perfil.grupo}
+            </p>
+          )}
         </div>
       </div>
 
@@ -138,11 +151,20 @@ function etiquetaRol(rol) {
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "18px 0" },
   avatarGrande: {
-    width: 56, height: 56, borderRadius: "50%", background: color.primarioClaro,
+    width: 64, height: 64, borderRadius: "50%", background: color.primarioClaro,
     color: color.primarioOscuro, display: "flex", alignItems: "center",
-    justifyContent: "center", fontSize: "1.2rem", fontWeight: 700, flexShrink: 0,
+    justifyContent: "center", fontSize: "1.35rem", fontWeight: 700, flexShrink: 0,
   },
-  nombre: { margin: 0, fontSize: "1.1rem", color: color.texto, fontWeight: 700 },
+  nombre: { margin: 0, fontSize: "1.2rem", color: color.texto, fontWeight: 700 },
+  // Bloque de datos de contacto, separado del nombre por una línea fina.
+  datos: {
+    marginTop: 18, paddingTop: 16, borderTop: `1px solid ${color.bordeSuave}`,
+    display: "flex", flexDirection: "column", gap: 10,
+  },
+  datoConIcono: {
+    margin: 0, fontSize: "0.9rem", color: color.textoSuave,
+    display: "flex", alignItems: "center", gap: 10, wordBreak: "break-all",
+  },
   dato: { margin: "3px 0 0", fontSize: "0.88rem", color: color.textoSuave },
   datoTenue: { margin: "2px 0 0", fontSize: "0.82rem", color: color.textoDebil },
   etiqueta: {

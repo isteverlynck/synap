@@ -24,3 +24,15 @@ export async function verOrdenTrabajo(otId) {
   const res = await cliente.get(`/ordenes-trabajo/${otId}`);
   return res.data;
 }
+
+
+// Adjuntar archivos (fotos o PDFs) a una solicitud ya creada. "archivos" es
+// una lista de File (lo que devuelve un <input type="file">). Se mandan como
+// formulario (FormData) porque así viajan los archivos; el backend los recibe
+// todos juntos bajo el nombre "archivos".
+export async function subirAdjuntos(solicitudId, archivos) {
+  const formulario = new FormData();
+  archivos.forEach((archivo) => formulario.append("archivos", archivo));
+  const res = await cliente.post(`/solicitudes/${solicitudId}/adjuntos`, formulario);
+  return res.data;
+}

@@ -11,12 +11,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import cliente from "../api/cliente";
 import { logout } from "../api/auth";
-import { crearSolicitud, misSolicitudes, verOrdenTrabajo } from "../api/solicitudes";
+import { crearSolicitud, misSolicitudes, verOrdenTrabajo, subirAdjuntos } from "../api/solicitudes";
 import { verActivo } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
 import { formatearFecha, agruparPorFecha } from "../utiles/fechas";
 import { normalizarCodigo } from "../utiles/codigos";
+
 
 const SOLAPAS = [
   { key: "crear", label: "Crear solicitud" },
@@ -47,7 +48,7 @@ function Solicitudes() {
   return (
     <div style={cs.pagina}>
       <div style={cs.contenido}>
-        <Encabezado titulo="Solicitudes de servicio" subtitulo="Enfermería">
+        <Encabezado titulo="Solicitudes de servicio" subtitulo="Reporte de fallas">
           <button style={boton("secundario")} onClick={() => navegar("/escanear")}>
             Escanear equipo (QR)
           </button>
@@ -84,6 +85,11 @@ function Solicitudes() {
 // SOLAPA 1 — Crear solicitud
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Límites de los adjuntos (los mismos que controla el backend).
+const MAX_ADJUNTOS = 5;
+const MAX_BYTES_ADJUNTO = 10 * 1024 * 1024; // 10 MB
+const EXTENSIONES_PERMITIDAS = [".jpg", ".jpeg", ".png", ".heic", ".heif", ".pdf"];
+
 function CrearSolicitud({ onCreada, activoInicial }) {
   // null = todavía no eligió; true = equipo médico; false = no es equipo médico.
   // Si venimos de escanear un QR, ya sabemos que es un equipo médico y cuál.
@@ -102,6 +108,7 @@ function CrearSolicitud({ onCreada, activoInicial }) {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
+  const [archivos, setArchivos] = useState([]);
 
   // Traemos una lista de activos para mostrar sugerencias mientras escribe.
   // No hace falta que esté completa: el ID que finalmente se manda siempre
@@ -180,6 +187,32 @@ function CrearSolicitud({ onCreada, activoInicial }) {
     setErrorCodigo("");
   }
 
+  function agregarArchivos(e) {
+    const elegidos = Array.from(e.target.files || []);
+    e.target.value = ""; // así se puede volver a elegir el mismo archivo si se quitó
+    setError("");
+    for (const archivo of elegidos) {
+      const extension = archivo.name.slice(archivo.name.lastIndexOf(".")).toLowerCase();
+      if (!EXTENSIONES_PERMITIDAS.includes(extension)) {
+        setError(`"${archivo.name}" no es un tipo permitido. Solo JPG, PNG, HEIC o PDF.`);
+        return;
+      }
+      if (archivo.size > MAX_BYTES_ADJUNTO) {
+        setError(`"${archivo.name}" pesa más de 10 MB.`);
+        return;
+      }
+    }
+    if (archivos.length + elegidos.length > MAX_ADJUNTOS) {
+      setError(`Podés adjuntar hasta ${MAX_ADJUNTOS} archivos.`);
+      return;
+    }
+    setArchivos([...archivos, ...elegidos]);
+  }
+
+  function quitarArchivo(indice) {
+    setArchivos(archivos.filter((_, i) => i !== indice));
+  }
+
   async function enviar() {
     setError("");
     setExito("");
@@ -218,13 +251,26 @@ function CrearSolicitud({ onCreada, activoInicial }) {
 
     setEnviando(true);
     try {
-      await crearSolicitud({
+      const nueva = await crearSolicitud({
         es_equipo_medico: esEquipoMedico,
         activo_codigo: esEquipoMedico ? equipo.codigo : undefined,
         descripcion_cosa: esEquipoMedico ? undefined : descripcionCosa.trim(),
         descripcion_problema: descripcionProblema.trim(),
         ubicacion: ubicacion.trim(),
       });
+      // Con la solicitud ya creada, subimos los adjuntos (si hay). Si esto
+      // falla, la solicitud igual quedó enviada: avisamos solo lo de los archivos.
+      if (archivos.length > 0) {
+        try {
+          await subirAdjuntos(nueva.id, archivos);
+        } catch (err) {
+          setError(
+            "La solicitud se envió, pero no se pudieron adjuntar los archivos. " +
+            (err.response?.data?.detail || "")
+          );
+        }
+      }
+      setArchivos([]);
       setExito("Solicitud enviada correctamente.");
       // Limpiar el formulario para la próxima.
       setEsEquipoMedico(null);
@@ -346,6 +392,42 @@ function CrearSolicitud({ onCreada, activoInicial }) {
             />
           </div>
 
+          {/* Adjuntos opcionales: fotos o PDFs. Se listan solo por nombre. */}
+          <div style={estilos.campo}>
+            <label style={cs.label}>Adjuntar fotos o PDF (opcional)</label>
+            {/* El <input type="file"> del navegador escribe sus textos en el
+            idioma del navegador ("Choose files"): lo escondemos y usamos un
+            botón propio. Al tocar el label, se abre el selector igual. */}
+            {archivos.length < MAX_ADJUNTOS && (
+              <label style={{ ...boton("secundario"), display: "inline-flex", cursor: "pointer" }}>
+                Elegir archivos
+                <input
+                  type="file"
+                  multiple
+                  accept={EXTENSIONES_PERMITIDAS.join(",")}
+                  onChange={agregarArchivos}
+                  style={{ display: "none" }}
+                />
+              </label>
+            )}
+            <p style={estilos.ayudaCampo}>
+              Hasta {MAX_ADJUNTOS} archivos de 10 MB cada uno (JPG, PNG, HEIC o PDF).
+            </p>
+            {archivos.map((archivo, i) => (
+              <div
+                key={`${archivo.name}-${i}`}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 6 }}
+              >
+                <span style={{ fontSize: "0.88rem", color: color.texto, wordBreak: "break-all" }}>
+                  📎 {archivo.name}
+                </span>
+                <button type="button" style={estilos.linkCambiar} onClick={() => quitarArchivo(i)}>
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
+
           {error && <p style={estilos.error}>{error}</p>}
           {exito && <p style={estilos.exito}>{exito}</p>}
 
@@ -419,11 +501,10 @@ function ListaSolicitudes({ estado, vacio }) {
 // SOLAPA 3 — Aceptadas, con su sub-estado (sin asignar / en progreso / finalizada)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function estadoOt(ot) {
-  if (!ot) return { texto: "Sin asignar", tono: "advertencia" };
-  if (ot.estado === "CERRADA") return { texto: "Finalizada", tono: "exito" };
-  if (!ot.tecnico_id) return { texto: "Sin asignar", tono: "advertencia" };
-  return { texto: "En progreso", tono: "primario" };
+function estadoOt(s) {
+  // Enfermería solo ve si su pedido ya tiene técnico, no cómo avanza la OT.
+  if (s.ot_asignada) return { texto: "Asignada", tono: "primario" };
+  return { texto: "Sin asignar", tono: "advertencia" };
 }
 
 function ListaAceptadas() {
@@ -487,7 +568,7 @@ function ListaAceptadas() {
         <div key={grupo.fecha}>
           <h3 style={estilos.fechaTitulo}>{grupo.fecha}</h3>
           {grupo.items.map(({ solicitud: s, ot }) => {
-            const estado = estadoOt(ot);
+            const estado = estadoOt(s);
             return (
               <TarjetaSolicitud key={s.id} s={s}>
                 <span style={insignia(estado.tono)}>{estado.texto}</span>

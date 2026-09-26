@@ -27,7 +27,7 @@ import { useNavigate } from "react-router-dom";
 import { misOrdenes, listarOrdenes } from "../api/ordenes";
 import { tecnicosDisponibles } from "../api/coordinacion";
 import { obtenerPerfil } from "../api/auth";
-import { agruparPorFecha } from "../utiles/fechas";
+import { agruparPorFecha, formatearFechaOT } from "../utiles/fechas";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, insignia } from "../tema";
 import { AlertTriangle, CalendarClock, Search, X } from "lucide-react";
@@ -145,7 +145,7 @@ function Ordenes() {
     : FILTROS_BASE;
 
   const ordenesFiltradas = busqueda ? ordenes.filter((ot) => coincideBusqueda(ot, busqueda)) : ordenes;
-  const grupos = agruparPorFecha(ordenesFiltradas, (o) => o.fecha_apertura);
+  const grupos = agruparPorFecha(ordenesFiltradas, (o) => o.fecha_apertura, formatearFechaOT);
 
   return (
     <>
@@ -234,18 +234,22 @@ function Ordenes() {
                   son los identificadores con los que se ubica una orden o un
                   equipo puntual. El nombre queda abajo, como dato secundario
                   (mismo criterio que en la lista de Equipos). */}
-                  <p style={estilos.titulo}>
-                    OT-{String(ot.numero_ot).padStart(4, "0")} · {ot.activo_codigo}
-                    {/* Etiqueta de tipo: solo en las preventivas (son la
-                    excepción a "OT normal, por una falla") — así la vista
-                    "Todas" deja ver de un vistazo cuáles son rutina programada. */}
+                  {/* Título y etiqueta de tipo en una misma fila. Si entran,
+                  van uno al lado del otro; si no (pantalla angosta o código
+                  largo), la etiqueta baja sola, alineada a la izquierda.
+                  La etiqueta es solo para preventivas: así la vista "Todas"
+                  deja ver de un vistazo cuáles son rutina programada. */}
+                  <div style={estilos.lineaTitulo}>
+                    <p style={estilos.titulo}>
+                      OT-{String(ot.numero_ot).padStart(4, "0")} · {ot.activo_codigo}
+                    </p>
                     {ot.tipo === "PREVENTIVA" && (
                       <span style={estilos.etiquetaPreventiva}>
                         <CalendarClock size={12} strokeWidth={2.2} aria-hidden="true" />
                         Preventiva
                       </span>
                     )}
-                  </p>
+                  </div>
                   <p style={estilos.codigo}>
                     {ot.activo_descripcion || "Equipo sin descripción"}
                     {ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
@@ -370,16 +374,19 @@ const estilos = {
   // (son identificadores, mismo criterio que el código en la lista de
   // Equipos); el nombre del equipo abajo queda en "codigo" pese al nombre
   // del estilo, como dato secundario.
+  lineaTitulo: {
+    display: "flex", flexWrap: "wrap", alignItems: "center",
+    columnGap: 8, rowGap: 5,
+  },
   titulo: {
     margin: 0, fontSize: "0.95rem", color: color.texto, fontWeight: 700,
     fontFamily: "ui-monospace, monospace",
   },
   etiquetaPreventiva: {
     display: "inline-flex", alignItems: "center", gap: 4,
-    marginLeft: 8, padding: "2px 8px", borderRadius: 999,
+    padding: "2px 8px", borderRadius: 999,
     background: color.primarioClaro, color: color.primarioOscuro,
     fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.02em",
-    verticalAlign: "middle", position: "relative", top: -2,
   },
   codigo: { margin: "3px 0 0", fontSize: "0.85rem", color: color.textoSuave },
   columnaEstado: {

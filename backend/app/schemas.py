@@ -373,10 +373,14 @@ class OrdenTrabajoOut(BaseModel):
     # transcurrido al total en vivo.
     parada_iniciada_en: datetime | None = None
     tiempo_parada_segundos: int = 0
+    iniciada_por: uuid.UUID | None = None
+    iniciada_por_nombre: str | None = None
     model_config = ConfigDict(from_attributes=True)
     activo_descripcion: str | None = None
     activo_ubicacion: str | None = None
     activo_proxima_fecha_mp: date | None = None
+    reportado_por_nombre: str | None = None
+    reportado_por_email: str | None = None
 
 
 class OrdenTrabajoCorrectivaCreate(BaseModel):
@@ -863,6 +867,8 @@ class SolicitudOut(BaseModel):
     ubicacion: str
     estado: str
     ot_id: uuid.UUID | None = None
+    grupo_id: str | None = None
+    ot_asignada: bool = False
     motivo_rechazo: str | None = None
     created_at: datetime | None = None
 
@@ -977,3 +983,16 @@ class CambiarPasswordRequest(BaseModel):
 class MensajeGenerico(BaseModel):
     """Respuesta neutra, sin datos del usuario."""
     mensaje: str
+
+
+# ─── Adjuntos de una solicitud de servicio ───
+class AdjuntoOut(BaseModel):
+    """Datos de un archivo adjunto, SIN el archivo en sí: la lista solo
+    necesita el nombre. El contenido se pide aparte, al tocar el nombre."""
+    id: uuid.UUID
+    nombre_archivo: str
+    tipo_mime: str
+    tamano_bytes: int
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -118,10 +118,10 @@ function Tarjeta({ solicitud: s, tecnicos, grupos, abierta, setAbierta, alResolv
             {/* Equipo médico o "cosa": son circuitos distintos (uno se rutea
             solo por el tipo de equipo, el otro necesita que el coordinador
             elija el grupo). Que se distinga de un vistazo ahorra abrir. */}
-            {s.es_equipo_medico
+            {s.activo_codigo
               ? <HeartPulse size={14} strokeWidth={1.8} aria-hidden="true" />
               : <Wrench size={14} strokeWidth={1.8} aria-hidden="true" />}
-            {s.es_equipo_medico
+            {s.activo_codigo
               ? `${s.activo_codigo || "Equipo sin código"} · ${s.ubicacion || "Sin ubicación"}`
               : `${s.descripcion_cosa || "Sin equipo asociado"} · ${s.ubicacion || "Sin ubicación"}`}
           </p>
@@ -162,7 +162,7 @@ function Tarjeta({ solicitud: s, tecnicos, grupos, abierta, setAbierta, alResolv
 function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
   // Las solicitudes de un equipo médico ya saben su grupo (sale del equipo);
   // las de "cosa" no, así que acá hay que elegirlo antes de poder asignar.
-  const requiereGrupo = !s.es_equipo_medico;
+  const requiereGrupo = !s.activo_codigo;
   const [grupoId, setGrupoId] = useState("");
   const [tecnicoId, setTecnicoId] = useState("");
   const [tecnicosDelGrupo, setTecnicosDelGrupo] = useState(tecnicos);
@@ -208,19 +208,29 @@ function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
     <div style={estilos.panel}>
       <p style={estilos.panelTitulo}>Aceptar y generar la orden de trabajo</p>
 
-      {requiereGrupo && (
-        <>
-          <label style={cs.label}>Grupo</label>
-          <select style={{ ...cs.input, marginBottom: 12 }} value={grupoId}
-                  onChange={(e) => setGrupoId(e.target.value)}>
-            <option value="">Elegir grupo...</option>
-            {grupos.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.descripcion ? `${g.id} — ${g.descripcion}` : g.id}
-              </option>
-            ))}
-          </select>
-        </>
+      {/* Grupo: en una solicitud de equipo ya viene decidido por el tipo de
+      equipo (ej. anestesia → G1), así que se muestra fijo y no se puede
+      cambiar. Solo en las de "cosa" (sin equipo) el coordinador lo elige. */}
+      <label style={cs.label}>Grupo</label>
+      {requiereGrupo ? (
+        <select style={{ ...cs.input, marginBottom: 12 }} value={grupoId}
+                onChange={(e) => setGrupoId(e.target.value)}>
+          <option value="">Elegir grupo...</option>
+          {grupos.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.descripcion ? `${g.id} — ${g.descripcion}` : g.id}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div style={{ ...cs.input, marginBottom: 12, background: color.fondo, color: color.textoSuave }}>
+          {(() => {
+            // Mismo texto que en el desplegable: "G1 — Anestesia".
+            const g = grupos.find((x) => x.id === s.grupo_id);
+            if (!s.grupo_id) return "Sin grupo definido";
+            return g?.descripcion ? `${g.id} — ${g.descripcion}` : s.grupo_id;
+          })()}
+        </div>
       )}
 
       <label style={cs.label}>Asignar a</label>

@@ -145,3 +145,23 @@ def grupos_del_coordinador(db: Session, usuario: Usuario) -> list[str]:
         GrupoTecnico.coordinador_id == usuario.id
     ).all()
     return [g.id for g in grupos]
+
+
+def validar_a_cargo_de_preventiva(current_user: Usuario, orden) -> None:
+    """Si la OT es una preventiva que alguien ya empezó, solo esa persona la
+    puede trabajar (cerrar, checklist, consumos, paradas, correctiva). El resto
+    del grupo la puede ver, pero no modificar.
+
+    Si la preventiva no tiene registro de quién la empezó (todavía está
+    abierta, o es una OT vieja/migrada), no se restringe acá: siguen valiendo
+    los chequeos de grupo de cada endpoint.
+    """
+    if (
+        orden.tipo == "PREVENTIVA"
+        and orden.iniciada_por is not None
+        and orden.iniciada_por != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Esta preventiva la está trabajando otra persona del grupo. Podés verla, pero no modificarla.",
+        )

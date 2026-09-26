@@ -7,13 +7,15 @@
 // En compu el menú es una barra lateral oscura; en celular pasa abajo, como
 // pestañas. Es el mismo componente: solo cambia dónde se dibuja.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { obtenerPerfil, logout } from "../api/auth";
+import { descargarCSV } from "../api/exportar";
+import { toast } from "sonner";
 import { color } from "../tema";
 import {
   QrCode, Inbox, ClipboardList, HeartPulse, Package,
-  CalendarClock, CalendarDays, BarChart3, Bell, Boxes,
+  CalendarClock, CalendarDays, BarChart3, Bell, Boxes, Download,
 } from "lucide-react";
 
 // ─── Qué ve cada rol ──────────────────────────────────────────────────────
@@ -57,6 +59,17 @@ const MENUS = {
   ],
 };
 
+const DESCARGAS = [
+  { texto: "Descargar CSV de activos", ruta: "/exportar/activos", archivo: "equipos",
+    roles: ["tecnico", "coordinacion", "jefatura"] },
+  { texto: "Descargar CSV de órdenes", ruta: "/exportar/ordenes", archivo: "ordenes",
+    roles: ["tecnico", "coordinacion"] },
+  { texto: "Descargar CSV de insumos", ruta: "/exportar/insumos", archivo: "insumos",
+    roles: ["tecnico", "coordinacion", "jefatura"] },
+  { texto: "Descargar CSV de mantenimientos", ruta: "/exportar/mantenimientos", archivo: "mantenimientos",
+    roles: ["tecnico", "coordinacion", "jefatura"] },
+];
+
 function Cascaron() {
   const navegar = useNavigate();
   const ubicacion = useLocation();
@@ -73,6 +86,28 @@ function Cascaron() {
   // 'junior' usa el mismo menú que 'tecnico' (mismos permisos en el backend).
   const rol = perfil?.rol === "junior" ? "tecnico" : perfil?.rol;
   const items = MENUS[rol] || [];
+
+  // Menú de descargas: qué opciones tiene este rol, y si está abierto.
+  const descargas = DESCARGAS.filter((d) => d.roles.includes(rol));
+  const [descargasAbierto, setDescargasAbierto] = useState(false);
+  const cajaDescargas = useRef(null);
+
+  // Si el menú de descargas está abierto y se toca en otro lado, se cierra.
+  useEffect(() => {
+    if (!descargasAbierto) return;
+    function alTocarAfuera(e) {
+      if (cajaDescargas.current && !cajaDescargas.current.contains(e.target)) {
+        setDescargasAbierto(false);
+      }
+    }
+    document.addEventListener("mousedown", alTocarAfuera);
+    return () => document.removeEventListener("mousedown", alTocarAfuera);
+  }, [descargasAbierto]);
+
+  function descargar(d) {
+    setDescargasAbierto(false);
+    descargarCSV(d.ruta, d.archivo).catch(() => toast.error("No se pudo descargar la tabla."));
+  }
 
   function irA(item) {
     if (!item.listo) return;   // las pantallas que faltan no navegan
@@ -120,14 +155,49 @@ function Cascaron() {
 
         {/* ─── Barra de arriba ─── */}
         <header style={estilos.barraArriba}>
-          <div>
-            <p style={estilos.saludo}>
-              {perfil ? `Hola, ${perfil.nombre}!` : "Hola!"}
-            </p>
-            <p style={estilos.rolTexto}>{etiquetaRol(perfil?.rol)}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            {/* En celular no está el menú lateral (que es donde va el logo),
+            así que lo mostramos acá, a la izquierda del saludo. */}
+            {esCelular && (
+              <span style={{ ...estilos.logoChico, width: 38, height: 38, fontSize: "1.05rem", flexShrink: 0 }}>
+                S
+              </span>
+            )}
+            <div>
+              <p style={estilos.saludo}>
+                {perfil ? `Hola, ${perfil.nombre}!` : "Hola!"}
+              </p>
+              <p style={estilos.rolTexto}>{etiquetaRol(perfil?.rol)}</p>
+            </div>
           </div>
 
           <div style={estilos.iconosArriba}>
+            {/* Descargas en CSV: solo aparece si el rol tiene algo para bajar. */}
+            {descargas.length > 0 && (
+              <div ref={cajaDescargas} style={{ position: "relative" }}>
+                <button
+                  style={estilos.iconoBoton}
+                  title="Descargar tablas"
+                  onClick={() => setDescargasAbierto(!descargasAbierto)}
+                >
+                  <Icono nombre="descargar" color={color.textoSuave} />
+                </button>
+                {descargasAbierto && (
+                  <div style={estilos.menuDescargas}>
+                    {descargas.map((d) => (
+                      <button
+                        key={d.ruta}
+                        className="sy-clickeable"
+                        style={estilos.opcionDescarga}
+                        onClick={() => descargar(d)}
+                      >
+                        {d.texto}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <button style={estilos.iconoBoton} title="Notificaciones">
               <Icono nombre="campana" color={color.textoSuave} />
             </button>
@@ -159,10 +229,10 @@ function Cascaron() {
               onClick={() => irA(item)}
               style={{
                 ...estilos.itemAbajo,
-                color: activo(item) ? color.primario : color.textoSuave,
+                color: activo(item) ? "#fff" : color.lateralTexto,
               }}
             >
-              <Icono nombre={item.icono} color={activo(item) ? color.primario : color.textoSuave} />
+              <Icono nombre={item.icono} color={activo(item) ? "#fff" : color.lateralTexto} />
               <span style={{ fontSize: "0.65rem" }}>{item.texto}</span>
             </div>
           ))}
@@ -219,6 +289,7 @@ const ICONOS = {
   grafico: BarChart3,
   campana: Bell,
   catalogos: Boxes,
+  descargar: Download,
 };
 
 function Icono({ nombre, color: c = "currentColor" }) {
@@ -272,6 +343,16 @@ const estilos = {
   saludo: { margin: 0, fontSize: "1.4rem", color: color.texto, fontWeight: 700 },
   rolTexto: { margin: "3px 0 0", fontSize: "0.88rem", color: color.textoSuave },
   iconosArriba: { display: "flex", alignItems: "center", gap: 12 },
+  menuDescargas: {
+    position: "absolute", top: "100%", right: 0, marginTop: 4, zIndex: 30,
+    background: color.tarjeta, border: `1px solid ${color.borde}`, borderRadius: 10,
+    boxShadow: "0 6px 20px rgba(15,20,30,0.12)", padding: 4, minWidth: 220,
+  },
+  opcionDescarga: {
+    display: "block", width: "100%", background: "transparent", border: "none",
+    borderRadius: 8, cursor: "pointer", padding: "9px 12px", fontSize: "0.88rem",
+    color: color.texto, fontFamily: "inherit", textAlign: "left", whiteSpace: "nowrap",
+  },
   iconoBoton: {
     background: "transparent", border: "none", cursor: "pointer",
     padding: 9, borderRadius: 10, display: "flex",
@@ -284,12 +365,15 @@ const estilos = {
   },
   barraAbajo: {
     position: "fixed", bottom: 0, left: 0, right: 0,
-    background: color.tarjeta, borderTop: `1px solid ${color.borde}`,
+    background: color.lateral, borderTop: `1px solid ${color.lateral}`,
     display: "flex", padding: "8px 0 12px", zIndex: 10,
   },
   itemAbajo: {
     flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
     gap: 3, cursor: "pointer",
+    // Si el texto se parte en dos renglones (ej. "Calendario MP"), que
+    // queden centrados bajo el ícono y no alineados a la izquierda.
+    textAlign: "center",
   },
 };
 

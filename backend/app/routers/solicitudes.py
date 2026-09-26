@@ -13,7 +13,7 @@ quienes usan los equipos, a diferencia de "tecnico", que los repara).
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -145,10 +145,14 @@ def solicitudes_pendientes(
         if s.activo_codigo:
             grupo = _grupo_de_activo(db, s.activo_codigo)
             if grupo in mis_grupos:
-                resultado.append(s)
+                # Mandamos el grupo ya resuelto, así la pantalla lo muestra
+                # fijo y el coordinador no tiene que elegirlo.
+                salida = SolicitudOut.model_validate(s)
+                salida.grupo_id = grupo
+                resultado.append(salida)
         else:
             # solicitud de 'cosa': sin grupo deducible, la ven todos los coord.
-            resultado.append(s)
+            resultado.append(SolicitudOut.model_validate(s))
     return resultado
 
 
@@ -386,3 +390,86 @@ def modificar_solicitud(
     db.commit()
     db.refresh(sol)
     return sol
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ADJUNTOS (POST) — fotos o PDFs que suma quien hizo la solicitud
+# ═══════════════════════════════════════════════════════════════════════════
+
+import os
+from ..models import AdjuntoSolicitud
+from ..schemas import AdjuntoOut
+
+MAX_ADJUNTOS = 5                    # por solicitud
+MAX_BYTES = 10 * 1024 * 1024        # 10 MB por archivo
+
+# Tipos permitidos, según la extensión del archivo. Guardamos el tipo a partir
+# de la extensión (y no del que manda el navegador) porque con las HEIC del
+# celular algunos navegadores no mandan ninguno.
+TIPOS_PERMITIDOS = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    ".pdf": "application/pdf",
+}
+
+
+@router.post("/{solicitud_id}/adjuntos", response_model=list[AdjuntoOut], status_code=201)
+def subir_adjuntos(
+    solicitud_id: str,
+    archivos: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("enfermeria")),
+):
+    """Adjuntar fotos (JPG, PNG, HEIC) o PDFs a una solicitud.
+
+    Solo lo puede hacer quien creó la solicitud. Máximo 5 archivos por
+    solicitud y 10 MB cada uno. Si algún archivo no cumple, no se guarda
+    ninguno: así no queda la mitad subida.
+    """
+    sol = db.query(SolicitudServicio).filter(SolicitudServicio.id == solicitud_id).first()
+    if sol is None:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if sol.solicitante_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Solo podés adjuntar archivos a tus propias solicitudes.")
+
+    ya_tiene = db.query(AdjuntoSolicitud).filter(AdjuntoSolicitud.solicitud_id == sol.id).count()
+    if ya_tiene + len(archivos) > MAX_ADJUNTOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Se pueden adjuntar hasta {MAX_ADJUNTOS} archivos por solicitud.",
+        )
+
+    # Primero se revisan TODOS; recién si están todos bien, se guardan.
+    nuevos = []
+    for archivo in archivos:
+        nombre = archivo.filename or "archivo"
+        extension = os.path.splitext(nombre)[1].lower()
+        if extension not in TIPOS_PERMITIDOS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{nombre}' no es un tipo permitido. Solo JPG, PNG, HEIC o PDF.",
+            )
+        # Leemos un byte de más: si llega a leerlo, el archivo supera el límite.
+        contenido = archivo.file.read(MAX_BYTES + 1)
+        if len(contenido) > MAX_BYTES:
+            raise HTTPException(status_code=400, detail=f"'{nombre}' pesa más de 10 MB.")
+        if len(contenido) == 0:
+            raise HTTPException(status_code=400, detail=f"'{nombre}' está vacío.")
+
+        nuevos.append(AdjuntoSolicitud(
+            solicitud_id=sol.id,
+            nombre_archivo=nombre,
+            tipo_mime=TIPOS_PERMITIDOS[extension],
+            tamano_bytes=len(contenido),
+            contenido=contenido,
+            subido_por=current_user.id,
+        ))
+
+    db.add_all(nuevos)
+    db.commit()
+    for adjunto in nuevos:
+        db.refresh(adjunto)
+    return nuevos

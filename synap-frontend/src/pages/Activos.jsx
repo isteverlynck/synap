@@ -7,9 +7,11 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, SlidersHorizontal, X, Plus } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus, Download } from "lucide-react";
 import { listarActivos, opcionesDeFiltro } from "../api/activos";
 import { rolActual } from "../api/auth";
+import { descargarCSV } from "../api/exportar";
+import { toast } from "sonner";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, tonoEstadoActivo } from "../tema";
 
@@ -20,6 +22,7 @@ const PUEDE_CREAR = ["coordinacion", "tecnico", "junior", "jefatura"];
 function Activos() {
   const navegar = useNavigate();
   const puedeCrear = PUEDE_CREAR.includes(rolActual());
+  const PUEDE_DESCARGAR = ["coordinacion", "tecnico", "jefatura"];
   const [activos, setActivos] = useState([]);
   const [opciones, setOpciones] = useState({ tipos: [], sectores: [], grupos: [], estados: [] });
   const [cargando, setCargando] = useState(true);
@@ -74,6 +77,7 @@ function Activos() {
           Escanear equipo (QR)
         </button>
       </Encabezado>
+      
 
       {/* ─── Buscador ─── */}
       <div style={estilos.barraBusqueda}>

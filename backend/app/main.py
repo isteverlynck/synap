@@ -20,7 +20,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock, checklists, planes_mantenimiento, dashboard, solicitudes, preventivas, usuarios
+from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock, checklists, planes_mantenimiento, dashboard, exportar, solicitudes, preventivas, usuarios
 from .scheduler import iniciar_scheduler, detener_scheduler
 
 
@@ -75,6 +75,7 @@ app.include_router(dashboard.router)
 app.include_router(solicitudes.router)
 app.include_router(preventivas.router)
 app.include_router(usuarios.router)
+app.include_router(exportar.router)
 
 
 @app.get("/health", tags=["health"])
