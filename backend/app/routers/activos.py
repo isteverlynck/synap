@@ -86,8 +86,16 @@ def opciones_de_filtro(
         (a.estado or "").strip() for a in db.query(Activo.estado).all() if a.estado
     })
 
+    # A qué grupo técnico pertenece cada tipo de equipo (tabla de enlace
+    # grupo_tipo_equipo). Va adentro de cada tipo para que el frontend pueda
+    # filtrar "Tipo de equipo" en cascada cuando ya se eligió un "Grupo
+    # técnico" (si no, quedan mezclados tipos de otros grupos).
+    grupo_por_tipo = {
+        r.tipo_equipo_id: r.grupo_id for r in db.query(GrupoTipoEquipo).all()
+    }
+
     tipos = [
-        {"id": t.id, "nombre": t.nombre}
+        {"id": t.id, "nombre": t.nombre, "grupo_id": grupo_por_tipo.get(t.id)}
         for t in db.query(TipoEquipo).order_by(TipoEquipo.nombre).all()
         if t.id in tipos_usados
     ]
