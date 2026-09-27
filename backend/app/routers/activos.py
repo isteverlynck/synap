@@ -7,7 +7,16 @@ from sqlalchemy import or_
 
 from ..database import get_db
 from ..models import Activo, Usuario, GrupoTipoEquipo, GrupoTecnico, Usuario, TipoEquipo, Servicio, PlantillaMP
-from ..schemas import ActivoOut, ActivoDetalle, ActivoCreate, ResponsableOut
+from ..schemas import (
+    ActivoOut,
+    ActivoDetalle,
+    ActivoCreate,
+    ResponsableOut,
+    TipoEquipoCreate,
+    TipoEquipoOut,
+    ServicioCreate,
+    ServicioOut,
+)
 from ..security import get_current_user, requiere_rol, grupos_del_coordinador
 
 router = APIRouter(prefix="/activos", tags=["activos"])
@@ -117,6 +126,55 @@ def catalogos_para_alta(
         for s in db.query(Servicio).order_by(Servicio.nombre).all()
     ]
     return {"tipos": tipos, "sectores": sectores}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ALTA DE TIPO DE EQUIPO Y SERVICIO (POST) — Catalogos.jsx ya los llamaba
+# (crearTipoEquipo/crearServicio en api/activos.js) pero el backend nunca
+# tuvo estas dos rutas: el botón "Nuevo tipo de equipo"/"Nuevo servicio"
+# devolvía 404. Encontrado al revisar Catálogos para agregar el glosario de
+# siglas de ubicación.
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/tipos-equipo", response_model=TipoEquipoOut, status_code=201)
+def crear_tipo_equipo(
+    payload: TipoEquipoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Dar de alta un tipo de equipo nuevo en el catálogo (ej: llegó un robot
+    quirúrgico y no había un tipo para eso todavía)."""
+    existente = db.query(TipoEquipo).filter(TipoEquipo.id == payload.id).first()
+    if existente:
+        raise HTTPException(status_code=400, detail=f"Ya existe un tipo de equipo con el código '{payload.id}'.")
+    tipo = TipoEquipo(id=payload.id, nombre=payload.nombre, descripcion=payload.descripcion)
+    db.add(tipo)
+    db.commit()
+    db.refresh(tipo)
+    return tipo
+
+
+@router.post("/servicios", response_model=ServicioOut, status_code=201)
+def crear_servicio(
+    payload: ServicioCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Dar de alta un servicio/área nueva del hospital (ej: se abrió un
+    sector nuevo y todavía no está en el catálogo)."""
+    existente = db.query(Servicio).filter(Servicio.id == payload.id).first()
+    if existente:
+        raise HTTPException(status_code=400, detail=f"Ya existe un servicio con el código '{payload.id}'.")
+    servicio = Servicio(
+        id=payload.id,
+        nombre=payload.nombre,
+        centro_costos=payload.centro_costos,
+        descripcion=payload.descripcion,
+    )
+    db.add(servicio)
+    db.commit()
+    db.refresh(servicio)
+    return servicio
 
 
 @router.post("", response_model=ActivoOut, status_code=201)

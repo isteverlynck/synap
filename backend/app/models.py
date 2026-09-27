@@ -669,3 +669,28 @@ class AdjuntoSolicitud(Base):
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
     )
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SiglaUbicacion(Base):
+    """Glosario de siglas que aparecen en un código de ubicación (o de
+    equipo) — ej: la sigla "IMAG" significa "Imágenes", "RMG" significa
+    "Resonancia Magnética", "E01" significa "Edificio 1", "1SS" significa
+    "Primer subsuelo". Un código como E01-1SS-IMAG-RMG se arma concatenando
+    siglas como estas con guiones.
+
+    No hay una tabla de "códigos de ubicación" completos: ubicacion sigue
+    siendo texto libre en Activo (no todos los equipos van a tener un código
+    tan estructurado). Esto es solo el diccionario sigla → significado, para
+    poder decodificar cualquier código (de ubicación o de equipo) en un
+    cartelito al pasar el mouse, sin tener que cargar cada combinación.
+    """
+    __tablename__ = "siglas_ubicacion"
+
+    # La sigla tal cual aparece en el código (ej: "IMAG"). Es el id porque no
+    # puede haber dos significados distintos para la misma sigla.
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String, nullable=False)  # ej: "Imágenes"
+    # Solo para organizar el catálogo en pantalla (ej: "Edificio",
+    # "Piso/Subsuelo", "Área", "Sala") — no afecta la decodificación.
+    categoria: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)

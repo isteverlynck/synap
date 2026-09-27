@@ -9,9 +9,9 @@
 // stock a mano SÍ lo puede hacer cualquiera que llegue a esta pantalla
 // (técnico, junior, coordinación, jefatura) — es el trabajo del día a día.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, History } from "lucide-react";
 import {
   listarInsumos, crearInsumo, alertasDeStock, registrarPedidoCompra,
   recibirCompra, listarCompras, registrarAjuste, listarMovimientos,
@@ -42,7 +42,9 @@ function Stock() {
   const [error, setError] = useState("");
   const [modalNuevo, setModalNuevo] = useState(false);
   const [movimientos, setMovimientos] = useState([]);
+  const [cargandoMovimientos, setCargandoMovimientos] = useState(true);
   const [tipoFiltro, setTipoFiltro] = useState("");
+  const historialRef = useRef(null);
 
   function cargarInsumos() {
     setCargando(true);
@@ -58,7 +60,15 @@ function Stock() {
   useEffect(cargarInsumos, [soloAlertas]);
 
   function cargarMovimientos() {
-    listarMovimientos().then(setMovimientos).catch(() => {});
+    setCargandoMovimientos(true);
+    listarMovimientos()
+      .then(setMovimientos)
+      .catch(() => {})
+      .finally(() => setCargandoMovimientos(false));
+  }
+
+  function irAlHistorial() {
+    historialRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   useEffect(cargarMovimientos, []);
@@ -100,6 +110,19 @@ function Stock() {
     return i.tipo_equipo_id === tipoFiltro;
   });
 
+  // El desplegable NO usa el catálogo completo de tipos de equipo (ese es el
+  // mismo de Activos y tiene equipos que ningún insumo usa todavía) — solo
+  // los tipos que ya tienen al menos un insumo cargado, para que la lista sea
+  // corta y relevante. Se calcula sobre todosInsumos (no sobre "insumos",
+  // que puede estar recortado por el toggle de alertas) para que las
+  // opciones no cambien según si estás viendo "solo alertas" o no.
+  const tiposConInsumos = tipos.filter((t) => todosInsumos.some((i) => i.tipo_equipo_id === t.id));
+  const hayInsumosSinTipo = todosInsumos.some((i) => !i.tipo_equipo_id);
+  const opcionesFiltroTipo = [
+    ...tiposConInsumos,
+    ...(hayInsumosSinTipo ? [{ id: SIN_TIPO, nombre: "Sin tipo específico" }] : []),
+  ];
+
   function nombrePorId(id) {
     const ins = todosInsumos.find((x) => x.id === id);
     return ins ? ins.nombre : "Insumo";
@@ -127,16 +150,27 @@ function Stock() {
         )}
       </Encabezado>
 
-      <div style={estilos.barraFiltro}>
-        <Filtro
-          etiqueta="Tipo de insumo"
-          valor={tipoFiltro}
-          onChange={setTipoFiltro}
-          opciones={[...tipos, { id: SIN_TIPO, nombre: "Sin tipo específico" }]}
-        />
+      <div style={estilos.barraFiltroFila}>
+        <div style={estilos.barraFiltro}>
+          <Filtro
+            etiqueta="Tipo de insumo"
+            valor={tipoFiltro}
+            onChange={setTipoFiltro}
+            opciones={opcionesFiltroTipo}
+          />
+        </div>
+        <button style={{ ...boton("secundario"), gap: 7 }} onClick={irAlHistorial}>
+          <History size={16} strokeWidth={1.9} aria-hidden="true" />
+          Ver historial
+        </button>
       </div>
 
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
+
+      {/* Mientras carga, un mensaje propio en vez de dejar el hueco en blanco
+      — así no da la sensación de que lo único que "llegó" es el historial
+      de más abajo. */}
+      {cargando && <p style={estilos.mensaje}>Cargando insumos...</p>}
 
       {!cargando && !error && insumosFiltrados.length === 0 && (
         <p style={estilos.mensaje}>
@@ -146,19 +180,27 @@ function Stock() {
         </p>
       )}
 
-      <div style={estilos.lista}>
-        {insumosFiltrados.map((i) => (
-          <InsumoCard
-            key={i.id}
-            insumo={i}
-            onPedidoRegistrado={alCambiarStock}
-            onRecibida={() => marcarRecibida(i.id)}
-            onAjusteRegistrado={alCambiarStock}
-          />
-        ))}
-      </div>
+      {!cargando && (
+        <div style={estilos.lista}>
+          {insumosFiltrados.map((i) => (
+            <InsumoCard
+              key={i.id}
+              insumo={i}
+              onPedidoRegistrado={alCambiarStock}
+              onRecibida={() => marcarRecibida(i.id)}
+              onAjusteRegistrado={alCambiarStock}
+            />
+          ))}
+        </div>
+      )}
 
-      <MovimientosHistorial movimientos={movimientos} nombrePorId={nombrePorId} unidadPorId={unidadPorId} />
+      <MovimientosHistorial
+        innerRef={historialRef}
+        movimientos={movimientos}
+        cargando={cargandoMovimientos}
+        nombrePorId={nombrePorId}
+        unidadPorId={unidadPorId}
+      />
 
       {modalNuevo && (
         <ModalNuevoInsumo tipos={tipos} onCancelar={() => setModalNuevo(false)} onCreado={alCrearInsumo} />
@@ -184,6 +226,18 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
   const [motivoAjuste, setMotivoAjuste] = useState("");
   const [enviandoAjuste, setEnviandoAjuste] = useState(false);
   const [errorAjuste, setErrorAjuste] = useState("");
+
+  function cancelarPedido() {
+    setPidiendo(false);
+    setError("");
+    setCantidad(""); setProveedor(""); setNumeroOrden("");
+  }
+
+  function cancelarAjuste() {
+    setAjustando(false);
+    setErrorAjuste("");
+    setCantidadAjuste(""); setMotivoAjuste("");
+  }
 
   async function confirmarPedido() {
     const cant = Number(cantidad);
@@ -268,13 +322,17 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
             </button>
           </>
         ) : (
-          <button style={boton("secundario")} onClick={() => setPidiendo((v) => !v)}>
-            {pidiendo ? "Cancelar" : "Registrar pedido de compra"}
+          !pidiendo && (
+            <button style={boton("secundario")} onClick={() => setPidiendo(true)}>
+              Registrar pedido de compra
+            </button>
+          )
+        )}
+        {!ajustando && (
+          <button style={boton("secundario")} onClick={() => setAjustando(true)}>
+            Ajustar stock
           </button>
         )}
-        <button style={boton("secundario")} onClick={() => setAjustando((v) => !v)}>
-          {ajustando ? "Cancelar" : "Ajustar stock"}
-        </button>
       </div>
 
       {pidiendo && (
@@ -300,9 +358,14 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
             onChange={(e) => setNumeroOrden(e.target.value)}
           />
           {error && <p style={estilos.error}>{error}</p>}
-          <button style={boton("primario")} onClick={confirmarPedido} disabled={enviando}>
-            {enviando ? "Registrando..." : "Confirmar pedido"}
-          </button>
+          <div style={estilos.filaBotonesForm}>
+            <button style={boton("primario")} onClick={confirmarPedido} disabled={enviando}>
+              {enviando ? "Registrando..." : "Confirmar pedido"}
+            </button>
+            <button style={boton("secundario")} onClick={cancelarPedido} disabled={enviando}>
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
@@ -333,9 +396,14 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
             onChange={(e) => setMotivoAjuste(e.target.value)}
           />
           {errorAjuste && <p style={estilos.error}>{errorAjuste}</p>}
-          <button style={boton("primario")} onClick={confirmarAjuste} disabled={enviandoAjuste}>
-            {enviandoAjuste ? "Registrando..." : "Confirmar ajuste"}
-          </button>
+          <div style={estilos.filaBotonesForm}>
+            <button style={boton("primario")} onClick={confirmarAjuste} disabled={enviandoAjuste}>
+              {enviandoAjuste ? "Registrando..." : "Confirmar ajuste"}
+            </button>
+            <button style={boton("secundario")} onClick={cancelarAjuste} disabled={enviandoAjuste}>
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -344,11 +412,13 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
 
 // ─── Historial unificado: compras recibidas + consumos + ajustes, todo junto ───
 
-function MovimientosHistorial({ movimientos, nombrePorId, unidadPorId }) {
+function MovimientosHistorial({ innerRef, movimientos, cargando, nombrePorId, unidadPorId }) {
   return (
-    <div style={estilos.tarjetaHistorial}>
+    <div style={estilos.tarjetaHistorial} ref={innerRef}>
       <p style={estilos.panelTitulo}>Historial de movimientos</p>
-      {movimientos.length === 0 ? (
+      {cargando ? (
+        <p style={estilos.mensaje}>Cargando movimientos...</p>
+      ) : movimientos.length === 0 ? (
         <p style={estilos.mensaje}>Todavía no hay movimientos de stock registrados.</p>
       ) : (
         <div style={estilos.lista}>
@@ -523,7 +593,11 @@ const estilos = {
   mensaje: { color: color.textoSuave, padding: "14px 0", lineHeight: 1.6 },
   error: { fontSize: "0.85rem", color: color.peligro, margin: "8px 0" },
   lista: { display: "flex", flexDirection: "column", gap: 10 },
-  barraFiltro: { maxWidth: 240, marginBottom: 14 },
+  barraFiltroFila: {
+    display: "flex", alignItems: "flex-end", justifyContent: "space-between",
+    gap: 12, marginBottom: 14, flexWrap: "wrap",
+  },
+  barraFiltro: { maxWidth: 240, flex: 1, minWidth: 180 },
   tarjeta: { ...cs.tarjeta, padding: "14px 18px" },
   filaPrincipal: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   nombre: { fontSize: "0.92rem", color: color.texto, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 },
@@ -537,6 +611,7 @@ const estilos = {
   formPedido: {
     marginTop: 12, paddingTop: 12, borderTop: `1px solid ${color.bordeSuave}`,
   },
+  filaBotonesForm: { display: "flex", gap: 10 },
   tarjetaHistorial: { ...cs.tarjeta, padding: 18, marginTop: 20 },
   panelTitulo: { margin: "0 0 12px", fontSize: "0.95rem", fontWeight: 700, color: color.texto },
   filaHistorial: {

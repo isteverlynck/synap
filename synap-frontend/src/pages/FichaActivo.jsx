@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { logout, rolActual } from "../api/auth";
-import { verActivoDetalle } from "../api/activos";
+import { verActivoDetalle, catalogosParaAlta } from "../api/activos";
+import { listarSiglas } from "../api/catalogos";
 import Encabezado from "../componentes/Encabezado";
+import CodigoConGlosario from "../componentes/CodigoConGlosario";
+import { armarDiccionarioSiglas } from "../utiles/codigos";
 import { color, cs, boton, insignia, estadoDelEquipo } from "../tema";
 import Volver from "../componentes/Volver";
 import { diasHasta, parsearFecha, formatearFechaOT } from "../utiles/fechas";
@@ -18,6 +21,7 @@ function FichaActivo() {
   const [error, setError] = useState("");
   const [programando, setProgramando] = useState(false);
   const [avisoRestringido, setAvisoRestringido] = useState(false);
+  const [diccionarioSiglas, setDiccionarioSiglas] = useState({});
 
   async function programarMP() {
     if (programando) return;
@@ -41,6 +45,14 @@ function FichaActivo() {
       .catch(() => setError(`No encontramos el equipo "${codigo}".`))
       .finally(() => setCargando(false));
   }, [codigo]);
+
+  // Glosario para el cartelito del código/ubicación al pasar el mouse — no
+  // bloquea la carga de la ficha si falla, es solo un extra.
+  useEffect(() => {
+    Promise.all([listarSiglas(), catalogosParaAlta()])
+      .then(([siglas, cat]) => setDiccionarioSiglas(armarDiccionarioSiglas(siglas, cat.tipos)))
+      .catch(() => {});
+  }, []);
 
   function cerrarSesion() {
     logout();
@@ -90,7 +102,9 @@ function FichaActivo() {
         <AvisoEstado situacion={situacion} />
 
         <h2 style={estilos.nombreEquipo}>{activo.descripcion}</h2>
-        <p style={estilos.codigo}>{activo.codigo}</p>
+        <p style={estilos.codigo}>
+          <CodigoConGlosario codigo={activo.codigo} diccionario={diccionarioSiglas} />
+        </p>
 
         {rol === "coordinacion" && activo.proxima_fecha_mp && !activo.frecuencia_mp_meses && (
           <div style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12 }}>
@@ -111,7 +125,12 @@ function FichaActivo() {
 
         <div style={estilos.tarjetaDatos}>
           <Dato etiqueta="Marca y modelo" valor={[activo.marca, activo.modelo].filter(Boolean).join(" ") || "—"} />
-          <Dato etiqueta="Ubicación" valor={activo.ubicacion || "—"} />
+          <Dato
+            etiqueta="Ubicación"
+            valor={activo.ubicacion
+              ? <CodigoConGlosario codigo={activo.ubicacion} diccionario={diccionarioSiglas} />
+              : "—"}
+          />
           <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
           <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
         </div>

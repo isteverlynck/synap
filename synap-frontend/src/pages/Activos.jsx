@@ -9,10 +9,13 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, SlidersHorizontal, X, Plus, Download } from "lucide-react";
 import { listarActivos, opcionesDeFiltro } from "../api/activos";
+import { listarSiglas } from "../api/catalogos";
 import { rolActual } from "../api/auth";
 import { descargarCSV } from "../api/exportar";
 import { toast } from "sonner";
 import Encabezado from "../componentes/Encabezado";
+import CodigoConGlosario from "../componentes/CodigoConGlosario";
+import { armarDiccionarioSiglas } from "../utiles/codigos";
 import { color, cs, boton, insignia, tonoEstadoActivo } from "../tema";
 
 // Quién puede dar de alta un equipo nuevo. Enfermería no: para ellos "Activos"
@@ -25,6 +28,7 @@ function Activos() {
   const PUEDE_DESCARGAR = ["coordinacion", "tecnico", "jefatura"];
   const [activos, setActivos] = useState([]);
   const [opciones, setOpciones] = useState({ tipos: [], sectores: [], grupos: [], estados: [] });
+  const [siglas, setSiglas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [verFiltros, setVerFiltros] = useState(false);
@@ -37,7 +41,12 @@ function Activos() {
 
   useEffect(() => {
     opcionesDeFiltro().then(setOpciones).catch(() => {});
+    listarSiglas().then(setSiglas).catch(() => {});
   }, []);
+
+  // Diccionario sigla → significado para el cartelito de código/ubicación
+  // (glosario de siglas + tipos de equipo, que ya trae su propio nombre).
+  const diccionarioSiglas = armarDiccionarioSiglas(siglas, opciones.tipos);
 
   // Esperamos 350 ms sin que teclee antes de buscar. Es lo que hace que se
   // sienta instantáneo sin castigar al servidor con una consulta por letra.
@@ -166,8 +175,13 @@ function Activos() {
               ubica un equipo puntual (QR, etiqueta física) y con el que está
               ordenada la lista. El nombre queda abajo, como dato secundario. */}
               <div style={estilos.codigo}>
-                {a.codigo}
-                {a.ubicacion ? ` · ${a.ubicacion}` : ""}
+                <CodigoConGlosario codigo={a.codigo} diccionario={diccionarioSiglas} />
+                {a.ubicacion && (
+                  <>
+                    {" · "}
+                    <CodigoConGlosario codigo={a.ubicacion} diccionario={diccionarioSiglas} />
+                  </>
+                )}
               </div>
               <div style={estilos.descripcion}>{a.descripcion}</div>
               {(a.marca || a.modelo) && (

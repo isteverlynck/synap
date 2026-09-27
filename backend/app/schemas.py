@@ -985,6 +985,36 @@ class MensajeGenerico(BaseModel):
     mensaje: str
 
 
+# ─── Glosario de siglas (para decodificar códigos de ubicación y de equipo) ───
+class SiglaUbicacionCreate(BaseModel):
+    """Dar de alta una sigla nueva en el glosario (ej: id='IMAG',
+    nombre='Imágenes'). Mismo formato de código que tipos de equipo/servicios."""
+    id: str
+    nombre: str
+    categoria: str | None = None
+
+    @field_validator("id")
+    @classmethod
+    def _validar_id(cls, v: str) -> str:
+        return _validar_id_catalogo(v)
+
+    @field_validator("nombre")
+    @classmethod
+    def _validar_nombre(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Indicá el significado de la sigla.")
+        return v
+
+
+class SiglaUbicacionOut(BaseModel):
+    id: str
+    nombre: str
+    categoria: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ─── Adjuntos de una solicitud de servicio ───
 class AdjuntoOut(BaseModel):
     """Datos de un archivo adjunto, SIN el archivo en sí: la lista solo

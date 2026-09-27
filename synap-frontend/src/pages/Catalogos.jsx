@@ -16,8 +16,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Boxes, Building2 } from "lucide-react";
+import { Plus, Boxes, Building2, MapPinned } from "lucide-react";
 import { catalogosParaAlta, crearTipoEquipo, crearServicio } from "../api/activos";
+import { listarSiglas, crearSigla } from "../api/catalogos";
 import { rolActual } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton } from "../tema";
@@ -27,15 +28,19 @@ const PUEDE_CREAR = ["coordinacion", "jefatura"];
 function Catalogos() {
   const puedeCrear = PUEDE_CREAR.includes(rolActual());
   const [catalogos, setCatalogos] = useState({ tipos: [], sectores: [] });
+  const [siglas, setSiglas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [modal, setModal] = useState(""); // "" | "tipo" | "servicio"
+  const [modal, setModal] = useState(""); // "" | "tipo" | "servicio" | "sigla"
 
   function cargar() {
     setCargando(true);
     setError("");
-    catalogosParaAlta()
-      .then(setCatalogos)
+    Promise.all([catalogosParaAlta(), listarSiglas()])
+      .then(([cat, sig]) => {
+        setCatalogos(cat);
+        setSiglas(sig);
+      })
       .catch(() => setError("No se pudieron cargar los catálogos."))
       .finally(() => setCargando(false));
   }
@@ -49,7 +54,7 @@ function Catalogos() {
 
   return (
     <>
-      <Encabezado titulo="Catálogos" subtitulo="Tipos de equipo y servicios/áreas del hospital" />
+      <Encabezado titulo="Catálogos" subtitulo="Tipos de equipo, servicios/áreas y glosario de siglas del hospital" />
 
       {error && <p style={estilos.error}>{error}</p>}
 
@@ -74,6 +79,17 @@ function Catalogos() {
           onNuevo={() => setModal("servicio")}
           textoNuevo="Nuevo servicio"
         />
+        <Seccion
+          icono={<MapPinned size={18} strokeWidth={1.9} color={color.primario} aria-hidden="true" />}
+          titulo="Glosario de siglas"
+          ayuda='Qué significa cada sigla de un código de ubicación o de equipo (ej: "IMAG" = Imágenes, "RMG" = Resonancia Magnética). Al pasar el mouse sobre un código en otras pantallas, se arma el cartelito con esto.'
+          items={siglas}
+          cargando={cargando}
+          puedeCrear={puedeCrear}
+          onNuevo={() => setModal("sigla")}
+          textoNuevo="Nueva sigla"
+          mostrarCategoria
+        />
       </div>
 
       {modal && (
@@ -83,7 +99,7 @@ function Catalogos() {
   );
 }
 
-function Seccion({ icono, titulo, ayuda, items, cargando, puedeCrear, onNuevo, textoNuevo }) {
+function Seccion({ icono, titulo, ayuda, items, cargando, puedeCrear, onNuevo, textoNuevo, mostrarCategoria }) {
   return (
     <div style={estilos.tarjeta}>
       <div style={estilos.seccionCabecera}>
@@ -113,6 +129,9 @@ function Seccion({ icono, titulo, ayuda, items, cargando, puedeCrear, onNuevo, t
             <div key={it.id} style={estilos.item}>
               <span style={estilos.itemCodigo}>{it.id}</span>
               <span style={estilos.itemNombre}>{it.nombre}</span>
+              {mostrarCategoria && it.categoria && (
+                <span style={estilos.itemCategoria}>{it.categoria}</span>
+              )}
             </div>
           ))}
         </div>
@@ -126,9 +145,11 @@ function Seccion({ icono, titulo, ayuda, items, cargando, puedeCrear, onNuevo, t
 function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
   const navegar = useNavigate();
   const esServicio = variante === "servicio";
+  const esSigla = variante === "sigla";
   const [id, setId] = useState("");
   const [nombre, setNombre] = useState("");
   const [centroCostos, setCentroCostos] = useState("");
+  const [categoria, setCategoria] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -137,28 +158,39 @@ function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
   // el modal de una, preguntar si quiere armarle el checklist ahora mismo.
   const [tipoRecienCreado, setTipoRecienCreado] = useState(null);
 
+  const titulo = esServicio ? "Nuevo servicio / área" : esSigla ? "Nueva sigla" : "Nuevo tipo de equipo";
+
   async function crear() {
     setError("");
     if (!id.trim()) return setError("Indicá el código.");
-    if (!nombre.trim()) return setError("Indicá el nombre.");
+    if (!nombre.trim()) return setError(esSigla ? "Indicá qué significa." : "Indicá el nombre.");
     if (esServicio && !centroCostos.trim()) return setError("Indicá el centro de costos.");
 
     setEnviando(true);
     try {
-      const creado = esServicio
-        ? await crearServicio({
-            id: id.trim(),
-            nombre: nombre.trim(),
-            centro_costos: centroCostos.trim(),
-            descripcion: descripcion.trim() || null,
-          })
-        : await crearTipoEquipo({
-            id: id.trim(),
-            nombre: nombre.trim(),
-            descripcion: descripcion.trim() || null,
-          });
-            toast.success(`${esServicio ? "Servicio" : "Tipo de equipo"} creado: ${creado.id} — ${creado.nombre}`);
+      let creado;
       if (esServicio) {
+        creado = await crearServicio({
+          id: id.trim(),
+          nombre: nombre.trim(),
+          centro_costos: centroCostos.trim(),
+          descripcion: descripcion.trim() || null,
+        });
+      } else if (esSigla) {
+        creado = await crearSigla({
+          id: id.trim(),
+          nombre: nombre.trim(),
+          categoria: categoria.trim() || null,
+        });
+      } else {
+        creado = await crearTipoEquipo({
+          id: id.trim(),
+          nombre: nombre.trim(),
+          descripcion: descripcion.trim() || null,
+        });
+      }
+      toast.success(`${esServicio ? "Servicio" : esSigla ? "Sigla" : "Tipo de equipo"} creado: ${creado.id} — ${creado.nombre}`);
+      if (esServicio || esSigla) {
         onCreado();
       } else {
         setTipoRecienCreado(creado);
@@ -200,18 +232,20 @@ function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
   return (
     <div style={estilos.overlay} onClick={onCancelar}>
       <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
-        <p style={estilos.modalTitulo}>{esServicio ? "Nuevo servicio / área" : "Nuevo tipo de equipo"}</p>
+        <p style={estilos.modalTitulo}>{titulo}</p>
         <Campo
           etiqueta="Código"
           ayuda={
             esServicio
               ? "Corto, sin espacios (ej: UTI)."
+              : esSigla
+              ? 'Corto, sin espacios. Tal cual aparece en el código (ej: "IMAG" en E01-1SS-IMAG-RMG).'
               : "Corto, sin espacios. Va en el código de cada equipo de este tipo (ej: ROBT para \"Robot quirúrgico\")."
           }
         >
           <input
             style={cs.input}
-            placeholder={esServicio ? "Ej: UTI" : "Ej: ROBT"}
+            placeholder={esServicio ? "Ej: UTI" : esSigla ? "Ej: IMAG" : "Ej: ROBT"}
             value={id}
             onChange={(e) => setId(e.target.value.toUpperCase())}
             autoFocus
@@ -219,10 +253,10 @@ function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
         </Campo>
 
         <div style={{ marginTop: 14 }}>
-          <Campo etiqueta="Nombre">
+          <Campo etiqueta={esSigla ? "Significado" : "Nombre"}>
             <input
               style={cs.input}
-              placeholder={esServicio ? "Ej: Unidad de Terapia Intensiva" : "Ej: Robot quirúrgico"}
+              placeholder={esServicio ? "Ej: Unidad de Terapia Intensiva" : esSigla ? "Ej: Imágenes" : "Ej: Robot quirúrgico"}
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
             />
@@ -237,11 +271,33 @@ function ModalNuevoCatalogo({ variante, onCancelar, onCreado }) {
           </div>
         )}
 
-        <div style={{ marginTop: 14 }}>
-          <Campo etiqueta="Descripción (opcional)">
-            <input style={cs.input} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-          </Campo>
-        </div>
+        {esSigla && (
+          <div style={{ marginTop: 14 }}>
+            <Campo etiqueta="Categoría (opcional)" ayuda='Solo para organizar el glosario en pantalla (ej: "Edificio", "Piso/Subsuelo", "Área", "Sala").'>
+              <input
+                style={cs.input}
+                list="categorias-sigla"
+                placeholder="Ej: Edificio"
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+              />
+              <datalist id="categorias-sigla">
+                <option value="Edificio" />
+                <option value="Piso/Subsuelo" />
+                <option value="Área" />
+                <option value="Sala" />
+              </datalist>
+            </Campo>
+          </div>
+        )}
+
+        {!esSigla && (
+          <div style={{ marginTop: 14 }}>
+            <Campo etiqueta="Descripción (opcional)">
+              <input style={cs.input} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+            </Campo>
+          </div>
+        )}
 
         {error && <p style={estilos.error}>{error}</p>}
 
@@ -294,6 +350,10 @@ const estilos = {
     padding: "2px 7px", borderRadius: 6, flexShrink: 0,
   },
   itemNombre: { fontSize: "0.87rem", color: color.texto },
+  itemCategoria: {
+    fontSize: "0.72rem", color: color.textoDebil, marginLeft: "auto",
+    background: color.fondo, padding: "2px 8px", borderRadius: 999, flexShrink: 0,
+  },
   overlay: {
     position: "fixed", inset: 0, background: "rgba(15,20,30,0.45)",
     display: "flex", alignItems: "center", justifyContent: "center",
