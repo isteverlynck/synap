@@ -4,7 +4,8 @@ Calcula, EN TIEMPO REAL (cada vez que se pide), los indicadores del anteproyecto
 más los estándar de la industria (MTTR, MTBF):
 
   1. Cumplimiento de mantenimiento preventivo (% realizados vs total).
-  2. Tiempo de inactividad del equipamiento (cierre - notificación, correctivas).
+  2. Tiempo de inactividad del equipamiento (tiempo de parada REAL medido a
+     mano con "Iniciar parada"/"Finalizar parada", no una resta de fechas).
   3. Frecuencia y tipo de fallas por equipo.
   4. MTTR — tiempo medio de reparación (apertura - cierre), solo correctivas.
   5. MTBF — tiempo medio entre fallas (confiabilidad), por equipo y por tipo.
@@ -140,16 +141,29 @@ def obtener_kpis(
     )
     cumplimiento = round(100 * mp_cumplidos_en_tiempo / mp_totales, 1) if mp_totales else None
 
-    # ─── KPI 2: tiempo de inactividad (correctivas: cierre - notificación) ───
+    # ─── KPI 2: tiempo de inactividad (correctivas) ───
     correctivas = filtrar(
         db.query(OrdenTrabajo).filter(OrdenTrabajo.tipo == "CORRECTIVA").all(),
         lambda o: o.activo_codigo,
     )
-    inactividades = []
-    for o in correctivas:
-        d = _dias_entre(o.fecha_notificacion, o.fecha_cierre)
-        if d is not None and d >= 0:
-            inactividades.append(d)
+    # Antes esto se ESTIMABA restando fechas (notificación → cierre). Eso no
+    # reflejaba cuánto tiempo estuvo el equipo REALMENTE parado: una OT puede
+    # tardar en tramitarse sin que el equipo esté fuera de servicio todo ese
+    # tiempo. Ahora usamos tiempo_parada_segundos, que es el dato medido a
+    # mano con los botones "Iniciar parada"/"Finalizar parada".
+    #
+    # Solo cuentan correctivas CERRADAS con parada medida (> 0 segundos): al
+    # cerrar una OT, si había una parada corriendo se cierra sola (ver
+    # _cerrar_parada_si_quedo_abierta en ordenes_trabajo.py), así que en toda
+    # OT cerrada el acumulado ya está completo. Un 0 no significa "no estuvo
+    # parado": significa "nadie lo midió" (ej. OT de antes de que existiera
+    # esta función) — incluirlo ensuciaría el promedio hacia abajo sin que
+    # sea un dato real.
+    inactividades = [
+        o.tiempo_parada_segundos / 86400.0
+        for o in correctivas
+        if o.estado == "CERRADA" and o.tiempo_parada_segundos and o.tiempo_parada_segundos > 0
+    ]
     inactividad_prom = round(sum(inactividades) / len(inactividades), 1) if inactividades else None
 
     # ─── KPI 3: fallas (= OT correctivas; ver nota del módulo) ───

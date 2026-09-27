@@ -30,6 +30,29 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 1 día
 
+    # ─── Notificaciones por mail ───
+    # Credenciales SMTP (hoy: relay gratuito de Brevo) para mandar mails de
+    # verdad. Si smtp_user o smtp_password quedan vacíos (no hay .env con
+    # estos datos, ej. en la compu de una compañera que todavía no los
+    # configuró), notificaciones.py cae solo al modo simulado — no explota.
+    smtp_host: str = "smtp-relay.brevo.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+
+    # Dirección que aparece como remitente ("From") en el mail. TIENE que ser
+    # una dirección verificada como remitente en tu cuenta de Brevo (pestaña
+    # "Remitentes, dominios e IP" → Remitentes) — si no está verificada, Brevo
+    # bloquea el envío sin devolver ningún error acá. Es distinta de
+    # smtp_user (que es solo la credencial de login SMTP). Si la dejás
+    # vacía, se usa smtp_user como remitente de respaldo.
+    smtp_remitente: str = ""
+
+    # Casilla FIJA que recibe las notificaciones automáticas del sistema (OT
+    # correctiva creada, stock crítico, MP por vencer) — no es el mail de
+    # ningún usuario en particular, es la casilla que revisa Bioingeniería.
+    email_notificaciones: str = ""
+
     # ─── Debug ───
     # Habilita endpoints de demo/prueba. Poner en False en producción.
     debug: bool = True

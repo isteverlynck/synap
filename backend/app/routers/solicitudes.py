@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import SolicitudServicio, Activo, Usuario
+from ..notificaciones import notificar_bioingenieria
 from ..schemas import SolicitudCrear, SolicitudOut
 from ..security import get_current_user, requiere_rol, grupos_del_coordinador
 
@@ -294,6 +295,21 @@ def aceptar_solicitud(
 
     db.commit()
     db.refresh(sol)
+
+    # Avisar a bioingeniería que se abrió una OT correctiva (uno de los 3
+    # disparadores de notificación automática). Si el mail falla, no rompe
+    # la aceptación de la solicitud: enviar_mail ya loguea el error y sigue.
+    notificar_bioingenieria(
+        "OT correctiva creada",
+        (
+            f"Se abrió la OT correctiva #{numero_ot}, a partir de la solicitud "
+            f"#{sol.numero_solicitud}.\n\n"
+            f"Equipo: {sol.activo_codigo or sol.descripcion_cosa}\n"
+            f"Motivo: {sol.titulo}\n"
+            f"{sol.descripcion_problema}\n\n"
+            f"Grupo asignado: {grupo_destino}\n"
+        ),
+    )
     return sol
 
 

@@ -3,13 +3,23 @@
 
 // Las fechas de solo día ("2026-10-29") las interpreta como UTC, y en
 // Argentina eso las corre un día para atrás. Si viene así, la armamos en
-// hora local; si trae hora, se parsea tal cual.
+// hora local.
+//
+// Las fechas CON hora las manda el backend en UTC (datetime.utcnow()) pero
+// SIN indicar la zona (ej: "2026-09-27T22:45:00.123456", sin "Z" ni offset
+// al final). El estándar de JS interpreta un datetime sin zona como hora
+// LOCAL, no UTC — así que sin este agregado, una OT abierta a las 19:45
+// (hora de Argentina) se mostraba como "22:45" (la hora UTC, tal cual, sin
+// convertir). Si el valor no trae ya una zona explícita, se la agregamos
+// ("Z" = UTC) para que el navegador la convierta bien a la hora local.
 export function parsearFecha(valor) {
   const texto = String(valor);
   const soloDia = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return soloDia
-    ? new Date(Number(soloDia[1]), Number(soloDia[2]) - 1, Number(soloDia[3]))
-    : new Date(texto);
+  if (soloDia) {
+    return new Date(Number(soloDia[1]), Number(soloDia[2]) - 1, Number(soloDia[3]));
+  }
+  const tieneZonaExplicita = /Z$|[+-]\d{2}:\d{2}$/.test(texto);
+  return new Date(tieneZonaExplicita ? texto : `${texto}Z`);
 }
 
 export function formatearFecha(fechaISO) {

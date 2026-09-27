@@ -297,6 +297,12 @@ class MantenimientoPreventivo(Base):
     # nula si se cumplió en tiempo y forma.
     justificacion_retraso: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Si ya se mandó el mail de "MP próximo a vencer" para este MP (ver
+    # scheduler.py: _job_avisar_mp_por_vencer). Se pone en True apenas se
+    # avisa una vez, para no mandar el mismo aviso todos los días durante la
+    # última semana del mes mientras el MP siga sin hacerse.
+    aviso_vencimiento_enviado: Mapped[bool | None] = mapped_column(default=False, nullable=True)
     
     # ─── Relaciones ───
     activo: Mapped["Activo"] = relationship(back_populates="mantenimientos")

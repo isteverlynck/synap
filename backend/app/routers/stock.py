@@ -34,6 +34,7 @@ from datetime import datetime, date
 
 from ..database import get_db
 from ..models import Insumo, Compra, ConsumoInsumo, AjusteInventario, OrdenTrabajo, Usuario
+from ..notificaciones import notificar_bioingenieria
 from ..schemas import (
     InsumoOut,
     InsumoCreate,
@@ -358,6 +359,18 @@ def registrar_consumo(
             f"punto de reorden {insumo.punto_reorden}."
         )
 
+    # Avisar a bioingeniería cuando un consumo deja el stock en nivel crítico
+    # (uno de los 3 disparadores de notificación automática). "reponer" es
+    # una alerta más suave, todavía no dispara mail — solo "critico".
+    if nivel == "critico":
+        notificar_bioingenieria(
+            "Stock crítico",
+            (
+                f"{aviso}\n\n"
+                f"Consumo registrado: {payload.cantidad} unidad(es), en la OT #{orden.numero_ot}.\n"
+            ),
+        )
+
     return ConsumoResultado(
         consumo=ConsumoOut.model_validate(consumo),
         stock_resultante=insumo.stock_actual,
@@ -404,6 +417,21 @@ def registrar_ajuste(
         insumo.stock_actual = (insumo.stock_actual or 0) - payload.cantidad
     db.commit()
     db.refresh(ajuste)
+
+    # Un ajuste de "salida" también puede dejar el stock en nivel crítico
+    # (una merma, una rotura). Mismo disparador que en /consumos; una
+    # "entrada" nunca hace falta avisarla, porque sube el stock.
+    if payload.tipo == "salida":
+        nivel = calcular_nivel(insumo.stock_actual, insumo.stock_minimo, insumo.punto_reorden)
+        if nivel == "critico":
+            notificar_bioingenieria(
+                "Stock crítico",
+                (
+                    f"Stock crítico de '{insumo.nombre}': quedan {insumo.stock_actual}, "
+                    f"el mínimo es {insumo.stock_minimo}. Reponer con urgencia.\n\n"
+                    f"Ajuste manual: -{payload.cantidad} unidad(es). Motivo: {payload.motivo}\n"
+                ),
+            )
     return ajuste
 
 

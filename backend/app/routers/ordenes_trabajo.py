@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import OrdenTrabajo, NotaOT, Usuario, MantenimientoPreventivo
+from ..notificaciones import notificar_bioingenieria
 from ..schemas import (
     OrdenTrabajoOut,
     OrdenTrabajoAsignar,
@@ -492,6 +493,20 @@ def crear_correctiva_asociada(
     db.add(correctiva)
     db.commit()
     db.refresh(correctiva)
+
+    # Avisar a bioingeniería que se abrió una OT correctiva (uno de los 3
+    # disparadores de notificación automática). Si el mail falla, no rompe
+    # la creación de la correctiva: enviar_mail ya loguea el error y sigue.
+    notificar_bioingenieria(
+        "OT correctiva creada",
+        (
+            f"Se abrió la OT correctiva #{numero_ot}, generada durante el "
+            f"mantenimiento preventivo (OT #{origen.numero_ot}).\n\n"
+            f"Equipo: {origen.activo_codigo}\n"
+            f"Descripción: {descripcion}\n\n"
+            f"Grupo asignado: {origen.grupo_id}\n"
+        ),
+    )
     return correctiva
 
 
