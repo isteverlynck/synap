@@ -199,6 +199,40 @@ class OrdenTrabajo(Base):
             return None
         return f"{self.iniciador.nombre} {self.iniciador.apellido}"
 
+    # Quién apretó "Confirmar cierre" (ver ordenes_trabajo.cerrar_orden). Antes
+    # no se guardaba: la OT quedaba CERRADA pero sin rastro de quién la
+    # cerró. Hace falta para el informe en PDF del preventivo ("información
+    # de la persona que la cerró"). Nula en las OT cerradas ANTES de este
+    # cambio (no se puede reconstruir ese dato para las viejas).
+    cerrado_por: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
+    cerrador = relationship("Usuario", foreign_keys=[cerrado_por])
+
+    @property
+    def cerrado_por_nombre(self) -> str | None:
+        """Nombre de quien cerró la OT, listo para mostrar (None si no hay registro)."""
+        if self.cerrador is None:
+            return None
+        return f"{self.cerrador.nombre} {self.cerrador.apellido}"
+
+    # Quién apretó "Completar orden de trabajo" (ver ordenes_trabajo.completar_orden).
+    # Solo aplica a preventivas: el técnico completa el checklist y la orden, pero
+    # no la cierra — queda PENDIENTE_CIERRE hasta que coordinación la revisa y
+    # la autoriza (ver autorizar_cierre) o la devuelve (ver devolver_orden).
+    completada_por: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
+    fecha_completada: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completador = relationship("Usuario", foreign_keys=[completada_por])
+
+    @property
+    def completada_por_nombre(self) -> str | None:
+        """Nombre de quien completó la OT, listo para mostrar (None si no hay registro)."""
+        if self.completador is None:
+            return None
+        return f"{self.completador.nombre} {self.completador.apellido}"
+
     # ─── Relaciones ───
     activo: Mapped["Activo"] = relationship(back_populates="ordenes_de_trabajo")
     fallas: Mapped[list["Falla"]] = relationship(back_populates="orden")

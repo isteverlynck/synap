@@ -26,6 +26,8 @@ from ..schemas import (
     OrdenTrabajoAsignar,
     OrdenTrabajoCambioEstado,
     OrdenTrabajoCierre,
+    OrdenTrabajoAutorizar,
+    OrdenTrabajoDevolver,
     OrdenTrabajoCorrectivaCreate,
     NotaOTOut,
     NotaOTCrear,
@@ -243,7 +245,7 @@ def asignar_tecnico(
 # SEGUIMIENTO (PATCH) — cambiar el estado de una OT
 # ═══════════════════════════════════════════════════════════════════════════
 
-ESTADOS_VALIDOS = {"ABIERTA", "EN_PROGRESO", "CERRADA"}
+ESTADOS_VALIDOS = {"ABIERTA", "EN_PROGRESO", "PENDIENTE_CIERRE", "CERRADA"}
 
 
 @router.patch("/{ot_id}/estado", response_model=OrdenTrabajoOut)
@@ -304,20 +306,29 @@ def cerrar_orden(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
-    """Cerrar una OT: la marca como CERRADA y le pone la fecha de cierre (ahora).
+    """Cerrar una OT CORRECTIVA: la marca como CERRADA y le pone la fecha de
+    cierre (ahora). Con esto quedan completas las 3 fechas (notificacion ->
+    apertura -> cierre). Si quedaba una parada del equipo corriendo, se cierra
+    sola acá (ver _cerrar_parada_si_quedo_abierta) para que el tiempo de
+    parada no quede incompleto.
 
-    Con esto quedan completas las 3 fechas (notificacion -> apertura -> cierre).
-    Si quedaba una parada del equipo corriendo, se cierra sola acá (ver
-    _cerrar_parada_si_quedo_abierta) para que el tiempo de parada no quede
-    incompleto.
+    Las PREVENTIVAS ya no se cierran por acá: el técnico las completa
+    (/completar) y coordinación autoriza el cierre (/autorizar-cierre) o las
+    devuelve (/devolver). Ver esa sección más abajo.
     """
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
 
+    if orden.tipo == "PREVENTIVA":
+        raise HTTPException(
+            status_code=400,
+            detail="Las preventivas no se cierran directo: primero se completan y coordinación autoriza el cierre.",
+        )
+
     if orden.estado == "CERRADA":
         raise HTTPException(status_code=400, detail="Esta OT ya está cerrada.")
-    
+
     validar_a_cargo_de_preventiva(current_user, orden)
     # Nadie cierra OT de otro grupo (mismo chequeo que ya usan las paradas).
     _validar_permiso_sobre_ot(current_user, db, orden)
@@ -335,34 +346,9 @@ def cerrar_orden(
 
     ahora = datetime.utcnow()
 
-    # Si es una preventiva con MP enganchado, resolvemos el desvío ANTES de
-    # tocar nada más: si hace falta justificación y no vino, cortamos acá con
-    # el 400 sin haber marcado la OT como cerrada.
-    mp = None
-    if orden.tipo == "PREVENTIVA":
-        mp = db.query(MantenimientoPreventivo).filter(
-            MantenimientoPreventivo.ot_id == orden.id
-        ).first()
-    if mp is not None:
-        a_tiempo = (ahora.year, ahora.month) == (mp.fecha_programada.year, mp.fecha_programada.month)
-        if not a_tiempo and not (payload.justificacion_retraso and payload.justificacion_retraso.strip()):
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Esta orden se está cerrando fuera del mes en que se programó "
-                    f"({mp.fecha_programada.strftime('%m/%Y')}). Contá el motivo del "
-                    "retraso para poder cerrarla."
-                ),
-            )
-        mp.fecha_realizada = ahora.date()
-        mp.estado = "REALIZADO"
-        mp.justificacion_retraso = payload.justificacion_retraso.strip() if not a_tiempo else None
-    
-    if orden.tipo == "PREVENTIVA" and orden.activo is not None:
-        orden.activo.ultima_fecha_mp = ahora.date()
-
     orden.estado = "CERRADA"
     orden.fecha_cierre = ahora
+    orden.cerrado_por = current_user.id
     _cerrar_parada_si_quedo_abierta(orden, orden.fecha_cierre)
     # si mandan observaciones del cierre, las sumamos (sin pisar las que hubiera)
     if payload.observaciones:
@@ -370,6 +356,178 @@ def cerrar_orden(
             orden.observaciones = orden.observaciones + " | Cierre: " + payload.observaciones
         else:
             orden.observaciones = payload.observaciones
+
+    db.commit()
+    db.refresh(orden)
+    return orden
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# COMPLETAR / AUTORIZAR CIERRE / DEVOLVER — circuito de cierre de preventivas
+# ═══════════════════════════════════════════════════════════════════════════
+# Dinámica real del hospital: el técnico completa el checklist y aprieta
+# "Completar orden de trabajo" — la OT NO se cierra todavía, queda
+# PENDIENTE_CIERRE. Coordinación es quien revisa esa OT completada y o bien
+# autoriza el cierre (ahí sí queda CERRADA, con fecha_cierre y cerrado_por),
+# o la devuelve al técnico con un motivo (vuelve a EN_PROGRESO) si encuentra
+# algo mal. Solo aplica a preventivas — las correctivas se siguen cerrando
+# directo por /cerrar.
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.patch("/{ot_id}/completar", response_model=OrdenTrabajoOut)
+def completar_orden(
+    ot_id: str,
+    payload: OrdenTrabajoCierre,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+):
+    """El técnico termina de trabajar una preventiva: registra qué se hizo y
+    la deja PENDIENTE_CIERRE, a la espera de que coordinación la autorice.
+
+    Acá se resuelve el desvío del MP (mismo criterio que antes tenía el
+    cierre directo): si se completa fuera del mes programado, hace falta
+    justificación. También se cierra sola una parada que hubiera quedado
+    corriendo, porque en la práctica el trabajo ya terminó.
+    """
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+
+    if orden.tipo != "PREVENTIVA":
+        raise HTTPException(
+            status_code=400,
+            detail="Completar (a la espera de autorización) solo aplica a órdenes preventivas.",
+        )
+    if orden.estado != "EN_PROGRESO":
+        raise HTTPException(
+            status_code=400,
+            detail="Esta orden no está en progreso: no se puede completar.",
+        )
+
+    validar_a_cargo_de_preventiva(current_user, orden)
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    ahora = datetime.utcnow()
+
+    # Si tiene MP enganchado, resolvemos el desvío ANTES de tocar nada más:
+    # si hace falta justificación y no vino, cortamos acá con el 400 sin
+    # haber marcado nada.
+    mp = db.query(MantenimientoPreventivo).filter(
+        MantenimientoPreventivo.ot_id == orden.id
+    ).first()
+    if mp is not None:
+        a_tiempo = (ahora.year, ahora.month) == (mp.fecha_programada.year, mp.fecha_programada.month)
+        if not a_tiempo and not (payload.justificacion_retraso and payload.justificacion_retraso.strip()):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Esta orden se está completando fuera del mes en que se programó "
+                    f"({mp.fecha_programada.strftime('%m/%Y')}). Contá el motivo del "
+                    "retraso para poder completarla."
+                ),
+            )
+        mp.fecha_realizada = ahora.date()
+        mp.estado = "REALIZADO"
+        mp.justificacion_retraso = payload.justificacion_retraso.strip() if not a_tiempo else None
+
+    if orden.activo is not None:
+        orden.activo.ultima_fecha_mp = ahora.date()
+
+    orden.estado = "PENDIENTE_CIERRE"
+    orden.completada_por = current_user.id
+    orden.fecha_completada = ahora
+    _cerrar_parada_si_quedo_abierta(orden, ahora)
+    if payload.observaciones:
+        if orden.observaciones:
+            orden.observaciones = orden.observaciones + " | Cierre: " + payload.observaciones
+        else:
+            orden.observaciones = payload.observaciones
+
+    db.commit()
+    db.refresh(orden)
+    return orden
+
+
+@router.patch("/{ot_id}/autorizar-cierre", response_model=OrdenTrabajoOut)
+def autorizar_cierre(
+    ot_id: str,
+    payload: OrdenTrabajoAutorizar,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Coordinación autoriza el cierre de una preventiva ya completada por
+    el técnico: recién acá queda CERRADA de verdad, con fecha_cierre y
+    cerrado_por."""
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+
+    if orden.tipo != "PREVENTIVA":
+        raise HTTPException(status_code=400, detail="Autorizar cierre solo aplica a órdenes preventivas.")
+    if orden.estado != "PENDIENTE_CIERRE":
+        raise HTTPException(
+            status_code=400,
+            detail="Esta orden no está pendiente de cierre: no hay nada para autorizar.",
+        )
+    # Solo coordinación de ESE grupo (o jefatura, que ya pasa requiere_rol).
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    ahora = datetime.utcnow()
+    orden.estado = "CERRADA"
+    orden.fecha_cierre = ahora
+    orden.cerrado_por = current_user.id
+    if payload.comentario and payload.comentario.strip():
+        comentario = payload.comentario.strip()
+        if orden.observaciones:
+            orden.observaciones = orden.observaciones + " | Autorización: " + comentario
+        else:
+            orden.observaciones = comentario
+
+    db.commit()
+    db.refresh(orden)
+    return orden
+
+
+@router.patch("/{ot_id}/devolver", response_model=OrdenTrabajoOut)
+def devolver_orden(
+    ot_id: str,
+    payload: OrdenTrabajoDevolver,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Coordinación devuelve al técnico una preventiva completada, en vez de
+    autorizar el cierre (ej: falta un dato, el checklist quedó mal cargado).
+
+    Vuelve a EN_PROGRESO y el motivo queda como entrada de la bitácora, para
+    que el técnico lo vea apenas entra a la OT — no hace falta un campo
+    aparte, la bitácora ya está pensada justo para esto."""
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+
+    if orden.tipo != "PREVENTIVA":
+        raise HTTPException(status_code=400, detail="Devolver solo aplica a órdenes preventivas.")
+    if orden.estado != "PENDIENTE_CIERRE":
+        raise HTTPException(
+            status_code=400,
+            detail="Esta orden no está pendiente de cierre: no hay nada para devolver.",
+        )
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    motivo = payload.motivo.strip()
+    if not motivo:
+        raise HTTPException(status_code=400, detail="Contá el motivo por el que devolvés la orden.")
+
+    orden.estado = "EN_PROGRESO"
+    orden.completada_por = None
+    orden.fecha_completada = None
+
+    nota = NotaOT(
+        ot_id=orden.id,
+        autor_id=current_user.id,
+        texto="Coordinación devolvió la orden para corregir: " + motivo,
+    )
+    db.add(nota)
 
     db.commit()
     db.refresh(orden)
@@ -664,4 +822,82 @@ def ver_adjunto(
         media_type=adjunto.tipo_mime,
         # inline: que el navegador lo abra (foto o PDF) en vez de forzar la descarga.
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(adjunto.nombre_archivo)}"},
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INFORME EN PDF — solo para preventivas ya CERRADAS
+# ═══════════════════════════════════════════════════════════════════════════
+# Junta en una hoja los datos del equipo, los de la orden (fechas, quién la
+# inició, quién la cerró) y el resultado de cada punto del checklist. La
+# armamos siempre al vuelo (no se guarda en ningún lado): si algo del
+# checklist se corrige después de cerrada, el próximo PDF que se pida ya
+# sale actualizado.
+# ═══════════════════════════════════════════════════════════════════════════
+
+from ..models import Activo, ChecklistItem, ChecklistRespuesta, Servicio, TipoEquipo
+from ..informes import generar_informe_preventiva_pdf
+
+
+@router.get("/{ot_id}/informe-pdf")
+def informe_pdf(
+    ot_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
+):
+    """Descargar el informe en PDF de una preventiva ya cerrada."""
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    if orden.tipo != "PREVENTIVA":
+        raise HTTPException(
+            status_code=400,
+            detail="El informe en PDF solo está disponible para órdenes preventivas.",
+        )
+    if orden.estado != "CERRADA":
+        raise HTTPException(
+            status_code=400,
+            detail="El informe se genera cuando la orden ya está cerrada.",
+        )
+
+    activo = db.query(Activo).filter(Activo.codigo == orden.activo_codigo).first()
+    tipo_equipo = (
+        db.query(TipoEquipo).filter(TipoEquipo.id == activo.tipo_equipo_id).first()
+        if activo else None
+    )
+    sector = (
+        db.query(Servicio).filter(Servicio.id == activo.sector_id).first()
+        if activo else None
+    )
+
+    mp = db.query(MantenimientoPreventivo).filter(MantenimientoPreventivo.ot_id == orden.id).first()
+    respuestas = []
+    if mp is not None:
+        respuestas = (
+            db.query(ChecklistRespuesta, ChecklistItem)
+            .join(ChecklistItem, ChecklistItem.id == ChecklistRespuesta.checklist_item_id)
+            .filter(ChecklistRespuesta.mp_id == mp.id)
+            .order_by(ChecklistItem.orden)
+            .all()
+        )
+
+    pdf_bytes = generar_informe_preventiva_pdf(
+        orden=orden,
+        activo=activo,
+        mp=mp,
+        respuestas=respuestas,
+        tipo_equipo_nombre=tipo_equipo.nombre if tipo_equipo else None,
+        sector_nombre=sector.nombre if sector else None,
+    )
+
+    nombre_archivo = f"Informe_OT-{str(orden.numero_ot).zfill(4)}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        # attachment (no inline, a diferencia de los adjuntos de arriba): esto
+        # es un informe que se genera al vuelo, tiene sentido que se descargue
+        # derecho en vez de intentar mostrarlo en la misma pestaña.
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(nombre_archivo)}"},
     )

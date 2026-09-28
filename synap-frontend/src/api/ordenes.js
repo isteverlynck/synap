@@ -55,11 +55,38 @@ export async function cambiarEstado(otId, estado) {
 
 // Cerrar la OT. Las observaciones son opcionales pero es donde queda registrado
 // qué se hizo: es lo que después alimenta el análisis de patrones de falla.
+// Solo sirve para CORRECTIVAS: las preventivas se cierran con el circuito de
+// abajo (completar → autorizar-cierre / devolver).
 export async function cerrarOrden(otId, observaciones, justificacionRetraso) {
   const res = await cliente.patch(`/ordenes-trabajo/${otId}/cerrar`, {
     observaciones: observaciones || null,
     justificacion_retraso: justificacionRetraso || null,
   });
+  return res.data;
+}
+
+// ─── Completar / autorizar cierre / devolver (solo preventivas) ───
+// El técnico completa la OT (deja el checklist y qué se hizo) y queda
+// PENDIENTE_CIERRE, a la espera de que coordinación la revise: o autoriza el
+// cierre (recién ahí CERRADA) o la devuelve al técnico con un motivo.
+
+export async function completarOrden(otId, observaciones, justificacionRetraso) {
+  const res = await cliente.patch(`/ordenes-trabajo/${otId}/completar`, {
+    observaciones: observaciones || null,
+    justificacion_retraso: justificacionRetraso || null,
+  });
+  return res.data;
+}
+
+export async function autorizarCierre(otId, comentario) {
+  const res = await cliente.patch(`/ordenes-trabajo/${otId}/autorizar-cierre`, {
+    comentario: comentario || null,
+  });
+  return res.data;
+}
+
+export async function devolverOrden(otId, motivo) {
+  const res = await cliente.patch(`/ordenes-trabajo/${otId}/devolver`, { motivo });
   return res.data;
 }
 
@@ -155,4 +182,20 @@ export async function abrirAdjunto(otId, adjunto) {
     if (pestana) pestana.close();
     throw err;
   }
+}
+
+// ─── Informe en PDF (solo preventivas ya cerradas) ───
+// Junta en una hoja los datos del equipo, los de la orden y el resultado del
+// checklist. Se pide como blob (igual que abrirAdjunto) porque el backend
+// exige el token de sesión, así que no alcanza con un link común.
+export async function descargarInformePDF(otId, numeroOt) {
+  const res = await cliente.get(`/ordenes-trabajo/${otId}/informe-pdf`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Informe_OT-${String(numeroOt).padStart(4, "0")}.pdf`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

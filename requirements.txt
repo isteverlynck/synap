@@ -4,6 +4,7 @@ anyio==4.14.2
 APScheduler==3.11.3
 bcrypt==4.0.1
 cffi==2.1.1
+charset-normalizer==3.5.1
 click==8.5.0
 cryptography==50.0.1
 dnspython==2.8.0
@@ -15,6 +16,7 @@ h11==0.16.0
 httptools==0.8.0
 idna==3.19
 passlib==1.7.4
+pillow==12.3.0
 psycopg2-binary==2.9.12
 pyasn1==0.6.4
 pycparser==3.0
@@ -25,6 +27,7 @@ python-dotenv==1.2.3
 python-jose==3.5.0
 python-multipart==0.0.32
 PyYAML==6.0.3
+reportlab==5.0.1
 rsa==4.9.1
 six==1.17.0
 SQLAlchemy==2.0.52

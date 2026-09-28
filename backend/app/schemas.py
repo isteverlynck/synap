@@ -130,7 +130,7 @@ class TipoEquipoCreate(BaseModel):
     quirúrgico y no había un tipo para eso todavía).
 
     El id es la abreviación que después va a aparecer en el código de cada
-    equipo de ese tipo (B-<área>-<id>-<número>), por eso tiene que ser corta
+    equipo de ese tipo (B-[área]-[id]-[número]), por eso tiene que ser corta
     y sin espacios.
     """
     id: str
@@ -235,7 +235,7 @@ class ActivoCreate(BaseModel):
     """Lo que se manda para dar de alta un activo nuevo.
 
     El código NO se manda: lo arma el backend con el formato del hospital
-    (B-<área>-<tipo de equipo>-<número>), a partir de 'area' (el segmento que
+    (B-[área]-[tipo de equipo]-[número]), a partir de 'area' (el segmento que
     la persona conoce de memoria, ej. 'INTR' para Internación — no siempre
     coincide con el sector/servicio elegido, así que se pide aparte) y
     tipo_equipo_id (el número sale solo: el siguiente correlativo para ese
@@ -375,6 +375,11 @@ class OrdenTrabajoOut(BaseModel):
     tiempo_parada_segundos: int = 0
     iniciada_por: uuid.UUID | None = None
     iniciada_por_nombre: str | None = None
+    cerrado_por: uuid.UUID | None = None
+    cerrado_por_nombre: str | None = None
+    completada_por: uuid.UUID | None = None
+    completada_por_nombre: str | None = None
+    fecha_completada: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
     activo_descripcion: str | None = None
     activo_ubicacion: str | None = None
@@ -745,7 +750,22 @@ class OrdenTrabajoCierre(BaseModel):
     """
     observaciones: str | None = None
     justificacion_retraso: str | None = None
-    
+
+
+class OrdenTrabajoAutorizar(BaseModel):
+    """Para que coordinación autorice el cierre de una preventiva ya
+    completada (estado PENDIENTE_CIERRE). El comentario es opcional: si
+    viene, se suma a las observaciones de la OT."""
+    comentario: str | None = None
+
+
+class OrdenTrabajoDevolver(BaseModel):
+    """Para que coordinación devuelva al técnico una preventiva completada
+    (estado PENDIENTE_CIERRE), en vez de autorizar el cierre. El motivo es
+    obligatorio: queda como entrada en la bitácora de la OT."""
+    motivo: str
+
+
 class GenerarCorrectivaDesdeChecklist(BaseModel):
     """Registrar un ítem NO_PASA y generar la OT correctiva asociada, de una.
  

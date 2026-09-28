@@ -1,16 +1,17 @@
-// DetalleOrden.jsx — una OT abierta en detalle. Es la pantalla donde el trabajo
+﻿// DetalleOrden.jsx — una OT abierta en detalle. Es la pantalla donde el trabajo
 // efectivamente avanza: el técnico la arranca y la cierra, coordinación la
 // asigna o reasigna.
 //
 // Igual que en la ficha del equipo, la parte de arriba es idéntica para todos
 // y lo único que cambia son las acciones de abajo.
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, createElement } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   verOrden, cambiarEstado, cerrarOrden, asignarTecnico, listarNotas, agregarNota,
   listarCorrectivasAsociadas, crearCorrectivaAsociada, iniciarParada, finalizarParada,
-  listarAdjuntos, abrirAdjunto,
+  listarAdjuntos, abrirAdjunto, descargarInformePDF,
+  autorizarCierre, devolverOrden,
 } from "../api/ordenes";
 import { tecnicosDisponibles } from "../api/coordinacion";
 import { listarInsumos, registrarConsumo, listarConsumos } from "../api/stock";
@@ -30,7 +31,11 @@ function DetalleOrden() {
   const [tecnicos, setTecnicos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [accion, setAccion] = useState(null);   // 'cerrar' | 'asignar' | 'correctiva' | null
+  // La OT preventiva se completa directo desde el checklist (ChecklistPreventiva
+  // llama al backend ella misma y actualiza `ot` acá con onCompletado) — no
+  // hay un accion="completar" separado, para que quede un solo botón que
+  // completa de verdad, no dos pasos.
+  const [accion, setAccion] = useState(null);   // 'cerrar' | 'asignar' | 'correctiva' | 'consumo' | 'autorizar' | 'devolver' | null
   const [notas, setNotas] = useState([]);
   const [correctivas, setCorrectivas] = useState([]);
   const [insumos, setInsumos] = useState([]);
@@ -134,6 +139,18 @@ function DetalleOrden() {
     }
   }
 
+  const [descargandoInforme, setDescargandoInforme] = useState(false);
+  async function descargarInforme() {
+    setDescargandoInforme(true);
+    try {
+      await descargarInformePDF(ot.id, ot.numero_ot);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "No pudimos generar el informe.");
+    } finally {
+      setDescargandoInforme(false);
+    }
+  }
+
   if (cargando) return <p style={estilos.mensaje}>Cargando orden...</p>;
   if (error && !ot) return <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>;
 
@@ -202,12 +219,14 @@ function DetalleOrden() {
                 <>
                   {ot.reportado_por_nombre}
                   {ot.reportado_por_email && (
-                    <a
-                      href={`mailto:${ot.reportado_por_email}`}
-                      style={{ display: "block", fontSize: "0.82rem", color: color.primario, wordBreak: "break-all" }}
-                    >
-                      {ot.reportado_por_email}
-                    </a>
+                    createElement(
+                      "a",
+                      {
+                        href: "mailto:" + ot.reportado_por_email,
+                        style: { display: "block", fontSize: "0.82rem", color: color.primario, wordBreak: "break-all" },
+                      },
+                      ot.reportado_por_email
+                    )
                   )}
                 </>
               ) : ot.ot_origen_id ? (
@@ -234,7 +253,22 @@ function DetalleOrden() {
         />
         <Dato etiqueta="Notificada" valor={fechaHora(ot.fecha_notificacion)} />
         <Dato etiqueta="Abierta" valor={fechaHora(ot.fecha_apertura)} />
+        {/* Preventivas: el técnico "completa" la orden (deja el checklist y
+        qué se hizo) y queda PENDIENTE_CIERRE hasta que coordinación la
+        autorice o la devuelva. Estos datos solo tienen sentido ahí. */}
+        {ot.tipo === "PREVENTIVA" && (ot.estado === "PENDIENTE_CIERRE" || cerrada) && (
+          <>
+            <Dato etiqueta="Completada por" valor={ot.completada_por_nombre || "Sin registro"} />
+            <Dato etiqueta="Completada" valor={fechaHora(ot.fecha_completada)} />
+          </>
+        )}
         <Dato etiqueta="Cerrada" valor={fechaHora(ot.fecha_cierre)} />
+        {/* Quién apretó "Confirmar cierre" (correctivas) o "Autorizar cierre"
+        (preventivas). Las OT cerradas ANTES de este cambio no tienen este
+        dato: ahí se muestra "Sin registro". */}
+        {cerrada && (
+          <Dato etiqueta="Cerrada por" valor={ot.cerrado_por_nombre || "Sin registro"} />
+        )}
         {/* Tiempo real que el equipo estuvo parado — medido con los botones
         "Iniciar parada" / "Finalizar parada" de abajo, no calculado a partir
         de otras fechas (antes se restaba notificación/apertura contra cierre,
@@ -280,8 +314,20 @@ function DetalleOrden() {
           {puedeTrabajar && ot.estado === "ABIERTA" && (
             <button style={boton("primario")} onClick={arrancar}>Empezar a trabajar</button>
           )}
-          {puedeTrabajar && ot.estado === "EN_PROGRESO" && (
+          {/* Cerrar directo por acá: solo correctivas. Las preventivas se
+          completan desde el checklist ("Revisar y completar la orden") y
+          después coordinación autoriza o devuelve (ver más abajo). */}
+          {puedeTrabajar && ot.estado === "EN_PROGRESO" && ot.tipo === "CORRECTIVA" && (
             <button style={boton("primario")} onClick={() => setAccion("cerrar")}>Cerrar la orden</button>
+          )}
+          {/* Coordinación revisa una preventiva ya completada por el
+          técnico: autoriza el cierre (recién ahí queda CERRADA) o la
+          devuelve con un motivo (vuelve a EN_PROGRESO). */}
+          {esCoordinacion && ot.tipo === "PREVENTIVA" && ot.estado === "PENDIENTE_CIERRE" && (
+            <>
+              <button style={boton("primario")} onClick={() => setAccion("autorizar")}>Autorizar cierre</button>
+              <button style={boton("secundario")} onClick={() => setAccion("devolver")}>Devolver al técnico</button>
+            </>
           )}
           {/* Las preventivas son del grupo entero: no se asignan a una
           persona. Solo las correctivas tienen dueño. */}
@@ -321,6 +367,16 @@ function DetalleOrden() {
         </div>
       )}
 
+      {/* Informe en PDF: solo tiene sentido en preventivas ya cerradas, una
+      vez que hay checklist y cierre para juntar en una hoja. */}
+      {cerrada && ot.tipo === "PREVENTIVA" && (
+        <div style={estilos.acciones}>
+          <button style={boton("secundario")} onClick={descargarInforme} disabled={descargandoInforme}>
+            {descargandoInforme ? "Generando informe..." : "Descargar informe PDF"}
+          </button>
+        </div>
+      )}
+
       {accion === "cerrar" && (
         <PanelCerrar ot={ot} setOt={setOt} cerrar={() => setAccion(null)} />
       )}
@@ -344,6 +400,12 @@ function DetalleOrden() {
           cerrar={() => setAccion(null)}
         />
       )}
+      {accion === "autorizar" && (
+        <PanelAutorizarCierre ot={ot} setOt={setOt} cerrar={() => setAccion(null)} />
+      )}
+      {accion === "devolver" && (
+        <PanelDevolver ot={ot} setOt={setOt} setNotas={setNotas} cerrar={() => setAccion(null)} />
+      )}
 
       {/* ─── Checklist del mantenimiento: se completa ítem por ítem, y desde
       cada ítem que "no pasa" se puede generar de una su propia correctiva ─── */}
@@ -351,8 +413,11 @@ function DetalleOrden() {
         <ChecklistPreventiva
           ot={ot}
           perfil={perfil}
-          puedeCompletar={!cerrada && puedeTrabajar}
-          onCerrarOT={() => setAccion("cerrar")}
+          // Una vez que la orden pasó a PENDIENTE_CIERRE (o se cerró), el
+          // checklist queda de solo lectura: ya no se puede completar de nuevo
+          // hasta que coordinación la devuelva (ahí vuelve a EN_PROGRESO).
+          puedeCompletar={!cerrada && puedeTrabajar && ot.estado === "EN_PROGRESO"}
+          onCompletado={(nuevaOrden) => setOt(nuevaOrden)}
           onCorrectivaCreada={(nueva) => setCorrectivas((antes) => [...antes, nueva])}
           navegar={navegar}
         />
@@ -560,6 +625,108 @@ function PanelCerrar({ ot, setOt, cerrar }) {
   );
 }
 
+// Nota: "Completar la orden" (preventivas) ya no es un panel acá — se hace
+// directo desde el checklist (ChecklistPreventiva), en el mismo modal de
+// validación, para que haya un solo botón que la complete de verdad.
+
+// ─── Autorizar cierre (coordinación) ───
+
+function PanelAutorizarCierre({ ot, setOt, cerrar }) {
+  const [comentario, setComentario] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function confirmar() {
+    setEnviando(true);
+    try {
+      setOt(await autorizarCierre(ot.id, comentario.trim()));
+      toast.success(`OT-${String(ot.numero_ot).padStart(4, "0")} cerrada`, {
+        description: "Ya figura en el historial del equipo.",
+      });
+      cerrar();
+    } catch (e) {
+      setError(e.response?.data?.detail || "No pudimos autorizar el cierre.");
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
+      <p style={estilos.panelTitulo}>Autorizar el cierre</p>
+      <p style={estilos.bitacoraAyuda}>
+        El técnico ya completó el checklist y la orden. Al autorizar, la OT
+        queda CERRADA de verdad.
+      </p>
+      <label style={cs.label}>Comentario (opcional)</label>
+      <textarea
+        style={{ ...cs.input, minHeight: 70, marginBottom: 12, resize: "vertical" }}
+        placeholder="Ej: revisado, todo en orden."
+        value={comentario}
+        onChange={(e) => setComentario(e.target.value)}
+      />
+      {error && <p style={estilos.error}>{error}</p>}
+      <div style={estilos.acciones}>
+        <button style={boton("primario")} onClick={confirmar} disabled={enviando}>
+          {enviando ? "Autorizando..." : "Autorizar cierre"}
+        </button>
+        <button style={boton("fantasma")} onClick={cerrar}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Devolver al técnico (coordinación) ───
+
+function PanelDevolver({ ot, setOt, setNotas, cerrar }) {
+  const [motivo, setMotivo] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function confirmar() {
+    if (!motivo.trim()) {
+      setError("Contá el motivo por el que devolvés la orden.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      setOt(await devolverOrden(ot.id, motivo.trim()));
+      toast.success(`OT-${String(ot.numero_ot).padStart(4, "0")} devuelta al técnico`);
+      // El motivo queda como entrada nueva en la bitácora (la pone el
+      // backend); la recargamos para que aparezca sin tener que salir y
+      // volver a entrar a la OT.
+      listarNotas(ot.id).then(setNotas).catch(() => {});
+      cerrar();
+    } catch (e) {
+      setError(e.response?.data?.detail || "No pudimos devolver la orden.");
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
+      <p style={estilos.panelTitulo}>Devolver al técnico</p>
+      <p style={estilos.bitacoraAyuda}>
+        Vuelve a EN_PROGRESO. El motivo queda como entrada en la bitácora,
+        para que el técnico lo vea apenas entra a la OT.
+      </p>
+      <label style={cs.label}>Motivo</label>
+      <textarea
+        style={{ ...cs.input, minHeight: 70, marginBottom: 12, resize: "vertical" }}
+        placeholder="Ej: falta la observación del ítem 2 del checklist."
+        value={motivo}
+        onChange={(e) => setMotivo(e.target.value)}
+      />
+      {error && <p style={estilos.error}>{error}</p>}
+      <div style={estilos.acciones}>
+        <button style={boton("primario")} onClick={confirmar} disabled={enviando}>
+          {enviando ? "Devolviendo..." : "Devolver al técnico"}
+        </button>
+        <button style={boton("fantasma")} onClick={cerrar}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Asignar ───
 
 function PanelAsignar({ ot, setOt, tecnicos, cerrar }) {
@@ -757,12 +924,18 @@ function fechaHora(valor) {
 // dejaría de significar "urgente".
 function tonoEstadoOT(estado) {
   if (estado === "CERRADA") return "apagado";
+  if (estado === "PENDIENTE_CIERRE") return "advertencia";
   if (estado === "EN_PROGRESO") return "proceso";
   return "pendiente";
 }
 
 function textoEstado(estado) {
-  const nombres = { ABIERTA: "Abierta", EN_PROGRESO: "En progreso", CERRADA: "Cerrada" };
+  const nombres = {
+    ABIERTA: "Abierta",
+    EN_PROGRESO: "En progreso",
+    PENDIENTE_CIERRE: "Pendiente de cierre",
+    CERRADA: "Cerrada",
+  };
   return nombres[estado] || estado;
 }
 

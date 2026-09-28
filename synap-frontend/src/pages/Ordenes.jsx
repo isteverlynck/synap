@@ -62,6 +62,7 @@ const FILTROS_BASE = [
   { id: "", texto: "Todas" },
   { id: "ABIERTA", texto: "Abiertas" },
   { id: "EN_PROGRESO", texto: "En progreso" },
+  { id: "PENDIENTE_CIERRE", texto: "Pendientes de cierre" },
   { id: "CERRADA", texto: "Cerradas" },
 ];
 
@@ -308,12 +309,18 @@ function Ordenes() {
 // dejaría de significar "urgente".
 function tonoEstadoOT(estado) {
   if (estado === "CERRADA") return "apagado";
+  if (estado === "PENDIENTE_CIERRE") return "advertencia";
   if (estado === "EN_PROGRESO") return "proceso";
   return "pendiente";
 }
 
 function textoEstado(estado) {
-  const nombres = { ABIERTA: "Abierta", EN_PROGRESO: "En progreso", CERRADA: "Cerrada" };
+  const nombres = {
+    ABIERTA: "Abierta",
+    EN_PROGRESO: "En progreso",
+    PENDIENTE_CIERRE: "Pendiente de cierre",
+    CERRADA: "Cerrada",
+  };
   return nombres[estado] || estado;
 }
 

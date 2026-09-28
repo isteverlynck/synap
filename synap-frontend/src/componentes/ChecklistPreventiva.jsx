@@ -18,9 +18,15 @@ import {
   verChecklistDePlantilla, verRespuestasDeMP,
   registrarRespuesta, generarCorrectivaDesdeChecklist,
 } from "../api/checklists";
+import { completarOrden } from "../api/ordenes";
 import { color, cs, boton, insignia } from "../tema";
 
-function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, onCerrarOT, navegar }) {
+// onCompletado(otActualizada): se llama cuando la orden ya se completó de
+// verdad (el backend la dejó PENDIENTE_CIERRE) — así el padre actualiza su
+// copia de la OT. Antes esto abría un panel aparte pidiendo de nuevo "qué se
+// hizo"; ahora todo el paso de completar pasa por acá, en el modal de
+// validación, para que haya un solo botón que complete la orden.
+function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, onCompletado, navegar }) {
   const [cargando, setCargando] = useState(true);
   const [mp, setMp] = useState(null);
   const [items, setItems] = useState([]);
@@ -40,6 +46,45 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
   const [errorItem, setErrorItem] = useState("");
   const [mostrarValidacion, setMostrarValidacion] = useState(false);
   const yaSeAbrio = useRef(false);
+
+  // ─── Completar la orden (dentro del modal de validación) ───
+  const [observacionesOT, setObservacionesOT] = useState("");
+  const [justificacionRetraso, setJustificacionRetraso] = useState("");
+  const [completando, setCompletando] = useState(false);
+  const [errorCompletar, setErrorCompletar] = useState("");
+
+  // Si hoy ya no estamos en el mes en que se abrió la OT, hubo un desvío y
+  // el backend va a pedir el motivo del retraso.
+  const hoy = new Date();
+  const apertura = ot.fecha_apertura ? new Date(ot.fecha_apertura) : null;
+  const conDesvio =
+    apertura &&
+    (apertura.getFullYear() !== hoy.getFullYear() || apertura.getMonth() !== hoy.getMonth());
+
+  async function confirmarCompletar() {
+    if (!observacionesOT.trim()) {
+      setErrorCompletar("Contá qué se hizo: es lo que queda en el historial del equipo.");
+      return;
+    }
+    if (conDesvio && !justificacionRetraso.trim()) {
+      setErrorCompletar("Este mantenimiento se completa fuera del mes en que se abrió: contá el motivo del retraso.");
+      return;
+    }
+    setCompletando(true);
+    setErrorCompletar("");
+    try {
+      const nuevaOrden = await completarOrden(ot.id, observacionesOT.trim(), justificacionRetraso.trim());
+      toast.success(`OT-${String(ot.numero_ot).padStart(4, "0")} completada`, {
+        description: "Queda pendiente de que coordinación autorice el cierre.",
+      });
+      setMostrarValidacion(false);
+      onCompletado?.(nuevaOrden);
+    } catch (e) {
+      setErrorCompletar(e.response?.data?.detail || "No pudimos completar la orden.");
+    } finally {
+      setCompletando(false);
+    }
+  }
 
   useEffect(() => {
     mantenimientoDeOT(ot.id)
@@ -290,17 +335,22 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
           style={{ ...boton("primario"), marginTop: 14, width: "100%" }}
           onClick={() => setMostrarValidacion(true)}
         >
-          Revisar y cerrar la orden
+          Revisar y completar la orden
         </button>
       )}
 
       {mostrarValidacion && (
-        <div style={estilos.fondoModal} onClick={() => setMostrarValidacion(false)}>
+        <div
+          style={estilos.fondoModal}
+          onClick={() => { if (!completando) setMostrarValidacion(false); }}
+        >
           <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
             <p style={estilos.panelTitulo}>Validación de datos</p>
             <p style={estilos.modalAyuda}>
-              Revisá lo que cargaste antes de cerrar la orden. Si algo quedó mal,
-              cancelá y corregilo con el botón "Cambiar".
+              Revisá lo que cargaste. Si algo quedó mal, cancelá y corregilo con el
+              botón "Cambiar". Al completar, la orden queda pendiente de cierre hasta
+              que coordinación la revise y la autorice (o te la devuelva si encuentra
+              algo mal).
             </p>
 
             <div style={estilos.listaItems}>
@@ -326,15 +376,44 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
               })}
             </div>
 
+            {ot.parada_iniciada_en && (
+              <p style={estilos.modalAyuda}>
+                El equipo figura parado ahora mismo. Al completar, la parada se
+                finaliza sola con la fecha de ahora.
+              </p>
+            )}
+
+            <label style={cs.label}>Qué se hizo</label>
+            <textarea
+              style={{ ...cs.input, minHeight: 70, marginBottom: 12, resize: "vertical" }}
+              placeholder="Ej: se reemplazó el sensor de flujo y se calibró el equipo."
+              value={observacionesOT}
+              onChange={(e) => setObservacionesOT(e.target.value)}
+            />
+
+            {conDesvio && (
+              <>
+                <p style={estilos.modalAyuda}>
+                  Este mantenimiento se abrió en {apertura.toLocaleDateString("es-AR", { month: "2-digit", year: "numeric" })} y se está completando fuera de ese mes: hubo un desvío.
+                </p>
+                <label style={cs.label}>Motivo del retraso</label>
+                <textarea
+                  style={{ ...cs.input, minHeight: 60, marginBottom: 12, resize: "vertical" }}
+                  placeholder="Ej: se esperó un repuesto que tardó en llegar."
+                  value={justificacionRetraso}
+                  onChange={(e) => setJustificacionRetraso(e.target.value)}
+                />
+              </>
+            )}
+
+            {errorCompletar && <p style={estilos.error}>{errorCompletar}</p>}
+
             <div style={estilos.accionesModal}>
-              <button style={boton("fantasma")} onClick={() => setMostrarValidacion(false)}>
+              <button style={boton("fantasma")} onClick={() => setMostrarValidacion(false)} disabled={completando}>
                 Cancelar
               </button>
-              <button
-                style={boton("primario")}
-                onClick={() => { setMostrarValidacion(false); onCerrarOT?.(); }}
-              >
-                Cerrar OT
+              <button style={boton("primario")} onClick={confirmarCompletar} disabled={completando}>
+                {completando ? "Completando..." : "Completar orden de trabajo"}
               </button>
             </div>
           </div>
