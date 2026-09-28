@@ -807,6 +807,30 @@ class MTBFItem(BaseModel):
     mtbf_dias: float
 
 
+class ConteoEstadoOT(BaseModel):
+    """Cuántas OT hay en cada estado — para la torta "OT por estado" del
+    dashboard."""
+    estado: str
+    cantidad: int
+
+
+class CargaGrupoItem(BaseModel):
+    """Cuántas OT abiertas (sin cerrar) tiene un grupo técnico ahora mismo —
+    para el gráfico de "carga laboral por grupo" del dashboard."""
+    grupo_id: str
+    grupo_nombre: str
+    cantidad: int
+
+
+class FallasTrimestreItem(BaseModel):
+    """Cuántas fallas (OT correctivas) hubo en un trimestre puntual — para el
+    gráfico de barras "fallas por trimestre" del dashboard. Siempre vienen
+    los últimos 4 trimestres, aunque alguno tenga 0 fallas."""
+    anio: int
+    trimestre: int  # 1 a 4
+    cantidad: int
+
+
 class DashboardKPIs(BaseModel):
     """Todos los indicadores del panel de jefatura, en una sola respuesta.
 
@@ -841,7 +865,16 @@ class DashboardKPIs(BaseModel):
     ot_abiertas: int = 0
     activos_totales: int = 0
     activos_en_baja: int = 0
-    
+
+    # KPI 6 — OT por estado (torta) y KPI 7 — carga laboral por grupo (barras)
+    ot_por_estado: list[ConteoEstadoOT] = []
+    carga_por_grupo: list[CargaGrupoItem] = []
+
+    # KPI 8 — fallas por trimestre (barras) y alertas (sin asignar / vencidos)
+    fallas_por_trimestre: list[FallasTrimestreItem] = []
+    ot_sin_asignar: int = 0
+    preventivos_vencidos: int = 0
+
 # ─── Solicitudes de servicio ───
 class SolicitudCrear(BaseModel):
     """Lo que manda un usuario (enfermería/médico) para crear una solicitud.
@@ -976,7 +1009,22 @@ class CalendarioPreventivas(BaseModel):
     anio: int
     mes: int
     items: list[ItemCalendarioPreventiva] = []
-    
+
+
+# ─── Gráfico "carga de mantenimientos por mes" del calendario ───
+class ItemResumenMes(BaseModel):
+    """Cuántos mantenimientos preventivos hay programados en un mes puntual
+    (generados + pronóstico, mismo criterio que CalendarioPreventivas)."""
+    anio: int
+    mes: int
+    cantidad: int
+
+
+class ResumenCalendarioMeses(BaseModel):
+    """La carga de mantenimientos mes a mes, para un rango de meses (el dato
+    que alimenta el gráfico de barras del calendario)."""
+    items: list[ItemResumenMes] = []
+
 class RecuperarPasswordRequest(BaseModel):
     """Pedido de recuperación: solo el número de identificación."""
     numero_identificacion: str
@@ -1031,6 +1079,16 @@ class SiglaUbicacionOut(BaseModel):
     id: str
     nombre: str
     categoria: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ─── Catálogo de ubicaciones (para elegir la ubicación de un equipo) ───
+class UbicacionOut(BaseModel):
+    codigo: str
+    descripcion: str
+    estado: str
+    planta: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

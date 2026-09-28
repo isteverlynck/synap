@@ -41,16 +41,21 @@ grupo/tipo, este SOLO afecta al cumplimiento de MP (KPI 1) — ver el porqué en
 el docstring del endpoint.
 """
 
+from datetime import date
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import OrdenTrabajo, MantenimientoPreventivo, SolicitudServicio, Activo, Usuario
+from ..models import OrdenTrabajo, MantenimientoPreventivo, SolicitudServicio, Activo, Usuario, GrupoTecnico
 from ..schemas import (
     DashboardKPIs,
     FallasPorEquipo,
     FallasPorTipo,
     MTBFItem,
+    ConteoEstadoOT,
+    CargaGrupoItem,
+    FallasTrimestreItem,
 )
 from ..security import get_current_user, requiere_rol
 
@@ -126,7 +131,8 @@ def obtener_kpis(
     # (queda registrado en justificacion_retraso) y NO cuenta como cumplido
     # para este %, aunque sí quede como 'realizado'. Se marca en
     # ordenes_trabajo.cerrar_orden al cerrar la OT preventiva.
-    mps = filtrar(db.query(MantenimientoPreventivo).all(), lambda m: m.activo_codigo)
+    mps_todos = filtrar(db.query(MantenimientoPreventivo).all(), lambda m: m.activo_codigo)
+    mps = mps_todos
     if anio and mes:
         mps = [
             m for m in mps
@@ -208,6 +214,23 @@ def obtener_kpis(
         for s in db.query(SolicitudServicio).filter(SolicitudServicio.ot_id.isnot(None)).all()
     }
 
+    # Los últimos 4 trimestres (el actual + los 3 anteriores), calculados a
+    # partir de hoy — se arman ANTES del loop y con 0 de entrada, así el
+    # gráfico de barras "fallas por trimestre" siempre muestra las 4
+    # columnas aunque alguna no tenga ninguna falla (mismo criterio que
+    # "Mantenimientos planeados").
+    hoy = date.today()
+
+    def _trimestre_anterior(t):
+        anio, trimestre = t
+        return (anio, trimestre - 1) if trimestre > 1 else (anio - 1, 4)
+
+    trimestres_recientes = [(hoy.year, (hoy.month - 1) // 3 + 1)]
+    for _ in range(3):
+        trimestres_recientes.append(_trimestre_anterior(trimestres_recientes[-1]))
+    trimestres_recientes.reverse()  # del más viejo al más nuevo
+    cuenta_trimestre = {t: 0 for t in trimestres_recientes}
+
     fechas_por_equipo = {}
     fechas_por_tipo = {}
     for o in correctivas:
@@ -223,6 +246,14 @@ def obtener_kpis(
         fechas_por_equipo.setdefault(o.activo_codigo, []).append(fecha)
         tipo = tipo_de_activo.get(o.activo_codigo, "SIN_TIPO")
         fechas_por_tipo.setdefault(tipo, []).append(fecha)
+        clave_trimestre = (fecha.year, (fecha.month - 1) // 3 + 1)
+        if clave_trimestre in cuenta_trimestre:
+            cuenta_trimestre[clave_trimestre] += 1
+
+    fallas_por_trimestre = [
+        FallasTrimestreItem(anio=a, trimestre=t, cantidad=cuenta_trimestre[(a, t)])
+        for (a, t) in trimestres_recientes
+    ]
 
     mtbf_por_equipo = []
     for cod, fechas in fechas_por_equipo.items():
@@ -247,6 +278,60 @@ def obtener_kpis(
         1 for a in activos_filtrados if str(a.estado).upper() == "BAJA"
     )
 
+    # ─── KPI 6: OT por estado (torta del dashboard) ───
+    # Mismos 4 estados que usa el resto de la app (ver CalendarioMP.jsx):
+    # ABIERTA, EN_PROGRESO, PENDIENTE_CIERRE, CERRADA. Se omite un estado de
+    # la lista si no tiene ninguna OT — así la torta no muestra una porción
+    # vacía.
+    ESTADOS_OT = ["ABIERTA", "EN_PROGRESO", "PENDIENTE_CIERRE", "CERRADA"]
+    cuenta_estado = {e: 0 for e in ESTADOS_OT}
+    for o in todas_ot:
+        cuenta_estado[o.estado] = cuenta_estado.get(o.estado, 0) + 1
+    ot_por_estado = [
+        ConteoEstadoOT(estado=e, cantidad=cuenta_estado[e])
+        for e in ESTADOS_OT
+        if cuenta_estado[e] > 0
+    ]
+
+    # ─── KPI 7: carga laboral por grupo técnico ───
+    # Cuenta las OT ABIERTAS AHORA (no cerradas) de cada grupo — es la carga
+    # de trabajo actual de cada equipo técnico, no el historial completo (una
+    # OT ya cerrada no pesa en la carga de hoy). Se ordena de mayor a menor
+    # carga, así el grupo más exigido queda primero.
+    nombre_de_grupo = {g.id: (g.descripcion or g.id) for g in db.query(GrupoTecnico).all()}
+    cuenta_grupo = {}
+    for o in todas_ot:
+        if o.estado == "CERRADA":
+            continue
+        clave = o.grupo_id or "SIN_GRUPO"
+        cuenta_grupo[clave] = cuenta_grupo.get(clave, 0) + 1
+    carga_por_grupo = [
+        CargaGrupoItem(
+            grupo_id=g,
+            grupo_nombre="Sin grupo asignado" if g == "SIN_GRUPO" else nombre_de_grupo.get(g, g),
+            cantidad=c,
+        )
+        for g, c in sorted(cuenta_grupo.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    # ─── KPI 8b: alertas — sin asignar / preventivos vencidos ───
+    # "Sin asignar": cualquier OT ABIERTA (no cerrada, correctiva o
+    # preventiva) sin técnico asignado — usa tecnico_id, que es el campo de
+    # asignación a una PERSONA (grupo_id es el equipo dueño, no quién la
+    # tiene tomada). "Vencido" SOLO aplica a preventivos (definición
+    # acordada con Cami): el mes de fecha_programada ya pasó y todavía no
+    # tiene fecha_realizada — sin importar si generó o no una OT. Usa
+    # mps_todos (no el filtro anio/mes de KPI 1: acá siempre se mira el
+    # estado actual completo, no un mes puntual).
+    ot_sin_asignar = sum(
+        1 for o in todas_ot if o.estado != "CERRADA" and o.tecnico_id is None
+    )
+    preventivos_vencidos = sum(
+        1 for m in mps_todos
+        if m.fecha_realizada is None
+        and (m.fecha_programada.year, m.fecha_programada.month) < (hoy.year, hoy.month)
+    )
+
     return DashboardKPIs(
         mp_totales=mp_totales,
         mp_realizados=mp_realizados,
@@ -264,4 +349,9 @@ def obtener_kpis(
         ot_abiertas=ot_abiertas,
         activos_totales=activos_totales,
         activos_en_baja=activos_en_baja,
+        ot_por_estado=ot_por_estado,
+        carga_por_grupo=carga_por_grupo,
+        fallas_por_trimestre=fallas_por_trimestre,
+        ot_sin_asignar=ot_sin_asignar,
+        preventivos_vencidos=preventivos_vencidos,
     )
