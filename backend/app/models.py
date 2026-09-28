@@ -734,3 +734,25 @@ class SiglaUbicacion(Base):
     # "Piso/Subsuelo", "Área", "Sala") — no afecta la decodificación.
     categoria: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Ubicacion(Base):
+    """Catálogo de ubicaciones válidas del hospital, relevado por
+    bioingeniería (edificio, piso/subsuelo, área, sala...). Reemplaza el
+    texto libre que tenía antes Activo.ubicacion: ahora se elige de acá al
+    dar de alta un equipo, en vez de escribirse a mano.
+
+    El código sigue siendo jerárquico (segmentos separados por guion, ej.
+    "E01-1SS-ESCO-CIR-1Y2"), así que sigue siendo compatible con el glosario
+    de siglas y con CodigoConGlosario tal como estaban."""
+    __tablename__ = "ubicaciones"
+
+    codigo: Mapped[str] = mapped_column(String, primary_key=True)
+    descripcion: Mapped[str] = mapped_column(String, nullable=False)
+    # OPERATIVO / ACTIVO / FUERASERVICIO / INACTIVO, tal cual viene de la
+    # planilla relevada. El endpoint que lista para elegir filtra por esto:
+    # no tiene sentido ofrecer una ubicación fuera de servicio.
+    estado: Mapped[str] = mapped_column(String, nullable=False)
+    # Por ahora todas son del mismo edificio (HA-PUEY), pero se guarda por si
+    # en el futuro se relevan otras sedes.
+    planta: Mapped[str | None] = mapped_column(String, nullable=True)

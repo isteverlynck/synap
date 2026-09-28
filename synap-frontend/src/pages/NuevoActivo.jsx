@@ -1,8 +1,8 @@
 // NuevoActivo.jsx — alta de un equipo nuevo en el inventario.
 //
 // La usan coordinación, técnicos (y junior) y jefatura. El código del equipo
-// NO se escribe a mano: lo arma el backend (B-<área>-<tipo de equipo>-<número
-// correlativo>) a partir del área que se elige acá y el tipo de equipo.
+// NO se escribe a mano: lo arma el backend (B-[área]-[tipo de equipo]-[número
+// correlativo]) a partir del área que se elige acá y el tipo de equipo.
 // La descripción tampoco se escribe a mano: el backend la completa sola con
 // el nombre del tipo de equipo elegido (ver el select "Tipo de equipo").
 //
@@ -21,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { crearActivo, catalogosParaAlta } from "../api/activos";
 import { listarPlanes } from "../api/planes";
+import { listarUbicaciones } from "../api/catalogos";
 import Encabezado from "../componentes/Encabezado";
 import Volver from "../componentes/Volver";
 import { color, cs, boton } from "../tema";
@@ -51,7 +52,13 @@ function NuevoActivo() {
   const [area, setArea] = useState("");
   const [tipoEquipoId, setTipoEquipoId] = useState("");
   const [sectorId, setSectorId] = useState("");
-  const [ubicacion, setUbicacion] = useState("");
+  // Ubicación: se elige del catálogo, no se escribe libre (ver
+  // listarUbicaciones). ubicacionTexto es lo que se va tipeando para
+  // filtrar; ubicacionElegida es la que realmente se manda al crear el
+  // equipo — solo se completa al elegir una sugerencia de la lista.
+  const [ubicaciones, setUbicaciones] = useState([]);
+  const [ubicacionTexto, setUbicacionTexto] = useState("");
+  const [ubicacionElegida, setUbicacionElegida] = useState(null);
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [numeroSerie, setNumeroSerie] = useState("");
@@ -76,14 +83,39 @@ function NuevoActivo() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([catalogosParaAlta(), listarPlanes()])
-      .then(([cat, pl]) => {
+    Promise.all([catalogosParaAlta(), listarPlanes(), listarUbicaciones()])
+      .then(([cat, pl, ubi]) => {
         setCatalogos(cat);
         setPlanes(pl);
+        setUbicaciones(ubi);
       })
       .catch(() => setErrorCatalogos("No se pudieron cargar los tipos de equipo y servicios. Recargá la página."))
       .finally(() => setCargandoCatalogos(false));
   }, []);
+
+  // Filtra el catálogo de ubicaciones a medida que se escribe (por código o
+  // por descripción), mismo criterio que el buscador de equipo en
+  // Solicitudes.jsx. Se corta en 30 para no mostrar una lista eterna.
+  const textoBusquedaUbicacion = ubicacionTexto.trim().toLowerCase();
+  const ubicacionesFiltradas = !ubicacionElegida && textoBusquedaUbicacion
+    ? ubicaciones
+        .filter(
+          (u) =>
+            u.codigo.toLowerCase().includes(textoBusquedaUbicacion) ||
+            u.descripcion.toLowerCase().includes(textoBusquedaUbicacion)
+        )
+        .slice(0, 30)
+    : [];
+
+  function elegirUbicacion(u) {
+    setUbicacionElegida(u);
+    setUbicacionTexto("");
+  }
+
+  function cambiarUbicacion() {
+    setUbicacionElegida(null);
+    setUbicacionTexto("");
+  }
 
   // El checklist que le va a tocar a este equipo, para mostrarlo ANTES de
   // crear el mantenimiento: primero el del tipo elegido; si no hay, el
@@ -111,6 +143,11 @@ function NuevoActivo() {
     if (!area.trim()) return setError("Indicá el área (va en el código del equipo, ej: INTR, TERA).");
     if (!tipoEquipoId) return setError("Elegí el tipo de equipo.");
     if (!sectorId) return setError("Elegí el servicio/sector.");
+    // La ubicación es opcional, pero si se escribió algo tiene que haberse
+    // elegido de la lista — no se manda texto libre sin elegir.
+    if (ubicacionTexto.trim() && !ubicacionElegida) {
+      return setError("Elegí la ubicación de la lista, o borrá lo que escribiste si no aplica.");
+    }
     if (crearMantenimiento) {
       const n = Number(frecuenciaEfectiva);
       if (!n || n <= 0) return setError("Indicá cada cuántos meses se repite el mantenimiento.");
@@ -129,7 +166,7 @@ function NuevoActivo() {
         area: area.trim(),
         tipo_equipo_id: tipoEquipoId,
         sector_id: sectorId,
-        ubicacion: ubicacion.trim() || null,
+        ubicacion: ubicacionElegida?.codigo || null,
         marca: marca.trim() || null,
         modelo: modelo.trim() || null,
         numero_serie: numeroSerie.trim() || null,
@@ -174,7 +211,7 @@ function NuevoActivo() {
           <div style={estilos.grilla2}>
             <Campo
               etiqueta="Área (para el código)"
-              ayuda="Ej: INTR, TERA, CIRU. Va en el código del equipo: B-<área>-<tipo>-<número>."
+              ayuda="Ej: INTR, TERA, CIRU. Va en el código del equipo: B-[área]-[tipo]-[número]."
             >
               <input
                 style={cs.input}
@@ -213,12 +250,46 @@ function NuevoActivo() {
 
           <div style={{ ...estilos.grilla2, marginTop: 16, marginBottom: 0 }}>
             <Campo etiqueta="Ubicación">
-              <input
-                style={cs.input}
-                placeholder="Ej: Habitación 1 UTI"
-                value={ubicacion}
-                onChange={(e) => setUbicacion(e.target.value)}
-              />
+              {ubicacionElegida ? (
+                <div style={estilos.ubicacionElegida}>
+                  <span>
+                    <strong>{ubicacionElegida.codigo}</strong> — {ubicacionElegida.descripcion}
+                  </span>
+                  <button type="button" style={estilos.linkCambiar} onClick={cambiarUbicacion}>
+                    Cambiar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    style={cs.input}
+                    placeholder="Buscá por código o descripción, ej: UTI, quirófano"
+                    value={ubicacionTexto}
+                    onChange={(e) => setUbicacionTexto(e.target.value)}
+                  />
+                  {textoBusquedaUbicacion && ubicacionesFiltradas.length === 0 && (
+                    <p style={estilos.ayuda}>No encontramos ninguna ubicación con eso.</p>
+                  )}
+                  {ubicacionesFiltradas.length > 0 && (
+                    <div style={estilos.listaSugerencias}>
+                      {ubicacionesFiltradas.map((u) => (
+                        <div
+                          key={u.codigo}
+                          style={estilos.sugerencia}
+                          // onMouseDown y no onClick: el mousedown ocurre antes
+                          // del blur del input, así el click no se pierde.
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            elegirUbicacion(u);
+                          }}
+                        >
+                          <strong>{u.codigo}</strong> — {u.descripcion}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </Campo>
             <Campo etiqueta="Código QR (si ya está pegado)">
               <input style={cs.input} placeholder="Opcional" value={codigoQr} onChange={(e) => setCodigoQr(e.target.value)} />
@@ -352,6 +423,21 @@ const estilos = {
   error: { fontSize: "0.85rem", color: color.peligro, margin: "8px 0" },
   checkboxFila: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
   checkboxTexto: { fontSize: "0.92rem", color: color.texto, fontWeight: 600 },
+  ubicacionElegida: {
+    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+    padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${color.borde}`, background: color.fondo,
+  },
+  linkCambiar: {
+    border: "none", background: "none", color: color.primario, cursor: "pointer",
+    fontSize: "0.85rem", fontWeight: 600, padding: 0, fontFamily: "inherit", flexShrink: 0,
+  },
+  listaSugerencias: {
+    marginTop: 6, maxHeight: 220, overflowY: "auto", border: `1px solid ${color.borde}`,
+    borderRadius: 10, background: color.tarjeta,
+  },
+  sugerencia: {
+    padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${color.bordeSuave}`, fontSize: "0.88rem", color: color.texto,
+  },
 };
 
 export default NuevoActivo;

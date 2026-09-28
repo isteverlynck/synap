@@ -13,9 +13,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import SiglaUbicacion, Usuario
-from ..schemas import SiglaUbicacionCreate, SiglaUbicacionOut
+from ..models import SiglaUbicacion, Ubicacion, Usuario
+from ..schemas import SiglaUbicacionCreate, SiglaUbicacionOut, UbicacionOut
 from ..security import get_current_user, requiere_rol
+
+# Estados de la planilla relevada que tiene sentido ofrecer para elegir al
+# dar de alta un equipo — el resto (fuera de servicio, inactivo) queda
+# excluido.
+_ESTADOS_UBICACION_ELEGIBLES = ("OPERATIVO", "ACTIVO")
 
 router = APIRouter(prefix="/catalogos", tags=["catalogos"])
 
@@ -60,3 +65,19 @@ def eliminar_sigla(
         raise HTTPException(status_code=404, detail="Esa sigla no está en el glosario.")
     db.delete(sigla)
     db.commit()
+
+
+@router.get("/ubicaciones", response_model=list[UbicacionOut])
+def listar_ubicaciones(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Catálogo completo de ubicaciones válidas del hospital, para elegir al
+    dar de alta un equipo (en vez de escribir la ubicación a mano). Solo las
+    operativas — no ofrecemos para elegir una que está fuera de servicio."""
+    return (
+        db.query(Ubicacion)
+        .filter(Ubicacion.estado.in_(_ESTADOS_UBICACION_ELEGIBLES))
+        .order_by(Ubicacion.codigo)
+        .all()
+    )

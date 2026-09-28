@@ -18,10 +18,11 @@ GET /calendario es la otra mitad: dejar que cualquiera vea, de cualquier mes
 pronóstico — para poder organizarse.
 """
 
+import re
 from datetime import datetime, date
 from calendar import monthrange
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, extract
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -34,6 +35,8 @@ from ..schemas import (
     PreventivasGeneradas,
     CalendarioPreventivas,
     ItemCalendarioPreventiva,
+    ResumenCalendarioMeses,
+    ItemResumenMes,
 )
 from ..security import get_current_user, requiere_rol
 
@@ -213,31 +216,13 @@ def _proxima_cae_en_mes(activo: Activo, anio: int, mes: int) -> bool:
     return diferencia_meses % activo.frecuencia_mp_meses == 0
 
 
-@router.get("/calendario", response_model=CalendarioPreventivas)
-def calendario_preventivas(
-    anio: int | None = None,
-    mes: int | None = None,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
-):
-    """Los mantenimientos preventivos de un mes puntual (por defecto, el
-    actual) — pasado, presente o futuro, el que se pida.
-
-    Junta dos cosas en una sola lista:
-      - Los que YA son una OT real (generada por generar_preventivas_core,
-        a mano o sola).
-      - Los que todavía son un PRONÓSTICO: la próxima MP del equipo cae en
-        ese mes, pero la OT no se generó todavía (típicamente, meses
-        futuros: el generador automático recién los va a crear cuando
-        llegue ese mes).
-
-    Sin restricción de rol: es información de planificación para
-    organizarse, no una acción — la puede ver cualquier persona logueada
-    (jefatura, coordinación o técnicos).
-    """
-    hoy = date.today()
-    anio = anio or hoy.year
-    mes = mes or hoy.month
+def _items_del_mes(db: Session, anio: int, mes: int) -> list[ItemCalendarioPreventiva]:
+    """La lista de mantenimientos preventivos de un mes puntual (generados +
+    pronóstico), sin envolver en el schema de respuesta — es el cuerpo que
+    antes vivía directo en GET /calendario. Se separó para que también lo
+    pueda usar GET /calendario/resumen (el gráfico de carga por mes), que
+    necesita esta misma cuenta para varios meses seguidos sin repetir la
+    lógica de qué cuenta como "mantenimiento de ese mes"."""
     descripcion_mp = _descripcion_mp(anio, mes)
 
     # Las que ya son OT reales de este mes.
@@ -281,5 +266,91 @@ def calendario_preventivas(
             ))
 
     items.sort(key=lambda i: i.activo_descripcion)
+    return items
 
+
+@router.get("/calendario", response_model=CalendarioPreventivas)
+def calendario_preventivas(
+    anio: int | None = None,
+    mes: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Los mantenimientos preventivos de un mes puntual (por defecto, el
+    actual) — pasado, presente o futuro, el que se pida.
+
+    Junta dos cosas en una sola lista:
+      - Los que YA son una OT real (generada por generar_preventivas_core,
+        a mano o sola).
+      - Los que todavía son un PRONÓSTICO: la próxima MP del equipo cae en
+        ese mes, pero la OT no se generó todavía (típicamente, meses
+        futuros: el generador automático recién los va a crear cuando
+        llegue ese mes).
+
+    Sin restricción de rol: es información de planificación para
+    organizarse, no una acción — la puede ver cualquier persona logueada
+    (jefatura, coordinación o técnicos).
+    """
+    hoy = date.today()
+    anio = anio or hoy.year
+    mes = mes or hoy.month
+    items = _items_del_mes(db, anio, mes)
     return CalendarioPreventivas(anio=anio, mes=mes, items=items)
+
+
+_MES_REGEX = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
+
+
+def _parsear_mes(valor: str, nombre_campo: str) -> tuple[int, int]:
+    """Convierte "YYYY-MM" en (año, mes). 400 si no viene en ese formato."""
+    m = _MES_REGEX.match(valor or "")
+    if not m:
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{nombre_campo}' tiene que tener el formato YYYY-MM (ej: 2026-03).",
+        )
+    return int(m.group(1)), int(m.group(2))
+
+
+@router.get("/calendario/resumen", response_model=ResumenCalendarioMeses)
+def resumen_calendario(
+    desde: str,
+    hasta: str,
+    grupo_id: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Cuántos mantenimientos preventivos hay programados en cada mes de un
+    rango (generados + pronóstico, mismo criterio que GET /calendario) — es
+    el dato del gráfico de barras "carga por mes" del calendario, para ver
+    de un vistazo qué mes tiene más mantenimientos encima.
+
+    desde/hasta: "YYYY-MM", los dos inclusive. grupo_id: opcional, para ver
+    la carga de un solo grupo técnico en vez de todos mezclados. Igual que
+    /calendario, sin restricción de rol — es información de planificación.
+    """
+    anio_desde, mes_desde = _parsear_mes(desde, "desde")
+    anio_hasta, mes_hasta = _parsear_mes(hasta, "hasta")
+
+    # Índice absoluto de mes (0 = enero del año 0) para poder recorrer el
+    # rango sumando de a uno sin manejar a mano el "diciembre → enero".
+    idx_desde = anio_desde * 12 + (mes_desde - 1)
+    idx_hasta = anio_hasta * 12 + (mes_hasta - 1)
+    cantidad_meses = idx_hasta - idx_desde + 1
+
+    if cantidad_meses <= 0:
+        raise HTTPException(status_code=400, detail="'hasta' tiene que ser igual o posterior a 'desde'.")
+    if cantidad_meses > 36:
+        raise HTTPException(status_code=400, detail="El rango no puede superar los 36 meses.")
+
+    resumen = []
+    for i in range(cantidad_meses):
+        idx = idx_desde + i
+        anio, mes = divmod(idx, 12)
+        mes += 1
+        items = _items_del_mes(db, anio, mes)
+        if grupo_id:
+            items = [it for it in items if it.grupo_id == grupo_id]
+        resumen.append(ItemResumenMes(anio=anio, mes=mes, cantidad=len(items)))
+
+    return ResumenCalendarioMeses(items=resumen)

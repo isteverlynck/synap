@@ -30,17 +30,35 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
-import { calendarioPreventivas, generarPreventivas } from "../api/preventivas";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList,
+} from "recharts";
+import { calendarioPreventivas, generarPreventivas, resumenCalendario } from "../api/preventivas";
 import { obtenerPerfil } from "../api/auth";
+import { opcionesDeFiltro } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
-import { color, cs, boton, insignia } from "../tema";
+import { color, cs, boton, insignia, sombra } from "../tema";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+const MESES_ABREV = MESES.map((m) => m.slice(0, 3));
 
 const PUEDE_GENERAR = ["coordinacion", "jefatura"];
+
+// "YYYY-MM" a partir de un Date — lo que espera el input type="month" y el
+// endpoint /preventivas/calendario/resumen.
+function formatoMes(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// Un Date desplazado "delta" meses (puede ser negativo), siempre al día 1 —
+// para calcular el default del rango del gráfico sin pelearse con los
+// desbordes de mes/año a mano.
+function sumarMesesFecha(d, delta) {
+  return new Date(d.getFullYear(), d.getMonth() + delta, 1);
+}
 
 // Los filtros de estado. "PRONOSTICO" no es un estado de OT real: es "la MP
 // existe en el plan pero todavía no se generó la orden" (ver comentario de
@@ -94,13 +112,45 @@ function CalendarioMP() {
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState("");
 
+  // ─── Gráfico "carga de mantenimientos por mes" ───
+  // Por default arranca en el mes actual y muestra los 6 siguientes: es una
+  // pantalla de planificación hacia adelante, así que el rango por default
+  // mira para adelante, no para atrás (se puede correr con "Desde"/"Hasta").
+  const [desdeGrafico, setDesdeGrafico] = useState(formatoMes(hoy));
+  const [hastaGrafico, setHastaGrafico] = useState(formatoMes(sumarMesesFecha(hoy, 5)));
+  const [grupoGrafico, setGrupoGrafico] = useState("");
+  const [resumenMeses, setResumenMeses] = useState([]);
+  const [cargandoGrafico, setCargandoGrafico] = useState(true);
+  const [errorGrafico, setErrorGrafico] = useState("");
+  const [gruposCatalogo, setGruposCatalogo] = useState([]);
+
   useEffect(() => {
     obtenerPerfil().then(setPerfil).catch(() => setPerfil(null));
+    opcionesDeFiltro().then((o) => setGruposCatalogo(o.grupos || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
     cargar();
   }, [anio, mes]);
+
+  // El rango se valida ACÁ (no solo en el backend) para no ni siquiera pedir
+  // algo que ya sabemos que va a fallar, y para poder mostrar el mensaje al
+  // toque en vez de esperar la respuesta del servidor.
+  const rangoGraficoValido = desdeGrafico && hastaGrafico && desdeGrafico <= hastaGrafico;
+
+  useEffect(() => {
+    if (!rangoGraficoValido) {
+      setErrorGrafico("El mes \"hasta\" tiene que ser igual o posterior al mes \"desde\".");
+      setCargandoGrafico(false);
+      return;
+    }
+    setCargandoGrafico(true);
+    setErrorGrafico("");
+    resumenCalendario(desdeGrafico, hastaGrafico, grupoGrafico)
+      .then((res) => setResumenMeses(res.items))
+      .catch((err) => setErrorGrafico(err.response?.data?.detail || "No pudimos calcular la carga por mes."))
+      .finally(() => setCargandoGrafico(false));
+  }, [desdeGrafico, hastaGrafico, grupoGrafico, rangoGraficoValido]);
 
   async function cargar() {
     setCargando(true);
@@ -212,6 +262,64 @@ function CalendarioMP() {
             {generando ? "Generando..." : "Generar ahora"}
           </button>
         )}
+      </div>
+
+      {/* ─── Carga de mantenimientos por mes: vista de conjunto (varios
+      meses a la vez), para ver de un vistazo qué mes tiene más encima antes
+      de meterse a revisar mes por mes en la lista de abajo. ─── */}
+      <div style={{ ...cs.tarjeta, padding: "18px 20px", marginBottom: 18 }}>
+        <div style={estilos.encabezadoGrafico}>
+          <div>
+            <p style={estilos.tituloGrafico}>Carga de mantenimientos por mes</p>
+            <p style={estilos.ayudaGrafico}>Generados + pronóstico, para ver qué mes está más cargado.</p>
+          </div>
+          <div style={estilos.controlesGrafico}>
+            <label style={estilos.campoRango}>
+              <span style={estilos.etiquetaRango}>Desde</span>
+              <input
+                type="month"
+                style={estilos.inputMesRango}
+                value={desdeGrafico}
+                onChange={(e) => setDesdeGrafico(e.target.value)}
+              />
+            </label>
+            <label style={estilos.campoRango}>
+              <span style={estilos.etiquetaRango}>Hasta</span>
+              <input
+                type="month"
+                style={estilos.inputMesRango}
+                value={hastaGrafico}
+                onChange={(e) => setHastaGrafico(e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+
+        {gruposCatalogo.length > 1 && (
+          <div style={{ ...estilos.filtros, marginTop: 12, marginBottom: 0 }}>
+            <button
+              onClick={() => setGrupoGrafico("")}
+              style={{ ...estilos.filtro, ...(grupoGrafico === "" ? estilos.filtroActivo : {}) }}
+            >
+              Todos los grupos
+            </button>
+            {gruposCatalogo.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => setGrupoGrafico(g.id)}
+                style={{ ...estilos.filtro, ...(grupoGrafico === g.id ? estilos.filtroActivo : {}) }}
+              >
+                {g.nombre}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <GraficoCargaMensual
+          datos={resumenMeses}
+          cargando={cargandoGrafico}
+          error={errorGrafico}
+        />
       </div>
 
       {/* ─── Buscador: por código o nombre del equipo ─── */}
@@ -328,8 +436,112 @@ function textoEstado(estado) {
   return nombres[estado] || estado;
 }
 
+// ─── Gráfico de barras: carga de mantenimientos por mes ───
+// Una sola serie (cantidad de mantenimientos), así que un solo color; el mes
+// con más carga se resalta con el tono más oscuro de la misma familia (no un
+// color distinto: sigue siendo la misma magnitud, solo que es el pico). Cada
+// barra muestra su valor arriba (son pocos meses a la vez, entran todos sin
+// amontonarse) y el eje Y va oculto: el valor en la barra ya lo reemplaza.
+function GraficoCargaMensual({ datos, cargando, error }) {
+  if (cargando) {
+    return <p style={estilos.mensajeGrafico}>Calculando...</p>;
+  }
+  if (error) {
+    return <p style={{ ...estilos.mensajeGrafico, color: color.peligro }}>{error}</p>;
+  }
+  if (datos.length === 0) {
+    return <p style={estilos.mensajeGrafico}>Elegí un rango de meses válido.</p>;
+  }
+
+  const maxCantidad = Math.max(0, ...datos.map((d) => d.cantidad));
+  const datosGrafico = datos.map((d) => ({
+    ...d,
+    etiqueta: `${MESES_ABREV[d.mes - 1]} ${String(d.anio).slice(2)}`,
+    esPico: maxCantidad > 0 && d.cantidad === maxCantidad,
+  }));
+  const mesPico = datosGrafico.find((d) => d.esPico);
+
+  return (
+    <>
+      {mesPico ? (
+        <p style={estilos.resumenGrafico}>
+          El mes con más carga en este rango es{" "}
+          <strong>{MESES[mesPico.mes - 1]} {mesPico.anio}</strong>, con {mesPico.cantidad}{" "}
+          {mesPico.cantidad === 1 ? "mantenimiento" : "mantenimientos"}.
+        </p>
+      ) : (
+        <p style={estilos.resumenGrafico}>No hay mantenimientos programados en este rango.</p>
+      )}
+
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={datosGrafico} margin={{ top: 22, right: 8, bottom: 4, left: 8 }} barCategoryGap="30%">
+          <CartesianGrid vertical={false} stroke={color.bordeSuave} />
+          <XAxis
+            dataKey="etiqueta"
+            tickLine={false}
+            axisLine={{ stroke: color.borde }}
+            tick={{ fill: color.textoDebil, fontSize: 12 }}
+          />
+          {/* Oculto a propósito: cada barra ya lleva su valor arriba (LabelList),
+          así que un eje numérico solo agregaría ruido sin sumar información. */}
+          <YAxis hide domain={[0, "dataMax + 1"]} allowDecimals={false} />
+          <Tooltip content={<TooltipGrafico />} cursor={{ fill: color.bordeSuave, opacity: 0.6 }} />
+          <Bar dataKey="cantidad" radius={[4, 4, 0, 0]} maxBarSize={26} isAnimationActive={false}>
+            {datosGrafico.map((d, i) => (
+              <Cell key={d.etiqueta + i} fill={d.esPico ? color.primarioOscuro : color.primario} />
+            ))}
+            <LabelList
+              dataKey="cantidad"
+              position="top"
+              style={{ fill: color.textoSuave, fontSize: 12, fontWeight: 600 }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </>
+  );
+}
+
+// Tooltip propio (en vez del que trae Recharts por default) para que respete
+// la tipografía y los colores de la app, y para que el valor sea lo
+// destacado (negrita, arriba) y el mes quede como dato secundario abajo.
+function TooltipGrafico({ active, payload }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const d = payload[0].payload;
+  return (
+    <div style={estilos.tooltip}>
+      <p style={estilos.tooltipValor}>
+        {d.cantidad} {d.cantidad === 1 ? "mantenimiento" : "mantenimientos"}
+      </p>
+      <p style={estilos.tooltipMes}>{MESES[d.mes - 1]} {d.anio}</p>
+    </div>
+  );
+}
+
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "20px 0", lineHeight: 1.6 },
+  // ─── Gráfico "carga de mantenimientos por mes" ───
+  encabezadoGrafico: {
+    display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+    gap: 14, flexWrap: "wrap",
+  },
+  tituloGrafico: { margin: 0, fontSize: "1rem", color: color.texto, fontWeight: 700 },
+  ayudaGrafico: { margin: "3px 0 0", fontSize: "0.8rem", color: color.textoSuave },
+  controlesGrafico: { display: "flex", gap: 10, flexWrap: "wrap" },
+  campoRango: { display: "flex", flexDirection: "column", gap: 3 },
+  etiquetaRango: {
+    fontSize: "0.7rem", fontWeight: 600, color: color.textoDebil,
+    textTransform: "uppercase", letterSpacing: "0.03em",
+  },
+  inputMesRango: { ...cs.input, padding: "6px 8px", fontSize: "0.82rem", width: "auto" },
+  mensajeGrafico: { color: color.textoSuave, padding: "16px 0", fontSize: "0.88rem" },
+  resumenGrafico: { margin: "12px 0 0", fontSize: "0.85rem", color: color.textoSuave, lineHeight: 1.5 },
+  tooltip: {
+    background: color.tarjeta, border: `1px solid ${color.borde}`, borderRadius: 10,
+    padding: "8px 12px", boxShadow: sombra.flotante,
+  },
+  tooltipValor: { margin: 0, fontSize: "0.88rem", fontWeight: 700, color: color.texto },
+  tooltipMes: { margin: "2px 0 0", fontSize: "0.78rem", color: color.textoSuave },
   navegador: {
     display: "flex", alignItems: "center", gap: 10,
     marginBottom: 18, flexWrap: "wrap",

@@ -29,3 +29,14 @@ export async function generarPreventivas(anio, mes) {
   });
   return res.data;
 }
+
+// La carga de mantenimientos mes a mes (generados + pronóstico) en un rango,
+// para el gráfico de barras "carga por mes" del calendario. desde/hasta en
+// formato "YYYY-MM", los dos inclusive. grupoId opcional, para ver un solo
+// grupo técnico en vez de todos mezclados.
+export async function resumenCalendario(desde, hasta, grupoId) {
+  const params = { desde, hasta };
+  if (grupoId) params.grupo_id = grupoId;
+  const res = await cliente.get("/preventivas/calendario/resumen", { params });
+  return res.data;
+}

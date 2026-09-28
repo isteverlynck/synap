@@ -22,3 +22,11 @@ export async function crearSigla(datos) {
 export async function eliminarSigla(id) {
   await cliente.delete(`/catalogos/siglas/${id}`);
 }
+
+// Catálogo completo de ubicaciones válidas del hospital (edificio, piso,
+// área, sala...), para elegir la ubicación de un equipo en vez de
+// escribirla libre. Ya viene filtrado a las operativas.
+export async function listarUbicaciones() {
+  const res = await cliente.get("/catalogos/ubicaciones");
+  return res.data;
+}
