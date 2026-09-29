@@ -18,6 +18,7 @@ from ..schemas import (
     ServicioOut,
 )
 from ..security import get_current_user, requiere_rol, grupos_del_coordinador
+from ..criticidad import criticidad_de_activo
 
 router = APIRouter(prefix="/activos", tags=["activos"])
 
@@ -295,7 +296,8 @@ def crear_activo(
         numero_orden_compra=payload.numero_orden_compra,
         fecha_instalacion=payload.fecha_instalacion,
         estado=payload.estado,
-        criticidad=payload.criticidad,
+        es_equipo_medico=payload.es_equipo_medico,
+        sin_backup=payload.sin_backup if payload.es_equipo_medico else False,
         plantilla_mp_id=plantilla_mp_id,
         proxima_fecha_mp=proxima_fecha_mp,
         frecuencia_mp_meses=frecuencia_mp_meses,
@@ -353,6 +355,22 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
         resumen.puedo_abrir = orden.grupo_id in mios
 
     return detalle
+
+@router.get("/{codigo}/criticidad")
+def ver_criticidad(
+    codigo: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Criticidad y nivel de riesgo del equipo según el PRIUX del Alemán.
+
+    Devuelve también el detalle de la cuenta (alfas, antigüedad, antecedentes)
+    para poder mostrar de dónde sale el número, no solo el resultado.
+    """
+    activo = db.query(Activo).filter(Activo.codigo == codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+    return criticidad_de_activo(db, activo)
 
 @router.patch("/{codigo}/programar-segun-plan", response_model=ActivoOut)
 def programar_segun_plan(

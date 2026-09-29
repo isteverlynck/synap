@@ -33,14 +33,6 @@ const ESTADOS = [
   { valor: "FUERA_DE_SERVICIO", texto: "Fuera de servicio" },
 ];
 
-const CRITICIDADES = [
-  { valor: "", texto: "Sin definir" },
-  { valor: "BAJA", texto: "Baja" },
-  { valor: "MEDIA", texto: "Media" },
-  { valor: "ALTA", texto: "Alta" },
-  { valor: "CRITICA", texto: "Crítica" },
-];
-
 function NuevoActivo() {
   const navegar = useNavigate();
 
@@ -66,7 +58,8 @@ function NuevoActivo() {
   const [codigoQr, setCodigoQr] = useState("");
   const [fechaInstalacion, setFechaInstalacion] = useState("");
   const [estado, setEstado] = useState("ACTIVO");
-  const [criticidad, setCriticidad] = useState("");
+  const [esEquipoMedico, setEsEquipoMedico] = useState(true);
+  const [sinBackup, setSinBackup] = useState(false);
 
   const [crearMantenimiento, setCrearMantenimiento] = useState(false);
   // Lo que la persona escribió a mano en el campo de frecuencia. Empieza
@@ -174,7 +167,8 @@ function NuevoActivo() {
         codigo_qr: codigoQr.trim() || null,
         fecha_instalacion: fechaInstalacion || null,
         estado,
-        criticidad: criticidad || null,
+        es_equipo_medico: esEquipoMedico,
+        sin_backup: esEquipoMedico ? sinBackup : false,
         crear_mantenimiento: crearMantenimiento,
         frecuencia_meses: crearMantenimiento ? Number(frecuenciaEfectiva) : null,
         // "YYYY-MM" del input type="month" → "YYYY-MM-01" para el backend.
@@ -309,16 +303,40 @@ function NuevoActivo() {
             <Campo etiqueta="Fecha de instalación">
               <input type="date" style={cs.input} value={fechaInstalacion} onChange={(e) => setFechaInstalacion(e.target.value)} />
             </Campo>
-            <Campo etiqueta="Criticidad">
-              <select style={cs.input} value={criticidad} onChange={(e) => setCriticidad(e.target.value)}>
-                {CRITICIDADES.map((c) => (
-                  <option key={c.valor} value={c.valor}>{c.texto}</option>
-                ))}
-              </select>
-            </Campo>
           </div>
         </div>
+        {/* Datos para la criticidad PRIUX (ver backend/app/criticidad.py). */}
+        <div style={estilos.tarjeta}>
+          <label style={estilos.checkboxFila}>
+            <input
+              type="checkbox"
+              checked={esEquipoMedico}
+              onChange={(e) => setEsEquipoMedico(e.target.checked)}
+            />
+            <span style={estilos.checkboxTexto}>Es equipo médico</span>
+          </label>
+          <p style={estilos.ayuda}>
+            Solo a los equipos médicos se les calcula la criticidad y el nivel de riesgo.
+          </p>
 
+          {/* La pregunta de backup solo tiene sentido si el equipo se evalúa. */}
+          {esEquipoMedico && (
+            <div style={{ marginTop: 14 }}>
+              <label style={estilos.checkboxFila}>
+                <input
+                  type="checkbox"
+                  checked={sinBackup}
+                  onChange={(e) => setSinBackup(e.target.checked)}
+                />
+                <span style={estilos.checkboxTexto}>No tiene backup</span>
+              </label>
+              <p style={estilos.ayuda}>
+                Marcalo si no hay otro equipo que lo reemplace, si es el único de su tipo
+                o si se usa mucho. Sube su nivel de riesgo.
+              </p>
+            </div>
+          )}
+        </div>
         <div style={estilos.tarjeta}>
           <label style={estilos.checkboxFila}>
             <input

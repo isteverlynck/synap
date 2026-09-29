@@ -6,10 +6,12 @@ import { listarSiglas } from "../api/catalogos";
 import Encabezado from "../componentes/Encabezado";
 import CodigoConGlosario from "../componentes/CodigoConGlosario";
 import { armarDiccionarioSiglas } from "../utiles/codigos";
-import { color, cs, boton, insignia, estadoDelEquipo } from "../tema";
+import { color, cs, boton, insignia, estadoDelEquipo, tonoRiesgo } from "../tema";
+import VentanaRiesgo from "../componentes/VentanaRiesgo";
+import { Info } from "lucide-react";
 import Volver from "../componentes/Volver";
 import { diasHasta, parsearFecha, formatearFechaOT } from "../utiles/fechas";
-import { programarSegunPlan } from "../api/activos";
+import { programarSegunPlan, verCriticidad } from "../api/activos";
 import { toast } from "sonner";
 
 function FichaActivo() {
@@ -22,6 +24,8 @@ function FichaActivo() {
   const [programando, setProgramando] = useState(false);
   const [avisoRestringido, setAvisoRestringido] = useState(false);
   const [diccionarioSiglas, setDiccionarioSiglas] = useState({});
+  const [criticidad, setCriticidad] = useState(null);
+  const [verCalculo, setVerCalculo] = useState(false);
 
   async function programarMP() {
     if (programando) return;
@@ -53,6 +57,10 @@ function FichaActivo() {
       .then(([siglas, cat]) => setDiccionarioSiglas(armarDiccionarioSiglas(siglas, cat.tipos)))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    verCriticidad(codigo).then(setCriticidad).catch(() => setCriticidad(null));
+  }, [codigo]);
 
   function cerrarSesion() {
     logout();
@@ -133,6 +141,17 @@ function FichaActivo() {
           />
           <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
           <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
+          {/* Criticidad y riesgo PRIUX: información interna de Bioingeniería,
+          enfermería no la ve. */}
+          {rol !== "enfermeria" && criticidad && (
+            <>
+              <Dato etiqueta="Criticidad" valor={textoCriticidad(criticidad)} />
+              <Dato
+                etiqueta="Nivel de riesgo"
+                valor={<NivelRiesgo datos={criticidad} alTocar={() => setVerCalculo(true)} />}
+              />
+            </>
+          )}
         </div>
 
                 {/* El responsable no es un dato más: es una acción. Cumple el objetivo
@@ -197,6 +216,10 @@ function FichaActivo() {
         </Seccion>
       </div>
 
+      {/* Ventanita que explica cómo se calculó el nivel de riesgo. */}
+      {verCalculo && criticidad?.nivel && (
+        <VentanaRiesgo datos={criticidad} alCerrar={() => setVerCalculo(false)} />
+      )}
       {avisoRestringido && (
         <div
           style={{
@@ -292,7 +315,7 @@ function Acciones({ rol, situacion, activo, navegar }) {
     });
   }
 
-  if (rol === "coordinacion") {
+  if (rol === "coordinacion" || rol === "jefatura") {
     acciones.push({ texto: "Ver plan de mantenimiento", variante: "secundario", onClick: () => navegar(`/mantenimientos?tipo=${activo.tipo_equipo_id}`) });
   }
   
@@ -343,6 +366,43 @@ function textoEstado(estado) {
     CUMPLIDO: "Cumplido",
   };
   return nombres[estado] || estado;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Criticidad PRIUX
+// ─────────────────────────────────────────────────────────────────────────
+
+// Criticidad = función + riesgo clínico (de 2 a 10). No depende de la fecha
+// de instalación, así que se muestra aunque falte el puntaje.
+function textoCriticidad(datos) {
+  if (!datos.evaluado) return "No aplica (no es equipo médico)";
+  if (datos.criticidad == null) return "Sin dato";
+  return `${datos.criticidad}/10`;
+}
+
+// Nivel de riesgo: la pastilla de color con el puntaje. Es un botón: al
+// tocarla se abre la ventanita que explica el cálculo (VentanaRiesgo). Si no
+// se pudo calcular, muestra por qué (ej. falta la fecha de instalación).
+function NivelRiesgo({ datos, alTocar }) {
+  if (!datos.evaluado) return "No aplica";
+  if (!datos.nivel) {
+    return <span style={{ color: color.textoSuave }}>Sin dato — {datos.motivo}</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={alTocar}
+      title="Ver cómo se calcula"
+      style={{
+        ...insignia(tonoRiesgo(datos.nivel)),
+        border: "none", cursor: "pointer", fontFamily: "inherit",
+        display: "inline-flex", alignItems: "center", gap: 5,
+      }}
+    >
+      {datos.nivel} - {datos.puntaje} pts
+      <Info size={12} strokeWidth={2.4} aria-hidden="true" />
+    </button>
+  );
 }
 
 function Dato({ etiqueta, valor }) {

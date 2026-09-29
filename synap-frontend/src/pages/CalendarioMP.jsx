@@ -208,6 +208,10 @@ function CalendarioMP() {
 
   const items = datos?.items || [];
   const puedeGenerar = PUEDE_GENERAR.includes(perfil?.rol);
+  const esJefatura = perfil?.rol === "jefatura";
+  function sePuedeAbrir(item) {
+    return !(item.generada && esJefatura);
+  }
 
   // Grupos técnicos presentes ESTE mes, para las opciones del filtro — así
   // nunca se ofrece un grupo que este mes no tiene ningún mantenimiento.
@@ -395,9 +399,9 @@ function CalendarioMP() {
         {itemsFiltrados.map((item) => (
           <div
             key={item.activo_codigo}
-            className="sy-clickeable"
+            className={sePuedeAbrir(item) ? "sy-clickeable" : undefined}
             style={estilos.tarjeta}
-            onClick={() => irAlItem(item)}
+            onClick={sePuedeAbrir(item) ? () => irAlItem(item) : undefined}
           >
             <div style={{ minWidth: 0 }}>
               <p style={estilos.titulo}>{item.activo_descripcion}</p>

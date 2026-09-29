@@ -243,3 +243,9 @@ export function estadoDelEquipo(activo) {
     accion: "reportar",
   };
 }
+
+// Color de la pastilla de nivel de riesgo PRIUX de un equipo.
+export function tonoRiesgo(nivel) {
+  const tonos = { ALTO: "peligro", MEDIO: "advertencia", BAJO: "exito" };
+  return tonos[nivel] || "neutro";
+}

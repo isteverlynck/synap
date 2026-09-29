@@ -65,10 +65,12 @@ def exportar_activos(
     tipos = {t.id: t.nombre for t in db.query(TipoEquipo).all()}
     servicios = {s.id: s.nombre for s in db.query(Servicio).all()}
 
+    # La columna "Criticidad" vieja (cargada a mano) se sacó: la criticidad
+    # ahora se calcula con el PRIUX. Se vuelve a agregar cuando esté el cálculo.
     encabezados = [
         "Código", "Código QR", "Descripción", "Tipo de equipo", "Servicio",
         "Ubicación", "Marca", "Modelo", "N° de serie", "N° orden de compra",
-        "Fecha de instalación", "Estado", "Criticidad", "Grupo",
+        "Fecha de instalación", "Estado", "Grupo",
         "Frecuencia MP (meses)", "Último MP", "Próximo MP",
     ]
     filas = [
@@ -77,7 +79,7 @@ def exportar_activos(
             tipos.get(a.tipo_equipo_id, a.tipo_equipo_id),
             servicios.get(a.sector_id, a.sector_id),
             a.ubicacion, a.marca, a.modelo, a.numero_serie, a.numero_orden_compra,
-            _fecha(a.fecha_instalacion), a.estado, a.criticidad, a.grupo_id,
+            _fecha(a.fecha_instalacion), a.estado, a.grupo_id,
             a.frecuencia_mp_meses, _fecha(a.ultima_fecha_mp), _fecha(a.proxima_fecha_mp),
         ]
         for a in db.query(Activo).order_by(Activo.codigo).all()

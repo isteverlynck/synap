@@ -83,6 +83,10 @@ function Cascaron() {
     obtenerPerfil().then(setPerfil).catch(() => setPerfil(null));
   }, []);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [ubicacion.pathname]);
+
   // 'junior' usa el mismo menú que 'tecnico' (mismos permisos en el backend).
   const rol = perfil?.rol === "junior" ? "tecnico" : perfil?.rol;
   const items = MENUS[rol] || [];

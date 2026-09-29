@@ -129,7 +129,9 @@ class Activo(Base):
     grupo_original_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
-    criticidad: Mapped[str | None] = mapped_column(String, nullable=True)
+    
+    es_equipo_medico: Mapped[bool | None] = mapped_column(nullable=True)
+    sin_backup: Mapped[bool] = mapped_column(default=False, nullable=False)
     
     # ─── Relaciones (navegar desde el activo hacia lo que le pertenece) ───
     ordenes_de_trabajo: Mapped[list["OrdenTrabajo"]] = relationship(back_populates="activo")
@@ -756,3 +758,52 @@ class Ubicacion(Base):
     # Por ahora todas son del mismo edificio (HA-PUEY), pero se guarda por si
     # en el futuro se relevan otras sedes.
     planta: Mapped[str | None] = mapped_column(String, nullable=True)
+    
+class CriticidadTipo(Base):
+    """Valores del PRIUX (tabla de riesgo del Hospital Alemán) para un TIPO
+    de equipo. Valen igual para todos los equipos de ese tipo, así que se
+    cargan una sola vez por tipo y no una vez por equipo.
+
+    La clave es la sigla del tipo (DESF, BOMV...), la misma de tipos_equipo.
+    """
+    __tablename__ = "criticidad_tipo"
+
+    tipo_equipo_id: Mapped[str] = mapped_column(
+        String, ForeignKey("tipos_equipo.id"), primary_key=True
+    )
+
+    # Las tres tablas del PRIUX que dependen del tipo (valores de 1 a 5).
+    # Supabase rechaza cualquier número fuera de ese rango.
+    funcion: Mapped[int] = mapped_column(Integer, nullable=False)
+    riesgo_clinico: Mapped[int] = mapped_column(Integer, nullable=False)
+    tipo_mantenimiento: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Años que dura el equipo, para saber si está fuera de su vida útil.
+    # El 10 por defecto es provisorio hasta que confirme Cami.
+    vida_util_anios: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+
+    # "Segunda parte" del PRIUX: todavía no entra en la fórmula, queda vacía.
+    facilidad_uso: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CriticidadModelo(Base):
+    """Datos de soporte del PRIUX para una MARCA y MODELO de equipo.
+
+    Las preguntas ya están dadas vuelta respecto del documento original:
+    True significa que NO hay (y por eso suma riesgo). Si un modelo no
+    tiene fila acá, se toma como que tiene todo el soporte (suma 0).
+    """
+    __tablename__ = "criticidad_modelo"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    marca: Mapped[str] = mapped_column(String, nullable=False)
+    modelo: Mapped[str] = mapped_column(String, nullable=False)
+
+    sin_soporte_repuestos: Mapped[bool] = mapped_column(default=False, nullable=False)  # suma 0,5
+    sin_soporte_mano_obra: Mapped[bool] = mapped_column(default=False, nullable=False)  # suma 0,5
+    sin_proveedor_local: Mapped[bool] = mapped_column(default=False, nullable=False)    # suma 1
+    fuera_de_fabricacion: Mapped[bool] = mapped_column(default=False, nullable=False)   # suma 1
+
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)

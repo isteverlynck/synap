@@ -33,6 +33,7 @@ from ..schemas import (
     NotaOTCrear,
 )
 from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto, validar_a_cargo_de_preventiva
+from ..criticidad import agregar_criticidad_a_ordenes
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 
@@ -134,6 +135,7 @@ def listar_ordenes(
     # orden entre recargas y confunde al usuario.
     return q.order_by(OrdenTrabajo.fecha_apertura.desc().nullslast()).limit(limit).all()
 
+
 @router.get("/mias", response_model=list[OrdenTrabajoOut])
 def mis_ordenes(
     estado: str | None = None,
@@ -190,6 +192,7 @@ def ver_orden(
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
     _validar_permiso_sobre_ot(current_user, db, orden)
+    agregar_criticidad_a_ordenes(db, [orden])
     return orden
 
 

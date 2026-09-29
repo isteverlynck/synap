@@ -226,7 +226,6 @@ class ActivoOut(BaseModel):
     # no se le programó mantenimiento (ver ActivoCreate más abajo).
     frecuencia_mp_meses: int | None = None
     fecha_instalacion: date | None = None
-    criticidad: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -266,7 +265,8 @@ class ActivoCreate(BaseModel):
     codigo_qr: str | None = None
     fecha_instalacion: date | None = None
     estado: str = "ACTIVO"
-    criticidad: str | None = None
+    es_equipo_medico: bool = True
+    sin_backup: bool = False
 
     crear_mantenimiento: bool = False
     frecuencia_meses: int | None = None
@@ -386,6 +386,9 @@ class OrdenTrabajoOut(BaseModel):
     activo_proxima_fecha_mp: date | None = None
     reportado_por_nombre: str | None = None
     reportado_por_email: str | None = None
+    activo_criticidad: int | None = None
+    activo_nivel_riesgo: str | None = None
+    activo_puntaje: float | None = None
 
 
 class OrdenTrabajoCorrectivaCreate(BaseModel):

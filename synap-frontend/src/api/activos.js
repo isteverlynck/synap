@@ -69,3 +69,9 @@ export async function programarSegunPlan(codigo) {
   const { data } = await cliente.patch(`/activos/${codigo}/programar-segun-plan`);
   return data;
 }
+
+// Criticidad y nivel de riesgo del equipo según el PRIUX del Alemán.
+export async function verCriticidad(codigo) {
+  const res = await cliente.get(`/activos/${codigo}/criticidad`);
+  return res.data;
+}

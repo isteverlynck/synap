@@ -17,11 +17,14 @@ import { tecnicosDisponibles } from "../api/coordinacion";
 import { listarInsumos, registrarConsumo, listarConsumos } from "../api/stock";
 import { obtenerPerfil } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
-import { color, cs, boton, insignia } from "../tema";
+import { color, cs, boton, insignia, tonoRiesgo } from "../tema";
 import Volver from "../componentes/Volver";
 import ChecklistPreventiva from "../componentes/ChecklistPreventiva";
 import { toast } from "sonner";
 import { diasHasta, formatearFechaOT } from "../utiles/fechas";
+import { verCriticidad } from "../api/activos";
+import VentanaRiesgo from "../componentes/VentanaRiesgo";
+import { Info } from "lucide-react";
 
 function DetalleOrden() {
   const { id } = useParams();
@@ -41,6 +44,20 @@ function DetalleOrden() {
   const [insumos, setInsumos] = useState([]);
   const [consumosOT, setConsumosOT] = useState([]);
   const [adjuntos, setAdjuntos] = useState([]);
+  const [calculoRiesgo, setCalculoRiesgo] = useState(null);
+
+  // Al tocar la pastilla de riesgo: la OT solo trae el resultado, así que se
+  // piden los datos completos del cálculo del equipo y se abre la ventanita.
+  async function abrirCalculoRiesgo(e) {
+    // La pastilla está dentro de la tarjeta del equipo, que al tocarla lleva a
+    // su ficha. Esto corta ese clic para que solo se abra la ventanita.
+    e.stopPropagation();
+    try {
+      setCalculoRiesgo(await verCriticidad(ot.activo_codigo));
+    } catch {
+      toast.error("No pudimos cargar el cálculo del riesgo.");
+    }
+  }
 
   useEffect(() => {
     Promise.all([verOrden(id), obtenerPerfil()])
@@ -155,10 +172,15 @@ function DetalleOrden() {
   if (error && !ot) return <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>;
 
   const cerrada = ot.estado === "CERRADA";
+  
+  
 
   return (
     <>
       <Volver />
+      {calculoRiesgo?.nivel && (
+        <VentanaRiesgo datos={calculoRiesgo} alCerrar={() => setCalculoRiesgo(null)} />
+      )}
       <Encabezado
         titulo={`OT-${String(ot.numero_ot).padStart(4, "0")}`}
         subtitulo={ot.tipo}
@@ -189,6 +211,27 @@ function DetalleOrden() {
           {ot.activo_codigo}{ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
         </p>
         {avisoPreventivo && !cerrada && <p style={estilos.equipoCodigo}>{avisoPreventivo}</p>}
+        {/* Criticidad y riesgo PRIUX del equipo (ver backend/app/criticidad.py). */}
+        {ot.activo_criticidad != null && (
+          <p style={{ ...estilos.equipoCodigo, marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            Criticidad {ot.activo_criticidad}/10
+            {ot.activo_nivel_riesgo && (
+              <button
+                type="button"
+                onClick={abrirCalculoRiesgo}
+                title="Ver cómo se calcula"
+                style={{
+                  ...insignia(tonoRiesgo(ot.activo_nivel_riesgo)),
+                  border: "none", cursor: "pointer", fontFamily: "inherit",
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                }}
+              >
+                Riesgo {ot.activo_nivel_riesgo} - {ot.activo_puntaje} pts
+                <Info size={12} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            )}
+          </p>
+        )}
       </div>
 
       {ot.descripcion && (
