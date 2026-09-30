@@ -19,7 +19,7 @@ from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import OrdenTrabajo, NotaOT, Usuario, MantenimientoPreventivo
+from ..models import OrdenTrabajo, NotaOT, Usuario, MantenimientoPreventivo, Activo
 from ..notificaciones import notificar_bioingenieria
 from ..schemas import (
     OrdenTrabajoOut,
@@ -29,6 +29,7 @@ from ..schemas import (
     OrdenTrabajoAutorizar,
     OrdenTrabajoDevolver,
     OrdenTrabajoCorrectivaCreate,
+    OrdenTrabajoUpdate,
     NotaOTOut,
     NotaOTCrear,
 )
@@ -195,6 +196,72 @@ def ver_orden(
     agregar_criticidad_a_ordenes(db, [orden])
     return orden
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EDICIÓN (PATCH) — corregir descripción, prioridad y/o equipo de una OT
+# que todavía no está cerrada (pedido de Cami)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.patch("/{ot_id}", response_model=OrdenTrabajoOut)
+def editar_orden(
+    ot_id: str,
+    payload: OrdenTrabajoUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+):
+    """Editar una OT que todavía no está cerrada.
+
+    Mismo permiso que el resto de las acciones sobre una OT
+    (_validar_permiso_sobre_ot): técnico/junior de su propio grupo, o
+    coordinación de los grupos que coordina.
+
+    Es un PATCH parcial (exclude_unset): solo se tocan los campos que vengan
+    en el pedido. Ver el docstring de OrdenTrabajoUpdate en schemas.py para
+    el detalle de qué significa reasignar el equipo.
+    """
+    orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
+    if orden is None:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    if orden.estado == "CERRADA":
+        raise HTTPException(
+            status_code=400,
+            detail="Esta orden ya está cerrada: no se puede editar.",
+        )
+
+    _validar_permiso_sobre_ot(current_user, db, orden)
+
+    datos = payload.model_dump(exclude_unset=True)
+
+    # Reasignar el equipo: recalculamos el grupo a partir del nuevo activo
+    # (mismo criterio que al crear una OT) y, si el técnico ya asignado no
+    # pertenece a ese grupo nuevo, lo desasignamos — mismo invariante que ya
+    # exige asignar_tecnico (nadie queda con una OT de un grupo que no es
+    # el suyo).
+    if "activo_codigo" in datos and datos["activo_codigo"] != orden.activo_codigo:
+        nuevo_activo = db.query(Activo).filter(Activo.codigo == datos["activo_codigo"]).first()
+        if nuevo_activo is None:
+            raise HTTPException(status_code=404, detail="El equipo elegido no existe.")
+        orden.activo_codigo = nuevo_activo.codigo
+        orden.grupo_id = nuevo_activo.grupo_id
+        if orden.tecnico_id is not None:
+            tecnico = db.query(Usuario).filter(Usuario.id == orden.tecnico_id).first()
+            if tecnico is None or tecnico.grupo != orden.grupo_id:
+                orden.tecnico_id = None
+        datos.pop("activo_codigo")
+
+    if "prioridad" in datos:
+        datos["prioridad"] = datos["prioridad"].upper() if datos["prioridad"] else None
+
+    if "descripcion" in datos:
+        descripcion = (datos["descripcion"] or "").strip()
+        datos["descripcion"] = descripcion or None
+
+    for campo, valor in datos.items():
+        setattr(orden, campo, valor)
+
+    db.commit()
+    db.refresh(orden)
+    return orden
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -838,7 +905,7 @@ def ver_adjunto(
 # sale actualizado.
 # ═══════════════════════════════════════════════════════════════════════════
 
-from ..models import Activo, ChecklistItem, ChecklistRespuesta, Servicio, TipoEquipo
+from ..models import ChecklistItem, ChecklistRespuesta, Servicio, TipoEquipo
 from ..informes import generar_informe_preventiva_pdf
 
 

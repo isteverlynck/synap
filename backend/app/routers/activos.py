@@ -11,6 +11,7 @@ from ..schemas import (
     ActivoOut,
     ActivoDetalle,
     ActivoCreate,
+    ActivoUpdate,
     ResponsableOut,
     TipoEquipoCreate,
     TipoEquipoOut,
@@ -405,6 +406,62 @@ def programar_segun_plan(
 
     meses = max(1, round(plan.frecuencia_dias / 30))
     activo.frecuencia_mp_meses = meses
+    db.commit()
+    db.refresh(activo)
+    return activo
+
+
+@router.patch("/{codigo}", response_model=ActivoOut)
+def editar_activo(
+    codigo: str,
+    payload: ActivoUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion", "tecnico", "junior")),
+):
+    """Editar la ficha de un equipo ya existente (pedido de Cami).
+
+    Mismos roles que pueden dar de alta un equipo (crear_activo) — técnico y
+    junior incluidos, sin restringir por grupo: ya es así en el alta, así que
+    se mantiene el mismo criterio acá para no ser más estricto al editar que
+    al crear.
+
+    Es un PATCH parcial: solo se tocan los campos que vinieron en el pedido
+    (exclude_unset), así mandar solo "ubicacion" no pisa el resto de la
+    ficha con None. Ver ActivoUpdate en schemas.py para qué NO se puede
+    editar acá y por qué (código, descripción, grupo, fechas de MP).
+    """
+    activo = db.query(Activo).filter(Activo.codigo == codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    datos = payload.model_dump(exclude_unset=True)
+
+    # Si cambia el tipo de equipo, la descripción y el grupo técnico se
+    # recalculan solos (mismo criterio que al crear) — no se editan a mano.
+    if "tipo_equipo_id" in datos and datos["tipo_equipo_id"] != activo.tipo_equipo_id:
+        tipo = db.query(TipoEquipo).filter(TipoEquipo.id == datos["tipo_equipo_id"]).first()
+        if tipo is None:
+            raise HTTPException(status_code=404, detail="El tipo de equipo no existe.")
+        activo.descripcion = tipo.nombre
+        rel_grupo = db.query(GrupoTipoEquipo).filter(
+            GrupoTipoEquipo.tipo_equipo_id == datos["tipo_equipo_id"]
+        ).first()
+        activo.grupo_id = rel_grupo.grupo_id if rel_grupo else None
+
+    if "sector_id" in datos and datos["sector_id"] != activo.sector_id:
+        sector = db.query(Servicio).filter(Servicio.id == datos["sector_id"]).first()
+        if sector is None:
+            raise HTTPException(status_code=404, detail="El servicio/sector no existe.")
+
+    for campo, valor in datos.items():
+        setattr(activo, campo, valor)
+
+    # sin_backup solo tiene sentido si es equipo médico (mismo criterio que
+    # al crear: NuevoActivo.jsx manda sin_backup=False cuando se destilda
+    # "es equipo médico").
+    if activo.es_equipo_medico is False:
+        activo.sin_backup = False
+
     db.commit()
     db.refresh(activo)
     return activo

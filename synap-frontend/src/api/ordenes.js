@@ -53,6 +53,14 @@ export async function cambiarEstado(otId, estado) {
   return res.data;
 }
 
+// Editar una OT que todavía no está cerrada: descripción, prioridad y/o
+// equipo asociado. Es parcial: solo manda los campos que realmente
+// cambiaron (ver PanelEditarOT en DetalleOrden.jsx).
+export async function editarOrden(otId, datos) {
+  const res = await cliente.patch(`/ordenes-trabajo/${otId}`, datos);
+  return res.data;
+}
+
 // Cerrar la OT. Las observaciones son opcionales pero es donde queda registrado
 // qué se hizo: es lo que después alimenta el análisis de patrones de falla.
 // Solo sirve para CORRECTIVAS: las preventivas se cierran con el circuito de

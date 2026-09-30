@@ -70,6 +70,13 @@ export async function programarSegunPlan(codigo) {
   return data;
 }
 
+// Editar la ficha de un equipo ya existente. Es parcial: solo manda los
+// campos que realmente cambiaron (ver EditarActivo en FichaActivo.jsx).
+export async function editarActivo(codigo, datos) {
+  const res = await cliente.patch(`/activos/${codigo}`, datos);
+  return res.data;
+}
+
 // Criticidad y nivel de riesgo del equipo según el PRIUX del Alemán.
 export async function verCriticidad(codigo) {
   const res = await cliente.get(`/activos/${codigo}/criticidad`);

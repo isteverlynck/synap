@@ -11,7 +11,7 @@ import {
   verOrden, cambiarEstado, cerrarOrden, asignarTecnico, listarNotas, agregarNota,
   listarCorrectivasAsociadas, crearCorrectivaAsociada, iniciarParada, finalizarParada,
   listarAdjuntos, abrirAdjunto, descargarInformePDF,
-  autorizarCierre, devolverOrden,
+  autorizarCierre, devolverOrden, editarOrden,
 } from "../api/ordenes";
 import { tecnicosDisponibles } from "../api/coordinacion";
 import { listarInsumos, registrarConsumo, listarConsumos } from "../api/stock";
@@ -22,7 +22,7 @@ import Volver from "../componentes/Volver";
 import ChecklistPreventiva from "../componentes/ChecklistPreventiva";
 import { toast } from "sonner";
 import { diasHasta, formatearFechaOT } from "../utiles/fechas";
-import { verCriticidad } from "../api/activos";
+import { verCriticidad, listarActivos } from "../api/activos";
 import VentanaRiesgo from "../componentes/VentanaRiesgo";
 import { Info } from "lucide-react";
 
@@ -38,7 +38,7 @@ function DetalleOrden() {
   // llama al backend ella misma y actualiza `ot` acá con onCompletado) — no
   // hay un accion="completar" separado, para que quede un solo botón que
   // completa de verdad, no dos pasos.
-  const [accion, setAccion] = useState(null);   // 'cerrar' | 'asignar' | 'correctiva' | 'consumo' | 'autorizar' | 'devolver' | null
+  const [accion, setAccion] = useState(null);   // 'cerrar' | 'asignar' | 'correctiva' | 'consumo' | 'autorizar' | 'devolver' | 'editar' | null
   const [notas, setNotas] = useState([]);
   const [correctivas, setCorrectivas] = useState([]);
   const [insumos, setInsumos] = useState([]);
@@ -379,6 +379,12 @@ function DetalleOrden() {
               {ot.tecnico_id ? "Reasignar técnico" : "Asignar técnico"}
             </button>
           )}
+          {/* Corregir descripción, prioridad y/o el equipo asociado. Mismo
+          permiso que reasignar/agregar notas: coordinación o técnico del
+          propio grupo de la orden. */}
+          {puedeAsignar && (
+            <button style={boton("secundario")} onClick={() => setAccion("editar")}>Editar orden</button>
+          )}
           {/* Solo tiene sentido desde una preventiva: es el "che, esto no
           funciona" que aparece haciendo el mantenimiento programado. */}
           {ot.tipo === "PREVENTIVA" && puedeTrabajar && (
@@ -448,6 +454,9 @@ function DetalleOrden() {
       )}
       {accion === "devolver" && (
         <PanelDevolver ot={ot} setOt={setOt} setNotas={setNotas} cerrar={() => setAccion(null)} />
+      )}
+      {accion === "editar" && (
+        <PanelEditarOT ot={ot} setOt={setOt} cerrar={() => setAccion(null)} />
       )}
 
       {/* ─── Checklist del mantenimiento: se completa ítem por ítem, y desde
@@ -812,6 +821,212 @@ function PanelAsignar({ ot, setOt, tecnicos, cerrar }) {
   );
 }
 
+// ─── Editar orden (descripción, prioridad, equipo asociado) ───
+// Mismo patrón que el resto de los paneles de esta pantalla, pero con un
+// cartel de confirmación antes de guardar (pedido de Cami: un "seguro" para
+// no editar por error, igual que en la ficha del equipo).
+
+function PanelEditarOT({ ot, setOt, cerrar }) {
+  const [descripcion, setDescripcion] = useState(ot.descripcion || "");
+  const [prioridad, setPrioridad] = useState(ot.prioridad || "");
+
+  // El equipo arranca "ya elegido" con el que tiene la OT hoy; buscar uno
+  // nuevo reemplaza esa elección (mismo patrón que el buscador de ubicación
+  // de EditarFicha, en FichaActivo.jsx).
+  const [equipoElegido, setEquipoElegido] = useState({
+    codigo: ot.activo_codigo,
+    descripcion: ot.activo_descripcion || "",
+  });
+  const [equipoTexto, setEquipoTexto] = useState("");
+  const [equiposFiltrados, setEquiposFiltrados] = useState([]);
+  const [buscandoEquipo, setBuscandoEquipo] = useState(false);
+
+  const [confirmando, setConfirmando] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+
+  // Busca a medida que se escribe, con una pequeña espera para no mandar un
+  // pedido por cada letra.
+  useEffect(() => {
+    const texto = equipoTexto.trim();
+    if (!texto) { setEquiposFiltrados([]); return; }
+    setBuscandoEquipo(true);
+    const espera = setTimeout(() => {
+      listarActivos({ buscar: texto })
+        .then((res) => setEquiposFiltrados(res.slice(0, 20)))
+        .catch(() => setEquiposFiltrados([]))
+        .finally(() => setBuscandoEquipo(false));
+    }, 300);
+    return () => clearTimeout(espera);
+  }, [equipoTexto]);
+
+  function elegirEquipo(a) {
+    setEquipoElegido({ codigo: a.codigo, descripcion: a.descripcion });
+    setEquipoTexto("");
+    setEquiposFiltrados([]);
+  }
+
+  function cambiarEquipo() {
+    setEquipoElegido(null);
+    setEquipoTexto("");
+  }
+
+  // Solo se manda lo que realmente cambió — PATCH parcial de verdad.
+  function armarCambios() {
+    const cambios = {};
+    const descTrim = descripcion.trim();
+    if (descTrim !== (ot.descripcion || "")) cambios.descripcion = descTrim || null;
+    const prioridadNueva = prioridad || null;
+    if (prioridadNueva !== (ot.prioridad || null)) cambios.prioridad = prioridadNueva;
+    if (equipoElegido?.codigo && equipoElegido.codigo !== ot.activo_codigo) {
+      cambios.activo_codigo = equipoElegido.codigo;
+    }
+    return cambios;
+  }
+
+  function pedirConfirmacion() {
+    setError("");
+    if (!equipoElegido?.codigo) {
+      setError("La orden tiene que tener un equipo asociado.");
+      return;
+    }
+    if (equipoTexto.trim() && !equipoElegido) {
+      setError("Elegí el equipo de la lista, o borrá lo que escribiste si no lo vas a cambiar.");
+      return;
+    }
+    const cambios = armarCambios();
+    if (Object.keys(cambios).length === 0) {
+      setError("No cambiaste nada todavía.");
+      return;
+    }
+    setConfirmando(true);
+  }
+
+  async function confirmarGuardado() {
+    setEnviando(true);
+    try {
+      const actualizada = await editarOrden(ot.id, armarCambios());
+      setOt(actualizada);
+      toast.success("Cambios guardados.");
+      cerrar();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "No se pudieron guardar los cambios.");
+      setConfirmando(false);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
+      <p style={estilos.panelTitulo}>Editar la orden</p>
+
+      <label style={cs.label}>Descripción del problema</label>
+      <textarea
+        style={{ ...cs.input, minHeight: 70, marginBottom: 12, resize: "vertical" }}
+        value={descripcion}
+        onChange={(e) => setDescripcion(e.target.value)}
+      />
+
+      <label style={cs.label}>Prioridad</label>
+      <select
+        style={{ ...cs.input, marginBottom: 12 }}
+        value={prioridad}
+        onChange={(e) => setPrioridad(e.target.value)}
+      >
+        <option value="">Sin definir</option>
+        <option value="BAJA">Baja</option>
+        <option value="MEDIA">Media</option>
+        <option value="ALTA">Alta</option>
+        <option value="URGENTE">Urgente</option>
+      </select>
+
+      <label style={cs.label}>Equipo asociado</label>
+      <p style={estilos.bitacoraAyuda}>
+        La ubicación se muestra según el equipo elegido: no se edita por
+        separado.
+      </p>
+      {equipoElegido ? (
+        <div style={estilos.equipoElegido}>
+          <span>
+            <strong>{equipoElegido.codigo}</strong>
+            {equipoElegido.descripcion ? ` — ${equipoElegido.descripcion}` : ""}
+          </span>
+          <button type="button" style={estilos.linkCambiar} onClick={cambiarEquipo}>
+            Cambiar
+          </button>
+        </div>
+      ) : (
+        <>
+          <input
+            style={cs.input}
+            placeholder="Buscá por código o nombre del equipo"
+            value={equipoTexto}
+            onChange={(e) => setEquipoTexto(e.target.value)}
+          />
+          {buscandoEquipo && <p style={estilos.bitacoraAyuda}>Buscando...</p>}
+          {!buscandoEquipo && equipoTexto.trim() && equiposFiltrados.length === 0 && (
+            <p style={estilos.bitacoraAyuda}>No encontramos ningún equipo con eso.</p>
+          )}
+          {equiposFiltrados.length > 0 && (
+            <div style={estilos.listaSugerencias}>
+              {equiposFiltrados.map((a) => (
+                <div
+                  key={a.codigo}
+                  style={estilos.sugerencia}
+                  onMouseDown={(e) => { e.preventDefault(); elegirEquipo(a); }}
+                >
+                  <strong>{a.codigo}</strong> — {a.descripcion}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {error && <p style={estilos.error}>{error}</p>}
+      <div style={estilos.acciones}>
+        <button style={boton("primario")} onClick={pedirConfirmacion} disabled={enviando}>
+          Guardar cambios
+        </button>
+        <button style={boton("fantasma")} onClick={cerrar} disabled={enviando}>Cancelar</button>
+      </div>
+
+      {confirmando && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15, 23, 32, 0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, zIndex: 50,
+          }}
+          onClick={() => !enviando && setConfirmando(false)}
+        >
+          <div
+            style={{ ...cs.tarjeta, padding: 22, width: "100%", maxWidth: 380 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: color.texto }}>
+              ¿Confirmás que querés modificar esta orden?
+            </p>
+            <p style={{ margin: "8px 0 0", fontSize: "0.88rem", color: color.textoSuave }}>
+              Se van a guardar los cambios en OT-{String(ot.numero_ot).padStart(4, "0")}.
+              Esto no se puede deshacer solo.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={boton("primario")} onClick={confirmarGuardado} disabled={enviando}>
+                {enviando ? "Guardando..." : "Sí, guardar cambios"}
+              </button>
+              <button style={boton("secundario")} onClick={() => setConfirmando(false)} disabled={enviando}>
+                Seguir editando
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Correctiva asociada ───
 
 function PanelCorrectivaAsociada({ ot, setCorrectivas, cerrar, navegar }) {
@@ -1014,6 +1229,21 @@ const estilos = {
   notaCabecera: { display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 4 },
   notaAutor: { fontSize: "0.82rem", fontWeight: 700, color: color.texto },
   notaFecha: { fontSize: "0.76rem", color: color.textoDebil, flexShrink: 0 },
+  equipoElegido: {
+    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+    padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${color.borde}`, background: color.fondo,
+  },
+  linkCambiar: {
+    border: "none", background: "none", color: color.primario, cursor: "pointer",
+    fontSize: "0.85rem", fontWeight: 600, padding: 0, fontFamily: "inherit", flexShrink: 0,
+  },
+  listaSugerencias: {
+    marginTop: 6, maxHeight: 220, overflowY: "auto", border: `1px solid ${color.borde}`,
+    borderRadius: 10, background: color.tarjeta,
+  },
+  sugerencia: {
+    padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${color.bordeSuave}`, fontSize: "0.88rem", color: color.texto,
+  },
 };
 
 export default DetalleOrden;
@@ -1021,7 +1251,7 @@ export default DetalleOrden;
 function textoPreventivo(fecha) {
   const dias = diasHasta(fecha);
   if (dias === null) return "";
-  if (dias < 0) return `Preventivo vencido hace ${Math.abs(dias)} días`;
   if (dias === 0) return "Preventivo programado para hoy";
+  if (dias < 0) return `Preventivo vencido hace ${Math.abs(dias)} días`;
   return `Próximo preventivo en ${dias} días`;
 }

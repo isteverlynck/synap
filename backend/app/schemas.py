@@ -226,6 +226,10 @@ class ActivoOut(BaseModel):
     # no se le programó mantenimiento (ver ActivoCreate más abajo).
     frecuencia_mp_meses: int | None = None
     fecha_instalacion: date | None = None
+    # Datos para la criticidad PRIUX (ver backend/app/criticidad.py). Se
+    # exponen acá también para poder precargarlos al editar la ficha.
+    es_equipo_medico: bool | None = None
+    sin_backup: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -289,6 +293,42 @@ class ActivoCreate(BaseModel):
         if v is None:
             return v
         return v.replace(day=1)
+
+
+class ActivoUpdate(BaseModel):
+    """Editar la ficha de un equipo ya existente (pedido de Cami: que la
+    ficha se pueda editar, con botón de guardar).
+
+    Es un PATCH parcial: todos los campos son opcionales, y solo se tocan
+    los que vengan realmente en el pedido (ver `exclude_unset` en el router).
+    Lo que NO se puede editar acá:
+      - codigo: es la clave primaria, arma el área/tipo/número al crear el
+        equipo y lo referencian todas las demás tablas. Cambiarlo requeriría
+        reescribir esas referencias; si el código quedó mal, se da de baja
+        el equipo y se carga de nuevo.
+      - descripcion: sigue completándose sola con el nombre del tipo de
+        equipo (mismo criterio que al crear) — si se edita tipo_equipo_id,
+        el router la recalcula; no se escribe a mano para no reintroducir
+        las inconsistencias que se limpiaron en la sesión del 27/08-13/09.
+      - grupo_id, plantilla_mp_id, proxima_fecha_mp, ultima_fecha_mp: se
+        recalculan solos (el grupo según el tipo de equipo; las fechas de MP
+        las maneja el flujo de "programar según su plan" y la generación de
+        preventivas) — tocarlas a mano acá podría desincronizar el
+        calendario de mantenimientos.
+    """
+    tipo_equipo_id: str | None = None
+    sector_id: str | None = None
+    ubicacion: str | None = None
+    marca: str | None = None
+    modelo: str | None = None
+    numero_serie: str | None = None
+    numero_orden_compra: str | None = None
+    codigo_qr: str | None = None
+    fecha_instalacion: date | None = None
+    estado: str | None = None
+    es_equipo_medico: bool | None = None
+    sin_backup: bool | None = None
+    frecuencia_mp_meses: int | None = None
 
 # ─── Schemas resumidos para anidar en la ficha del activo ───
     
@@ -401,6 +441,31 @@ class OrdenTrabajoCorrectivaCreate(BaseModel):
     """
     descripcion: str
     prioridad: str | None = None
+
+
+class OrdenTrabajoUpdate(BaseModel):
+    """Editar una orden de trabajo que todavía NO está cerrada (pedido de
+    Cami: además de asignar/cambiar estado/cerrar, que ya se podía hacer,
+    ahora también se puede corregir la descripción, la prioridad y el
+    equipo asociado).
+
+    Es un PATCH parcial: solo se tocan los campos que vengan en el pedido.
+
+    - activo_codigo: "equipo/ubicación" en la práctica es solo esto —
+      `OrdenTrabajo.activo_ubicacion` es una propiedad derivada del activo
+      (`self.activo.ubicacion`), no una columna propia, así que reasignar el
+      equipo ya mueve la ubicación con él. El router recalcula grupo_id a
+      partir del nuevo equipo y, si el técnico ya asignado no pertenece a
+      ese grupo, lo desasigna (mismo criterio que ya usa
+      `asignar_tecnico`).
+    - Lo que NO se puede editar acá: estado, técnico asignado y las fechas
+      — eso sigue teniendo sus propios endpoints (`/estado`, `/asignar`,
+      `/cerrar`, etc.), que ya validan sus propias reglas (ej. no reabrir
+      una preventiva a mitad de camino).
+    """
+    descripcion: str | None = None
+    prioridad: str | None = None
+    activo_codigo: str | None = None
 
 
 class NotaOTOut(BaseModel):

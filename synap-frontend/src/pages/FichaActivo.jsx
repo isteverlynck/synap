@@ -1,18 +1,34 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { logout, rolActual } from "../api/auth";
-import { verActivoDetalle, catalogosParaAlta } from "../api/activos";
+import { verActivoDetalle, catalogosParaAlta, editarActivo } from "../api/activos";
 import { listarSiglas, listarUbicaciones } from "../api/catalogos";
 import Encabezado from "../componentes/Encabezado";
 import CodigoConGlosario from "../componentes/CodigoConGlosario";
 import { armarDiccionarioSiglas } from "../utiles/codigos";
 import { color, cs, boton, insignia, estadoDelEquipo, tonoRiesgo } from "../tema";
 import VentanaRiesgo from "../componentes/VentanaRiesgo";
-import { Info } from "lucide-react";
+import { Info, Pencil } from "lucide-react";
 import Volver from "../componentes/Volver";
 import { diasHasta, parsearFecha, formatearFechaOT } from "../utiles/fechas";
 import { programarSegunPlan, verCriticidad } from "../api/activos";
 import { toast } from "sonner";
+
+// Mismas opciones que en el alta (NuevoActivo.jsx) — se repiten acá porque
+// ese archivo no las exporta, y son 4 líneas, no vale la pena acoplar los
+// dos archivos por esto.
+const ESTADOS = [
+  { valor: "ACTIVO", texto: "Activo / operativo" },
+  { valor: "EN_REPARACION", texto: "En reparación" },
+  { valor: "DE_BAJA", texto: "De baja" },
+  { valor: "FUERA_DE_SERVICIO", texto: "Fuera de servicio" },
+];
+
+// Roles que pueden editar la ficha de un equipo (pedido de Cami: que
+// coordinación, jefatura Y técnico puedan corregir los datos de un equipo,
+// no solo darlo de alta). Enfermería queda afuera, como en el resto del
+// sistema.
+const PUEDE_EDITAR = ["tecnico", "junior", "coordinacion", "jefatura"];
 
 function FichaActivo() {
   const { codigo } = useParams();
@@ -27,6 +43,11 @@ function FichaActivo() {
   const [diccionarioUbicaciones, setDiccionarioUbicaciones] = useState({});
   const [criticidad, setCriticidad] = useState(null);
   const [verCalculo, setVerCalculo] = useState(false);
+
+  // ─── Edición de la ficha ───
+  const [modoEdicion, setModoEdicion] = useState(false);
+  const [catalogos, setCatalogos] = useState({ tipos: [], sectores: [] });
+  const [ubicacionesCatalogo, setUbicacionesCatalogo] = useState([]);
 
   async function programarMP() {
     if (programando) return;
@@ -51,22 +72,28 @@ function FichaActivo() {
       .finally(() => setCargando(false));
   }, [codigo]);
 
-  // Glosario para el cartelito del código/ubicación al pasar el mouse — no
-  // bloquea la carga de la ficha si falla, es solo un extra.
+  // Glosario para el cartelito del código/ubicación al pasar el mouse, y de
+  // paso los catálogos de tipo de equipo/servicio para el formulario de
+  // edición — no bloquean la carga de la ficha si fallan, son un extra.
   useEffect(() => {
     Promise.all([listarSiglas(), catalogosParaAlta()])
-      .then(([siglas, cat]) => setDiccionarioSiglas(armarDiccionarioSiglas(siglas, cat.tipos)))
+      .then(([siglas, cat]) => {
+        setDiccionarioSiglas(armarDiccionarioSiglas(siglas, cat.tipos));
+        setCatalogos(cat);
+      })
       .catch(() => {});
   }, []);
 
   // Código de ubicación exacto → descripción completa (catálogo relevado del
   // hospital), prioritaria sobre el glosario de siglas en el cartelito de
-  // "Ubicación" — ver CodigoConGlosario.jsx.
+  // "Ubicación" — ver CodigoConGlosario.jsx. La lista completa también sirve
+  // para el buscador de ubicación del formulario de edición.
   useEffect(() => {
     listarUbicaciones()
-      .then((ubicaciones) =>
-        setDiccionarioUbicaciones(Object.fromEntries(ubicaciones.map((u) => [u.codigo, u.descripcion])))
-      )
+      .then((ubicaciones) => {
+        setUbicacionesCatalogo(ubicaciones);
+        setDiccionarioUbicaciones(Object.fromEntries(ubicaciones.map((u) => [u.codigo, u.descripcion])));
+      })
       .catch(() => {});
   }, []);
 
@@ -108,6 +135,14 @@ function FichaActivo() {
   // Mismo criterio que en Acciones: jefatura y enfermería no entran al detalle
   // de una OT, así que para ellas el historial no es clickeable.
   const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
+  const puedeEditar = PUEDE_EDITAR.includes(rol);
+
+  function actualizarActivoEditado(nuevo) {
+    // El backend devuelve la ficha "chica" (ActivoOut); la ficha completa
+    // (ActivoDetalle) tiene además el historial, que no cambia al editar —
+    // lo conservamos y solo pisamos los campos que sí pudieron cambiar.
+    setActivo((antes) => ({ ...antes, ...nuevo }));
+  }
 
   return (
     <div style={cs.pagina}>
@@ -121,10 +156,23 @@ function FichaActivo() {
         que alguien apurado en un pasillo lo vea sin leer. */}
         <AvisoEstado situacion={situacion} />
 
-        <h2 style={estilos.nombreEquipo}>{activo.descripcion}</h2>
-        <p style={estilos.codigo}>
-          <CodigoConGlosario codigo={activo.codigo} diccionario={diccionarioSiglas} />
-        </p>
+        <div style={estilos.filaTitulo}>
+          <div>
+            <h2 style={estilos.nombreEquipo}>{activo.descripcion}</h2>
+            <p style={estilos.codigo}>
+              <CodigoConGlosario codigo={activo.codigo} diccionario={diccionarioSiglas} />
+            </p>
+          </div>
+          {puedeEditar && !modoEdicion && (
+            <button
+              style={{ ...boton("secundario"), gap: 6, flexShrink: 0 }}
+              onClick={() => setModoEdicion(true)}
+            >
+              <Pencil size={14} strokeWidth={2.4} aria-hidden="true" />
+              Editar ficha
+            </button>
+          )}
+        </div>
 
         {rol === "coordinacion" && activo.proxima_fecha_mp && !activo.frecuencia_mp_meses && (
           <div style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12 }}>
@@ -143,34 +191,48 @@ function FichaActivo() {
           </div>
         )}
 
-        <div style={estilos.tarjetaDatos}>
-          <Dato etiqueta="Marca y modelo" valor={[activo.marca, activo.modelo].filter(Boolean).join(" ") || "—"} />
-          <Dato
-            etiqueta="Ubicación"
-            valor={activo.ubicacion
-              ? (
-                <CodigoConGlosario
-                  codigo={activo.ubicacion}
-                  diccionario={diccionarioSiglas}
-                  descripcionExacta={diccionarioUbicaciones[activo.ubicacion]}
-                />
-              )
-              : "—"}
+        {modoEdicion ? (
+          <EditarFicha
+            activo={activo}
+            catalogos={catalogos}
+            ubicacionesCatalogo={ubicacionesCatalogo}
+            diccionarioUbicaciones={diccionarioUbicaciones}
+            onGuardado={(nuevo) => {
+              actualizarActivoEditado(nuevo);
+              setModoEdicion(false);
+            }}
+            onCancelar={() => setModoEdicion(false)}
           />
-          <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
-          <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
-          {/* Criticidad y riesgo PRIUX: información interna de Bioingeniería,
-          enfermería no la ve. */}
-          {rol !== "enfermeria" && criticidad && (
-            <>
-              <Dato etiqueta="Criticidad" valor={textoCriticidad(criticidad)} />
-              <Dato
-                etiqueta="Nivel de riesgo"
-                valor={<NivelRiesgo datos={criticidad} alTocar={() => setVerCalculo(true)} />}
-              />
-            </>
-          )}
-        </div>
+        ) : (
+          <div style={estilos.tarjetaDatos}>
+            <Dato etiqueta="Marca y modelo" valor={[activo.marca, activo.modelo].filter(Boolean).join(" ") || "—"} />
+            <Dato
+              etiqueta="Ubicación"
+              valor={activo.ubicacion
+                ? (
+                  <CodigoConGlosario
+                    codigo={activo.ubicacion}
+                    diccionario={diccionarioSiglas}
+                    descripcionExacta={diccionarioUbicaciones[activo.ubicacion]}
+                  />
+                )
+                : "—"}
+            />
+            <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
+            <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
+            {/* Criticidad y riesgo PRIUX: información interna de Bioingeniería,
+            enfermería no la ve. */}
+            {rol !== "enfermeria" && criticidad && (
+              <>
+                <Dato etiqueta="Criticidad" valor={textoCriticidad(criticidad)} />
+                <Dato
+                  etiqueta="Nivel de riesgo"
+                  valor={<NivelRiesgo datos={criticidad} alTocar={() => setVerCalculo(true)} />}
+                />
+              </>
+            )}
+          </div>
+        )}
 
                 {/* El responsable no es un dato más: es una acción. Cumple el objetivo
         de contacto directo con el bioingeniero. Es TODO el grupo a cargo del
@@ -272,6 +334,282 @@ function FichaActivo() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Edición de la ficha
+// ─────────────────────────────────────────────────────────────────────────
+
+function EditarFicha({ activo, catalogos, ubicacionesCatalogo, diccionarioUbicaciones, onGuardado, onCancelar }) {
+  const [tipoEquipoId, setTipoEquipoId] = useState(activo.tipo_equipo_id || "");
+  const [sectorId, setSectorId] = useState(activo.sector_id || "");
+  const [estado, setEstado] = useState(activo.estado || "ACTIVO");
+  const [marca, setMarca] = useState(activo.marca || "");
+  const [modelo, setModelo] = useState(activo.modelo || "");
+  const [numeroSerie, setNumeroSerie] = useState(activo.numero_serie || "");
+  const [numeroOrdenCompra, setNumeroOrdenCompra] = useState(activo.numero_orden_compra || "");
+  const [codigoQr, setCodigoQr] = useState(activo.codigo_qr || "");
+  const [fechaInstalacion, setFechaInstalacion] = useState(activo.fecha_instalacion || "");
+  const [esEquipoMedico, setEsEquipoMedico] = useState(activo.es_equipo_medico !== false);
+  const [sinBackup, setSinBackup] = useState(!!activo.sin_backup);
+  const [frecuenciaMpMeses, setFrecuenciaMpMeses] = useState(
+    activo.frecuencia_mp_meses != null ? String(activo.frecuencia_mp_meses) : ""
+  );
+
+  // Ubicación: mismo patrón de búsqueda que al dar de alta un equipo
+  // (NuevoActivo.jsx). Arranca con la ubicación actual ya "elegida" (si
+  // existe en el catálogo relevado; si no, se muestra igual con el código
+  // que ya tenía cargado, para no perderlo si se guarda sin tocar el campo).
+  const ubicacionActualEnCatalogo = activo.ubicacion
+    ? ubicacionesCatalogo.find((u) => u.codigo === activo.ubicacion)
+    : null;
+  const [ubicacionElegida, setUbicacionElegida] = useState(
+    activo.ubicacion
+      ? ubicacionActualEnCatalogo || { codigo: activo.ubicacion, descripcion: diccionarioUbicaciones[activo.ubicacion] || "" }
+      : null
+  );
+  const [ubicacionTexto, setUbicacionTexto] = useState("");
+
+  const [confirmando, setConfirmando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const textoBusquedaUbicacion = ubicacionTexto.trim().toLowerCase();
+  const ubicacionesFiltradas = !ubicacionElegida && textoBusquedaUbicacion
+    ? ubicacionesCatalogo
+        .filter(
+          (u) =>
+            u.codigo.toLowerCase().includes(textoBusquedaUbicacion) ||
+            u.descripcion.toLowerCase().includes(textoBusquedaUbicacion)
+        )
+        .slice(0, 30)
+    : [];
+
+  function elegirUbicacion(u) {
+    setUbicacionElegida(u);
+    setUbicacionTexto("");
+  }
+
+  function cambiarUbicacion() {
+    setUbicacionElegida(null);
+    setUbicacionTexto("");
+  }
+
+  // Solo se manda lo que realmente cambió respecto de la ficha actual — un
+  // PATCH parcial de verdad, no todos los campos de nuevo cada vez.
+  function armarCambios() {
+    const cambios = {};
+    if (tipoEquipoId !== activo.tipo_equipo_id) cambios.tipo_equipo_id = tipoEquipoId;
+    if (sectorId !== activo.sector_id) cambios.sector_id = sectorId;
+    if (estado !== activo.estado) cambios.estado = estado;
+    const nuevaUbicacion = ubicacionElegida?.codigo || null;
+    if (nuevaUbicacion !== (activo.ubicacion || null)) cambios.ubicacion = nuevaUbicacion;
+    if (marca.trim() !== (activo.marca || "")) cambios.marca = marca.trim() || null;
+    if (modelo.trim() !== (activo.modelo || "")) cambios.modelo = modelo.trim() || null;
+    if (numeroSerie.trim() !== (activo.numero_serie || "")) cambios.numero_serie = numeroSerie.trim() || null;
+    if (numeroOrdenCompra.trim() !== (activo.numero_orden_compra || "")) {
+      cambios.numero_orden_compra = numeroOrdenCompra.trim() || null;
+    }
+    if (codigoQr.trim() !== (activo.codigo_qr || "")) cambios.codigo_qr = codigoQr.trim() || null;
+    if (fechaInstalacion !== (activo.fecha_instalacion || "")) cambios.fecha_instalacion = fechaInstalacion || null;
+    if (esEquipoMedico !== (activo.es_equipo_medico !== false)) cambios.es_equipo_medico = esEquipoMedico;
+    const sinBackupEfectivo = esEquipoMedico ? sinBackup : false;
+    if (sinBackupEfectivo !== !!activo.sin_backup) cambios.sin_backup = sinBackupEfectivo;
+    const frecuenciaNueva = frecuenciaMpMeses.trim() ? Number(frecuenciaMpMeses) : null;
+    if (frecuenciaNueva !== (activo.frecuencia_mp_meses ?? null)) cambios.frecuencia_mp_meses = frecuenciaNueva;
+    return cambios;
+  }
+
+  function pedirConfirmacion() {
+    setError("");
+    if (!tipoEquipoId) return setError("Elegí el tipo de equipo.");
+    if (!sectorId) return setError("Elegí el servicio/sector.");
+    if (ubicacionTexto.trim() && !ubicacionElegida) {
+      return setError("Elegí la ubicación de la lista, o borrá lo que escribiste si no aplica.");
+    }
+    const cambios = armarCambios();
+    if (Object.keys(cambios).length === 0) {
+      return setError("No cambiaste nada todavía.");
+    }
+    setConfirmando(true);
+  }
+
+  async function confirmarGuardado() {
+    setGuardando(true);
+    try {
+      const actualizado = await editarActivo(activo.codigo, armarCambios());
+      toast.success("Cambios guardados.");
+      onGuardado(actualizado);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "No se pudieron guardar los cambios.");
+      setConfirmando(false);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div style={{ ...cs.tarjeta, padding: 20, marginBottom: 16 }}>
+      <div style={estilosEdicion.grilla2}>
+        <Campo etiqueta="Tipo de equipo">
+          <select style={cs.input} value={tipoEquipoId} onChange={(e) => setTipoEquipoId(e.target.value)}>
+            <option value="">Elegí un tipo</option>
+            {catalogos.tipos.map((t) => (
+              <option key={t.id} value={t.id}>{t.nombre}</option>
+            ))}
+          </select>
+        </Campo>
+        <Campo etiqueta="Servicio / sector">
+          <select style={cs.input} value={sectorId} onChange={(e) => setSectorId(e.target.value)}>
+            <option value="">Elegí un servicio</option>
+            {catalogos.sectores.map((s) => (
+              <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
+        </Campo>
+        <Campo etiqueta="Estado">
+          <select style={cs.input} value={estado} onChange={(e) => setEstado(e.target.value)}>
+            {ESTADOS.map((e) => (
+              <option key={e.valor} value={e.valor}>{e.texto}</option>
+            ))}
+          </select>
+        </Campo>
+        <Campo etiqueta="Ubicación">
+          {ubicacionElegida ? (
+            <div style={estilosEdicion.ubicacionElegida}>
+              <span>
+                <strong>{ubicacionElegida.codigo}</strong>
+                {ubicacionElegida.descripcion ? ` — ${ubicacionElegida.descripcion}` : ""}
+              </span>
+              <button type="button" style={estilosEdicion.linkCambiar} onClick={cambiarUbicacion}>
+                Cambiar
+              </button>
+            </div>
+          ) : (
+            <>
+              <input
+                style={cs.input}
+                placeholder="Buscá por código o descripción, ej: UTI, quirófano"
+                value={ubicacionTexto}
+                onChange={(e) => setUbicacionTexto(e.target.value)}
+              />
+              {textoBusquedaUbicacion && ubicacionesFiltradas.length === 0 && (
+                <p style={estilosEdicion.ayuda}>No encontramos ninguna ubicación con eso.</p>
+              )}
+              {ubicacionesFiltradas.length > 0 && (
+                <div style={estilosEdicion.listaSugerencias}>
+                  {ubicacionesFiltradas.map((u) => (
+                    <div
+                      key={u.codigo}
+                      style={estilosEdicion.sugerencia}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        elegirUbicacion(u);
+                      }}
+                    >
+                      <strong>{u.codigo}</strong> — {u.descripcion}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </Campo>
+        <Campo etiqueta="Marca">
+          <input style={cs.input} value={marca} onChange={(e) => setMarca(e.target.value)} />
+        </Campo>
+        <Campo etiqueta="Modelo">
+          <input style={cs.input} value={modelo} onChange={(e) => setModelo(e.target.value)} />
+        </Campo>
+        <Campo etiqueta="Número de serie">
+          <input style={cs.input} value={numeroSerie} onChange={(e) => setNumeroSerie(e.target.value)} />
+        </Campo>
+        <Campo etiqueta="N° de orden de compra">
+          <input style={cs.input} value={numeroOrdenCompra} onChange={(e) => setNumeroOrdenCompra(e.target.value)} />
+        </Campo>
+        <Campo etiqueta="Código QR">
+          <input style={cs.input} value={codigoQr} onChange={(e) => setCodigoQr(e.target.value)} />
+        </Campo>
+        <Campo etiqueta="Fecha de instalación">
+          <input type="date" style={cs.input} value={fechaInstalacion} onChange={(e) => setFechaInstalacion(e.target.value)} />
+        </Campo>
+        <Campo etiqueta="Frecuencia de MP (meses)" ayuda="Dejalo vacío si el equipo no tiene mantenimiento programado.">
+          <input
+            type="number"
+            min="1"
+            style={cs.input}
+            value={frecuenciaMpMeses}
+            onChange={(e) => setFrecuenciaMpMeses(e.target.value)}
+          />
+        </Campo>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <label style={estilosEdicion.checkboxFila}>
+          <input type="checkbox" checked={esEquipoMedico} onChange={(e) => setEsEquipoMedico(e.target.checked)} />
+          <span style={estilosEdicion.checkboxTexto}>Es equipo médico</span>
+        </label>
+        {esEquipoMedico && (
+          <label style={{ ...estilosEdicion.checkboxFila, marginTop: 10 }}>
+            <input type="checkbox" checked={sinBackup} onChange={(e) => setSinBackup(e.target.checked)} />
+            <span style={estilosEdicion.checkboxTexto}>No tiene backup</span>
+          </label>
+        )}
+      </div>
+
+      {error && <p style={estilosEdicion.error}>{error}</p>}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+        <button style={boton("primario")} onClick={pedirConfirmacion} disabled={guardando}>
+          Guardar cambios
+        </button>
+        <button style={boton("secundario")} onClick={onCancelar} disabled={guardando}>
+          Cancelar
+        </button>
+      </div>
+
+      {confirmando && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(15, 23, 32, 0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, zIndex: 50,
+          }}
+          onClick={() => !guardando && setConfirmando(false)}
+        >
+          <div
+            style={{ ...cs.tarjeta, padding: 22, width: "100%", maxWidth: 380 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: color.texto }}>
+              ¿Confirmás que querés modificar este equipo?
+            </p>
+            <p style={{ margin: "8px 0 0", fontSize: "0.88rem", color: color.textoSuave }}>
+              Se van a guardar los cambios en la ficha de {activo.codigo}. Esto no se puede deshacer solo.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={boton("primario")} onClick={confirmarGuardado} disabled={guardando}>
+                {guardando ? "Guardando..." : "Sí, guardar cambios"}
+              </button>
+              <button style={boton("secundario")} onClick={() => setConfirmando(false)} disabled={guardando}>
+                Seguir editando
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Campo({ etiqueta, ayuda, children }) {
+  return (
+    <div>
+      <label style={cs.label}>{etiqueta}</label>
+      {children}
+      {ayuda && <p style={estilosEdicion.ayuda}>{ayuda}</p>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Aviso de estado
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -336,7 +674,7 @@ function Acciones({ rol, situacion, activo, navegar }) {
   if (rol === "coordinacion" || rol === "jefatura") {
     acciones.push({ texto: "Ver plan de mantenimiento", variante: "secundario", onClick: () => navegar(`/mantenimientos?tipo=${activo.tipo_equipo_id}`) });
   }
-  
+
 
   if (acciones.length === 0) return null;
 
@@ -462,8 +800,9 @@ const estilos = {
   aviso: { borderRadius: 12, padding: "14px 16px", marginBottom: 20 },
   avisoTitulo: { fontWeight: 700, marginBottom: 2 },
   avisoDetalle: { fontSize: "0.85rem" },
+  filaTitulo: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 },
   nombreEquipo: { margin: "0 0 2px", fontSize: "1.3rem", color: color.texto, fontWeight: 700 },
-  codigo: { margin: "0 0 18px", fontSize: "0.85rem", color: color.textoSuave, fontFamily: "ui-monospace, monospace" },
+  codigo: { margin: 0, fontSize: "0.85rem", color: color.textoSuave, fontFamily: "ui-monospace, monospace" },
   tarjetaDatos: {
     ...cs.tarjeta,
     padding: 20,
@@ -493,6 +832,33 @@ const estilos = {
   item: { ...cs.tarjeta, padding: "12px 16px", fontSize: "0.9rem", display: "flex", alignItems: "center", gap: 12 },
   detalle: { color: color.textoSuave, fontSize: "0.82rem", marginTop: 2 },
   vacio: { color: color.textoSuave, fontSize: "0.9rem" },
+};
+
+const estilosEdicion = {
+  grilla2: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 16,
+  },
+  ayuda: { fontSize: "0.78rem", color: color.textoDebil, margin: "6px 0 0" },
+  error: { fontSize: "0.85rem", color: color.peligro, margin: "12px 0 0" },
+  checkboxFila: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
+  checkboxTexto: { fontSize: "0.92rem", color: color.texto, fontWeight: 600 },
+  ubicacionElegida: {
+    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+    padding: "12px 14px", borderRadius: 10, border: `1.5px solid ${color.borde}`, background: color.fondo,
+  },
+  linkCambiar: {
+    border: "none", background: "none", color: color.primario, cursor: "pointer",
+    fontSize: "0.85rem", fontWeight: 600, padding: 0, fontFamily: "inherit", flexShrink: 0,
+  },
+  listaSugerencias: {
+    marginTop: 6, maxHeight: 220, overflowY: "auto", border: `1px solid ${color.borde}`,
+    borderRadius: 10, background: color.tarjeta,
+  },
+  sugerencia: {
+    padding: "10px 12px", cursor: "pointer", borderBottom: `1px solid ${color.bordeSuave}`, fontSize: "0.88rem", color: color.texto,
+  },
 };
 
 export default FichaActivo;
