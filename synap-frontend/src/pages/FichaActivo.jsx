@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { logout, rolActual } from "../api/auth";
 import { verActivoDetalle, catalogosParaAlta } from "../api/activos";
-import { listarSiglas } from "../api/catalogos";
+import { listarSiglas, listarUbicaciones } from "../api/catalogos";
 import Encabezado from "../componentes/Encabezado";
 import CodigoConGlosario from "../componentes/CodigoConGlosario";
 import { armarDiccionarioSiglas } from "../utiles/codigos";
@@ -24,6 +24,7 @@ function FichaActivo() {
   const [programando, setProgramando] = useState(false);
   const [avisoRestringido, setAvisoRestringido] = useState(false);
   const [diccionarioSiglas, setDiccionarioSiglas] = useState({});
+  const [diccionarioUbicaciones, setDiccionarioUbicaciones] = useState({});
   const [criticidad, setCriticidad] = useState(null);
   const [verCalculo, setVerCalculo] = useState(false);
 
@@ -55,6 +56,17 @@ function FichaActivo() {
   useEffect(() => {
     Promise.all([listarSiglas(), catalogosParaAlta()])
       .then(([siglas, cat]) => setDiccionarioSiglas(armarDiccionarioSiglas(siglas, cat.tipos)))
+      .catch(() => {});
+  }, []);
+
+  // Código de ubicación exacto → descripción completa (catálogo relevado del
+  // hospital), prioritaria sobre el glosario de siglas en el cartelito de
+  // "Ubicación" — ver CodigoConGlosario.jsx.
+  useEffect(() => {
+    listarUbicaciones()
+      .then((ubicaciones) =>
+        setDiccionarioUbicaciones(Object.fromEntries(ubicaciones.map((u) => [u.codigo, u.descripcion])))
+      )
       .catch(() => {});
   }, []);
 
@@ -136,7 +148,13 @@ function FichaActivo() {
           <Dato
             etiqueta="Ubicación"
             valor={activo.ubicacion
-              ? <CodigoConGlosario codigo={activo.ubicacion} diccionario={diccionarioSiglas} />
+              ? (
+                <CodigoConGlosario
+                  codigo={activo.ubicacion}
+                  diccionario={diccionarioSiglas}
+                  descripcionExacta={diccionarioUbicaciones[activo.ubicacion]}
+                />
+              )
               : "—"}
           />
           <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />

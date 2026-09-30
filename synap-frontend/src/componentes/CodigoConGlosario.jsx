@@ -4,12 +4,19 @@
 // utiles/codigos.js). Si no hay nada cargado para ese código puntual, se
 // muestra igual pero sin cartelito ni subrayado — no hace falta que TODOS
 // los códigos estén en el glosario para que esto sirva.
+//
+// descripcionExacta (opcional): cuando el código tiene una descripción
+// completa y confiable en un catálogo propio (hoy: el catálogo de
+// ubicaciones relevadas, por código exacto — ver diccionarioUbicaciones en
+// Activos.jsx/FichaActivo.jsx), esa descripción se usa tal cual en vez de
+// decodificar sigla por sigla, porque es más completa y no depende de que
+// cada segmento esté cargado en el glosario.
 
 import { decodificarCodigo } from "../utiles/codigos";
 
-function CodigoConGlosario({ codigo, diccionario, style, className }) {
+function CodigoConGlosario({ codigo, diccionario, descripcionExacta, style, className }) {
   if (!codigo) return null;
-  const decodificado = decodificarCodigo(codigo, diccionario);
+  const decodificado = descripcionExacta || decodificarCodigo(codigo, diccionario);
 
   return (
     <span

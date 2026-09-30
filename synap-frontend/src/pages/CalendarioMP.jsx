@@ -29,15 +29,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, BarChart3, Search, X } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList,
 } from "recharts";
 import { calendarioPreventivas, generarPreventivas, resumenCalendario } from "../api/preventivas";
 import { obtenerPerfil } from "../api/auth";
-import { opcionesDeFiltro } from "../api/activos";
+import { opcionesDeFiltro, listarActivos } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia, sombra } from "../tema";
+import { diasHasta, parsearFecha } from "../utiles/fechas";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -124,10 +125,51 @@ function CalendarioMP() {
   const [errorGrafico, setErrorGrafico] = useState("");
   const [gruposCatalogo, setGruposCatalogo] = useState([]);
 
+  // Plegado por default: es un gráfico de apoyo para planificar, no lo
+  // primero que hace falta ver, y con los controles de rango + los chips de
+  // grupo + el gráfico siempre visibles la pantalla se veía amontonada
+  // (sobre todo en el celular). Ahora es un botón.
+  const [verGrafico, setVerGrafico] = useState(false);
+
+  // ─── Buscador: "¿cuándo le toca el próximo MP a este equipo?" ───
+  // Distinto del buscador de la lista de abajo (que solo filtra DENTRO del
+  // mes que se está mirando): este busca por código o nombre sobre TODOS
+  // los equipos y muestra directamente su próxima fecha de MP, sin importar
+  // qué mes esté abierto en el calendario. Mismo patrón de debounce que usa
+  // Activos.jsx (esperar 350ms sin tipear antes de pedirle al backend).
+  const [textoEquipoProximo, setTextoEquipoProximo] = useState("");
+  const [busquedaEquipoProximo, setBusquedaEquipoProximo] = useState("");
+  const [resultadosProximoMP, setResultadosProximoMP] = useState([]);
+  const [buscandoProximoMP, setBuscandoProximoMP] = useState(false);
+  const [errorProximoMP, setErrorProximoMP] = useState("");
+
   useEffect(() => {
     obtenerPerfil().then(setPerfil).catch(() => setPerfil(null));
     opcionesDeFiltro().then((o) => setGruposCatalogo(o.grupos || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBusquedaEquipoProximo(textoEquipoProximo), 350);
+    return () => clearTimeout(t);
+  }, [textoEquipoProximo]);
+
+  useEffect(() => {
+    const texto = busquedaEquipoProximo.trim();
+    if (!texto) {
+      setResultadosProximoMP([]);
+      setErrorProximoMP("");
+      setBuscandoProximoMP(false);
+      return;
+    }
+    setBuscandoProximoMP(true);
+    setErrorProximoMP("");
+    listarActivos({ buscar: texto })
+      // Hasta 8: es un buscador rápido de "¿cuándo le toca a ESTE equipo?",
+      // no un listado — si hay más coincidencias, conviene afinar la búsqueda.
+      .then((res) => setResultadosProximoMP(res.slice(0, 8)))
+      .catch(() => setErrorProximoMP("No pudimos buscar el equipo."))
+      .finally(() => setBuscandoProximoMP(false));
+  }, [busquedaEquipoProximo]);
 
   useEffect(() => {
     cargar();
@@ -239,6 +281,142 @@ function CalendarioMP() {
         }
       />
 
+      {/* ─── Buscador: próximo mantenimiento de un equipo puntual ───
+      Independiente del mes que se esté viendo en el calendario de abajo: se
+      busca un equipo por código o nombre y se muestra directamente cuál es
+      SU próxima MP y en qué mes cae, sin tener que ir navegando mes a mes a
+      ver si aparece. Usa el mismo buscador que la pantalla de Activos
+      (GET /activos?buscar=), que ya trae proxima_fecha_mp. ─── */}
+      <div style={{ ...cs.tarjeta, padding: "16px 18px", marginBottom: 18 }}>
+        <p style={estilos.tituloGrafico}>¿Cuándo le toca el próximo mantenimiento a un equipo?</p>
+        <p style={estilos.ayudaGrafico}>Buscalo por código o nombre para ver su próxima fecha, sin importar qué mes estés mirando abajo.</p>
+
+        <div style={{ ...estilos.campoBusqueda, marginTop: 10, marginBottom: 0 }}>
+          <Search size={17} strokeWidth={1.9} color={color.textoDebil} aria-hidden="true" />
+          <input
+            style={estilos.inputBusqueda}
+            placeholder="Buscar por código o nombre del equipo"
+            value={textoEquipoProximo}
+            onChange={(e) => setTextoEquipoProximo(e.target.value)}
+          />
+          {textoEquipoProximo && (
+            <button style={estilos.limpiarBusqueda} onClick={() => setTextoEquipoProximo("")} title="Limpiar">
+              <X size={15} strokeWidth={2.2} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+
+        {textoEquipoProximo.trim() !== "" && (
+          <div style={estilos.resultadosProximo}>
+            {buscandoProximoMP && <p style={estilos.mensajeGrafico}>Buscando...</p>}
+            {!buscandoProximoMP && errorProximoMP && (
+              <p style={{ ...estilos.mensajeGrafico, color: color.peligro }}>{errorProximoMP}</p>
+            )}
+            {!buscandoProximoMP && !errorProximoMP && resultadosProximoMP.length === 0 && (
+              <p style={estilos.mensajeGrafico}>Ningún equipo coincide con "{textoEquipoProximo.trim()}".</p>
+            )}
+            {!buscandoProximoMP && !errorProximoMP && resultadosProximoMP.map((activo) => (
+              <div
+                key={activo.codigo}
+                className="sy-clickeable"
+                style={estilos.filaProximo}
+                onClick={() => navegar(`/activos/${activo.codigo}`)}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <p style={estilos.titulo}>{activo.descripcion}</p>
+                  <p style={estilos.codigo}>
+                    {activo.codigo}
+                    {activo.ubicacion ? ` · ${activo.ubicacion}` : ""}
+                  </p>
+                </div>
+                <span style={{ ...estilos.proximoValor, color: colorProximoMP(activo.proxima_fecha_mp) }}>
+                  {textoProximoMP(activo.proxima_fecha_mp)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ─── Carga de mantenimientos por mes: plegado por default (28/09) y
+      ubicado ARRIBA del navegador de mes (movido acá el 29/09, a pedido de
+      Cami): antes quedaba pegado a la lista de equipos y separaba el mes de
+      lo que ese mes contiene. Es un gráfico de apoyo para planificar, no lo
+      primero que hace falta ver — y con los controles de rango + los chips
+      de grupo + el gráfico juntos, en el celular se veía amontonado. Ahora
+      es un botón, y el gráfico en sí tiene su propio scroll horizontal para
+      que las barras no se aplasten en pantallas chicas (ver
+      GraficoCargaMensual, más abajo). ─── */}
+      <div style={{ marginBottom: 18 }}>
+        <button
+          style={{ ...boton(verGrafico ? "secundario" : "fantasma"), gap: 8 }}
+          onClick={() => setVerGrafico((v) => !v)}
+        >
+          <BarChart3 size={16} strokeWidth={1.9} aria-hidden="true" />
+          {verGrafico ? "Ocultar carga de mantenimientos" : "Ver carga de mantenimientos"}
+          {verGrafico
+            ? <ChevronUp size={15} strokeWidth={2} aria-hidden="true" />
+            : <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />}
+        </button>
+
+        {verGrafico && (
+          <div style={{ ...cs.tarjeta, padding: "18px 20px", marginTop: 10 }}>
+            <div style={estilos.encabezadoGrafico}>
+              <div>
+                <p style={estilos.tituloGrafico}>Carga de mantenimientos por mes</p>
+                <p style={estilos.ayudaGrafico}>Generados + pronóstico, para ver qué mes está más cargado.</p>
+              </div>
+              <div style={estilos.controlesGrafico}>
+                <label style={estilos.campoRango}>
+                  <span style={estilos.etiquetaRango}>Desde</span>
+                  <input
+                    type="month"
+                    style={estilos.inputMesRango}
+                    value={desdeGrafico}
+                    onChange={(e) => setDesdeGrafico(e.target.value)}
+                  />
+                </label>
+                <label style={estilos.campoRango}>
+                  <span style={estilos.etiquetaRango}>Hasta</span>
+                  <input
+                    type="month"
+                    style={estilos.inputMesRango}
+                    value={hastaGrafico}
+                    onChange={(e) => setHastaGrafico(e.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {gruposCatalogo.length > 1 && (
+              <div style={{ ...estilos.filtros, marginTop: 12, marginBottom: 0 }}>
+                <button
+                  onClick={() => setGrupoGrafico("")}
+                  style={{ ...estilos.filtro, ...(grupoGrafico === "" ? estilos.filtroActivo : {}) }}
+                >
+                  Todos los grupos
+                </button>
+                {gruposCatalogo.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => setGrupoGrafico(g.id)}
+                    style={{ ...estilos.filtro, ...(grupoGrafico === g.id ? estilos.filtroActivo : {}) }}
+                  >
+                    {g.nombre}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <GraficoCargaMensual
+              datos={resumenMeses}
+              cargando={cargandoGrafico}
+              error={errorGrafico}
+            />
+          </div>
+        )}
+      </div>
+
       <div style={estilos.navegador}>
         <button style={estilos.flecha} onClick={() => cambiarMes(-1)} aria-label="Mes anterior">
           <ChevronLeft size={18} strokeWidth={2} aria-hidden="true" />
@@ -266,64 +444,6 @@ function CalendarioMP() {
             {generando ? "Generando..." : "Generar ahora"}
           </button>
         )}
-      </div>
-
-      {/* ─── Carga de mantenimientos por mes: vista de conjunto (varios
-      meses a la vez), para ver de un vistazo qué mes tiene más encima antes
-      de meterse a revisar mes por mes en la lista de abajo. ─── */}
-      <div style={{ ...cs.tarjeta, padding: "18px 20px", marginBottom: 18 }}>
-        <div style={estilos.encabezadoGrafico}>
-          <div>
-            <p style={estilos.tituloGrafico}>Carga de mantenimientos por mes</p>
-            <p style={estilos.ayudaGrafico}>Generados + pronóstico, para ver qué mes está más cargado.</p>
-          </div>
-          <div style={estilos.controlesGrafico}>
-            <label style={estilos.campoRango}>
-              <span style={estilos.etiquetaRango}>Desde</span>
-              <input
-                type="month"
-                style={estilos.inputMesRango}
-                value={desdeGrafico}
-                onChange={(e) => setDesdeGrafico(e.target.value)}
-              />
-            </label>
-            <label style={estilos.campoRango}>
-              <span style={estilos.etiquetaRango}>Hasta</span>
-              <input
-                type="month"
-                style={estilos.inputMesRango}
-                value={hastaGrafico}
-                onChange={(e) => setHastaGrafico(e.target.value)}
-              />
-            </label>
-          </div>
-        </div>
-
-        {gruposCatalogo.length > 1 && (
-          <div style={{ ...estilos.filtros, marginTop: 12, marginBottom: 0 }}>
-            <button
-              onClick={() => setGrupoGrafico("")}
-              style={{ ...estilos.filtro, ...(grupoGrafico === "" ? estilos.filtroActivo : {}) }}
-            >
-              Todos los grupos
-            </button>
-            {gruposCatalogo.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => setGrupoGrafico(g.id)}
-                style={{ ...estilos.filtro, ...(grupoGrafico === g.id ? estilos.filtroActivo : {}) }}
-              >
-                {g.nombre}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <GraficoCargaMensual
-          datos={resumenMeses}
-          cargando={cargandoGrafico}
-          error={errorGrafico}
-        />
       </div>
 
       {/* ─── Buscador: por código o nombre del equipo ─── */}
@@ -440,6 +560,33 @@ function textoEstado(estado) {
   return nombres[estado] || estado;
 }
 
+// Mismo criterio de texto que usa la ficha del equipo ("Próximo preventivo")
+// para que la fecha se lea igual en toda la app: la fecha corta + cuántos
+// días faltan (o hace cuánto venció). Acá además cubrimos el caso de un
+// equipo sin ningún MP programado, que en el buscador es una respuesta
+// válida (no todos los equipos tienen plan preventivo).
+function textoProximoMP(fecha) {
+  if (!fecha) return "Sin mantenimiento programado";
+  const base = parsearFecha(fecha).toLocaleDateString("es-AR", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+  const dias = diasHasta(fecha);
+  if (dias === null) return base;
+  if (dias < 0) return `${base} · vencido hace ${Math.abs(dias)} días`;
+  if (dias === 0) return `${base} · es hoy`;
+  if (dias === 1) return `${base} · mañana`;
+  return `${base} · en ${dias} días`;
+}
+
+// Rojo si ya venció, para que salte a la vista sin tener que leer el texto
+// completo — mismo criterio de "vencido" que ya usa el resto de la app.
+function colorProximoMP(fecha) {
+  const dias = diasHasta(fecha);
+  if (dias === null) return color.textoDebil;
+  if (dias < 0) return color.peligro;
+  return color.textoSuave;
+}
+
 // ─── Gráfico de barras: carga de mantenimientos por mes ───
 // Una sola serie (cantidad de mantenimientos), así que un solo color; el mes
 // con más carga se resalta con el tono más oscuro de la misma familia (no un
@@ -477,31 +624,41 @@ function GraficoCargaMensual({ datos, cargando, error }) {
         <p style={estilos.resumenGrafico}>No hay mantenimientos programados en este rango.</p>
       )}
 
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={datosGrafico} margin={{ top: 22, right: 8, bottom: 4, left: 8 }} barCategoryGap="30%">
-          <CartesianGrid vertical={false} stroke={color.bordeSuave} />
-          <XAxis
-            dataKey="etiqueta"
-            tickLine={false}
-            axisLine={{ stroke: color.borde }}
-            tick={{ fill: color.textoDebil, fontSize: 12 }}
-          />
-          {/* Oculto a propósito: cada barra ya lleva su valor arriba (LabelList),
-          así que un eje numérico solo agregaría ruido sin sumar información. */}
-          <YAxis hide domain={[0, "dataMax + 1"]} allowDecimals={false} />
-          <Tooltip content={<TooltipGrafico />} cursor={{ fill: color.bordeSuave, opacity: 0.6 }} />
-          <Bar dataKey="cantidad" radius={[4, 4, 0, 0]} maxBarSize={26} isAnimationActive={false}>
-            {datosGrafico.map((d, i) => (
-              <Cell key={d.etiqueta + i} fill={d.esPico ? color.primarioOscuro : color.primario} />
-            ))}
-            <LabelList
-              dataKey="cantidad"
-              position="top"
-              style={{ fill: color.textoSuave, fontSize: 12, fontWeight: 600 }}
-            />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      {/* Scroll horizontal en vez de achicar las barras sin límite: en el
+      celular, con varios meses en el rango, las barras y sus etiquetas se
+      superponían y no se entendía nada (reportado por Cami el 28/09). Con
+      un ancho mínimo por mes, cada barra se ve igual de legible en
+      cualquier pantalla — en las angostas simplemente se desliza para ver
+      el resto, en vez de mostrar todo apretado e ilegible. */}
+      <div style={estilos.scrollGrafico}>
+        <div style={{ minWidth: Math.max(300, datosGrafico.length * 64) }}>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={datosGrafico} margin={{ top: 22, right: 8, bottom: 4, left: 8 }} barCategoryGap="30%">
+              <CartesianGrid vertical={false} stroke={color.bordeSuave} />
+              <XAxis
+                dataKey="etiqueta"
+                tickLine={false}
+                axisLine={{ stroke: color.borde }}
+                tick={{ fill: color.textoDebil, fontSize: 12 }}
+              />
+              {/* Oculto a propósito: cada barra ya lleva su valor arriba (LabelList),
+              así que un eje numérico solo agregaría ruido sin sumar información. */}
+              <YAxis hide domain={[0, "dataMax + 1"]} allowDecimals={false} />
+              <Tooltip content={<TooltipGrafico />} cursor={{ fill: color.bordeSuave, opacity: 0.6 }} />
+              <Bar dataKey="cantidad" radius={[4, 4, 0, 0]} maxBarSize={26} isAnimationActive={false}>
+                {datosGrafico.map((d, i) => (
+                  <Cell key={d.etiqueta + i} fill={d.esPico ? color.primarioOscuro : color.primario} />
+                ))}
+                <LabelList
+                  dataKey="cantidad"
+                  position="top"
+                  style={{ fill: color.textoSuave, fontSize: 12, fontWeight: 600 }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </>
   );
 }
@@ -539,6 +696,17 @@ const estilos = {
   },
   inputMesRango: { ...cs.input, padding: "6px 8px", fontSize: "0.82rem", width: "auto" },
   mensajeGrafico: { color: color.textoSuave, padding: "16px 0", fontSize: "0.88rem" },
+  // Permite deslizar el gráfico en horizontal en vez de aplastar las barras
+  // en pantallas angostas (ver GraficoCargaMensual). El momentum-scroll de
+  // iOS necesita la propiedad -webkit aparte, no alcanza con overflowX.
+  scrollGrafico: { overflowX: "auto", WebkitOverflowScrolling: "touch", marginTop: 4 },
+  // ─── Buscador: próximo mantenimiento de un equipo ───
+  resultadosProximo: { marginTop: 10, display: "flex", flexDirection: "column" },
+  filaProximo: {
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+    padding: "10px 0", borderBottom: `1px solid ${color.bordeSuave}`,
+  },
+  proximoValor: { fontSize: "0.82rem", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 },
   resumenGrafico: { margin: "12px 0 0", fontSize: "0.85rem", color: color.textoSuave, lineHeight: 1.5 },
   tooltip: {
     background: color.tarjeta, border: `1px solid ${color.borde}`, borderRadius: 10,

@@ -72,6 +72,15 @@ function Login() {
         >
           Olvidé mi contraseña
         </button>
+
+        {/* Primer ingreso: el hospital ya cargó a la persona en el padrón,
+        pero todavía no tiene contraseña propia (ver ActivarUsuario.jsx). */}
+        <button
+          style={{ ...boton("fantasma"), width: "100%", marginTop: 6 }}
+          onClick={() => navegar("/activar")}
+        >
+          ¿Primera vez? Activar mi usuario
+        </button>
       </div>
     </div>
   );

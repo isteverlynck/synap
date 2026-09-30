@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, SlidersHorizontal, X, Plus, Download } from "lucide-react";
 import { listarActivos, opcionesDeFiltro } from "../api/activos";
-import { listarSiglas } from "../api/catalogos";
+import { listarSiglas, listarUbicaciones } from "../api/catalogos";
 import { rolActual } from "../api/auth";
 import { descargarCSV } from "../api/exportar";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ function Activos() {
   const [activos, setActivos] = useState([]);
   const [opciones, setOpciones] = useState({ tipos: [], sectores: [], grupos: [], estados: [] });
   const [siglas, setSiglas] = useState([]);
+  const [ubicacionesCatalogo, setUbicacionesCatalogo] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [verFiltros, setVerFiltros] = useState(false);
@@ -42,11 +43,20 @@ function Activos() {
   useEffect(() => {
     opcionesDeFiltro().then(setOpciones).catch(() => {});
     listarSiglas().then(setSiglas).catch(() => {});
+    listarUbicaciones().then(setUbicacionesCatalogo).catch(() => {});
   }, []);
 
   // Diccionario sigla → significado para el cartelito de código/ubicación
   // (glosario de siglas + tipos de equipo, que ya trae su propio nombre).
   const diccionarioSiglas = armarDiccionarioSiglas(siglas, opciones.tipos);
+
+  // Código de ubicación exacto → descripción completa (catálogo relevado del
+  // hospital). Tiene prioridad sobre el glosario de siglas en el cartelito,
+  // porque es la descripción real de ESE código puntual, no una decodificación
+  // armada segmento por segmento.
+  const diccionarioUbicaciones = Object.fromEntries(
+    ubicacionesCatalogo.map((u) => [u.codigo, u.descripcion])
+  );
 
   // Esperamos 350 ms sin que teclee antes de buscar. Es lo que hace que se
   // sienta instantáneo sin castigar al servidor con una consulta por letra.
@@ -179,7 +189,11 @@ function Activos() {
                 {a.ubicacion && (
                   <>
                     {" · "}
-                    <CodigoConGlosario codigo={a.ubicacion} diccionario={diccionarioSiglas} />
+                    <CodigoConGlosario
+                      codigo={a.ubicacion}
+                      diccionario={diccionarioSiglas}
+                      descripcionExacta={diccionarioUbicaciones[a.ubicacion]}
+                    />
                   </>
                 )}
               </div>

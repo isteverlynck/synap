@@ -16,6 +16,7 @@ import Solicitudes from "./pages/Solicitudes";
 import EscanearQR from "./pages/EscanearQR";
 import FichaActivo from "./pages/FichaActivo";
 import RecuperarPassword from "./pages/RecuperarPassword";
+import ActivarUsuario from "./pages/ActivarUsuario";
 import Cascaron from "./componentes/Cascaron";
 import Pendientes from "./pages/Pendientes";
 import Ordenes from "./pages/Ordenes";
@@ -48,6 +49,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/recuperar" element={<RecuperarPassword />} />
         <Route path="/restablecer" element={<RecuperarPassword />} />
+        <Route path="/activar" element={<ActivarUsuario />} />
 
         {/* Todo lo de adentro vive dentro del cascarón */}
         <Route element={<Protegida><Cascaron /></Protegida>}>

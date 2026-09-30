@@ -55,6 +55,17 @@ export function pantallaInicioPorRol(rol) {
   return "/activos";
 }
 
+// Primer ingreso: crear la contraseña de una cuenta que el hospital ya cargó
+// en el padrón pero que todavía nunca activó (ver ActivarUsuario.jsx).
+export async function activarCuenta(numero, password, confirmacion) {
+  const res = await cliente.post("/auth/activar", {
+    numero_identificacion: numero,
+    password,
+    password_confirmacion: confirmacion,
+  });
+  return res.data;
+}
+
 // Pedir el mail de recuperación. Siempre devuelve el mismo mensaje, exista o
 // no la cuenta (el backend lo hace a propósito, por seguridad).
 export async function pedirRecuperacion(numero) {

@@ -339,7 +339,11 @@ const estilos = {
   },
   seccionTitulo: { margin: 0, fontSize: "1rem", fontWeight: 700, color: color.texto },
   seccionAyuda: { fontSize: "0.8rem", color: color.textoDebil, margin: "6px 0 14px", lineHeight: 1.5 },
-  lista: { display: "flex", flexDirection: "column", gap: 6 },
+  // Altura fija con scroll propio: antes cada catálogo estiraba toda la
+  // página (con el glosario de siglas cargado, sería una lista de cientos de
+  // filas). Con esto se ven unos pocos de entrada y el resto queda a un
+  // scroll, sin que la tarjeta crezca sin límite.
+  lista: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto", paddingRight: 4 },
   item: {
     display: "flex", alignItems: "center", gap: 10,
     padding: "9px 12px", borderRadius: 10, background: color.fondo,

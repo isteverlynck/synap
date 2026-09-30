@@ -8,11 +8,18 @@
 import { useEffect, useState } from "react";
 import { solicitudesPendientes, tecnicosDisponibles, listarGrupos, aceptarSolicitud,
          rechazarSolicitud, modificarSolicitud } from "../api/coordinacion";
+import { verCriticidad } from "../api/activos";
 import { agruparPorFecha } from "../utiles/fechas";
 import Encabezado from "../componentes/Encabezado";
 import { color, cs, boton, insignia } from "../tema";
 import { toast } from "sonner";
 import { HeartPulse, Wrench } from "lucide-react";
+
+// Sugerencia de prioridad según el nivel de riesgo PRIUX del equipo (ver
+// backend/app/criticidad.py::nivel_riesgo). Es un punto de partida nomás:
+// coordinación siempre puede elegir otra cosa en el desplegable.
+const PRIORIDAD_SEGUN_NIVEL = { ALTO: "ALTA", MEDIO: "MEDIA", BAJO: "BAJA" };
+const NOMBRE_NIVEL = { ALTO: "alto", MEDIO: "medio", BAJO: "bajo" };
 
 function Pendientes() {
   const [solicitudes, setSolicitudes] = useState([]);
@@ -167,6 +174,9 @@ function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
   const [tecnicoId, setTecnicoId] = useState("");
   const [tecnicosDelGrupo, setTecnicosDelGrupo] = useState(tecnicos);
   const [prioridad, setPrioridad] = useState("");
+  // Nivel de riesgo del equipo (PRIUX), si se pudo sugerir una prioridad a
+  // partir de él — para mostrar de dónde salió el valor precargado.
+  const [sugerencia, setSugerencia] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
 
@@ -178,6 +188,24 @@ function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
     if (!grupoId) { setTecnicosDelGrupo([]); return; }
     tecnicosDisponibles(grupoId).then(setTecnicosDelGrupo).catch(() => setTecnicosDelGrupo([]));
   }, [grupoId, requiereGrupo]);
+
+  // Precarga la prioridad según el riesgo del equipo — solo aplica a
+  // solicitudes de un equipo médico con el PRIUX calculable (si es "cosa", si
+  // no es equipo médico, o si falta algún dato para el cálculo, no hay nada
+  // que sugerir y queda "Sin definir" como siempre). Solo completa el campo
+  // si todavía está vacío: si coordinación ya eligió algo mientras se
+  // calculaba, no se lo pisa.
+  useEffect(() => {
+    if (!s.activo_codigo) return;
+    verCriticidad(s.activo_codigo)
+      .then((c) => {
+        const sugerida = PRIORIDAD_SEGUN_NIVEL[c.nivel];
+        if (!sugerida) return;
+        setSugerencia({ prioridad: sugerida, nivel: c.nivel });
+        setPrioridad((actual) => actual || sugerida);
+      })
+      .catch(() => {});
+  }, [s.activo_codigo]);
 
   async function confirmar() {
     if (requiereGrupo && !grupoId) {
@@ -246,9 +274,14 @@ function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
       </select>
 
       <label style={cs.label}>Prioridad</label>
+      {sugerencia && (
+        <p style={estilos.sugerencia}>
+          Sugerida según el riesgo del equipo (nivel {NOMBRE_NIVEL[sugerencia.nivel]}) — la podés cambiar.
+        </p>
+      )}
       <select style={{ ...cs.input, marginBottom: 14 }} value={prioridad}
               onChange={(e) => setPrioridad(e.target.value)}>
-        
+
         <option value="">Sin definir</option>
         <option value="CRITICA">Crítica</option>
         <option value="ALTA">Alta</option>
@@ -383,6 +416,7 @@ const estilos = {
   acciones: { display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" },
   panel: { marginTop: 14, paddingTop: 14, borderTop: `1px solid ${color.borde}` },
   panelTitulo: { margin: "0 0 12px", fontSize: "0.9rem", fontWeight: 700, color: color.texto },
+  sugerencia: { margin: "4px 0 6px", fontSize: "0.78rem", color: color.textoDebil },
   error: { color: color.peligro, fontSize: "0.84rem", margin: "0 0 10px" },
 };
 
