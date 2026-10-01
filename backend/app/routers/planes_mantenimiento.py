@@ -25,6 +25,7 @@ from ..schemas import (
     PlanMantenimientoCreate,
     PlanMantenimientoOut,
     PlanMantenimientoDetalle,
+    PlanMantenimientoUpdate,
 )
 from ..security import get_current_user, requiere_rol
 
@@ -36,6 +37,26 @@ router = APIRouter(prefix="/planes-mantenimiento", tags=["planes_mantenimiento"]
 # operativo". Se agregan solos al final de cada plan, no hace falta que
 # coordinación los tipee al armar el checklist.
 ITEMS_OBLIGATORIOS_TODO_PLAN = ["Necesidad de correctivo", "Equipo operativo"]
+
+
+def _armar_detalle(plan: PlantillaMP) -> PlanMantenimientoDetalle:
+    """Arma la respuesta de un plan con solo sus ítems ACTIVOS (ver baja
+    lógica en ChecklistItem.activo, models.py), ordenados. Se usa en vez de
+    devolver el objeto ORM directo porque `plan.items` trae también los
+    ítems dados de baja, que no tienen que aparecer nunca en la API."""
+    items_activos = [it for it in plan.items if it.activo]
+    items_activos.sort(key=lambda it: it.orden)
+    return PlanMantenimientoDetalle(
+        id=plan.id,
+        nombre=plan.nombre,
+        frecuencia_dias=plan.frecuencia_dias,
+        descripcion=plan.descripcion,
+        es_generica=plan.es_generica,
+        tipo_equipo_id=plan.tipo_equipo_id,
+        created_at=plan.created_at,
+        items=items_activos,
+    )
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LISTAR PLANES (GET)
@@ -64,9 +85,7 @@ def ver_plan(
     plan = db.query(PlantillaMP).filter(PlantillaMP.id == plan_id).first()
     if plan is None:
         raise HTTPException(status_code=404, detail="Plan de mantenimiento no encontrado")
-    # ordenar los items por su campo 'orden' para mostrarlos como checklist
-    plan.items.sort(key=lambda it: it.orden)
-    return plan
+    return _armar_detalle(plan)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -104,8 +123,7 @@ def plan_para_activo(
             detail="No hay plan para este tipo de equipo ni plan genérico definido.",
         )
 
-    plan.items.sort(key=lambda it: it.orden)
-    return plan
+    return _armar_detalle(plan)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -171,3 +189,107 @@ def crear_plan(
     db.refresh(plan)
     plan.items.sort(key=lambda it: it.orden)
     return plan
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EDITAR UN PLAN (PATCH) — nombre, frecuencia, descripción y/o ítems
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.patch("/{plan_id}", response_model=PlanMantenimientoDetalle)
+def editar_plan(
+    plan_id: str,
+    payload: PlanMantenimientoUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Editar un plan de mantenimiento ya existente (pedido de Cami, parte 3
+    de 3 de la edición con confirmación — ficha de equipo y OT no cerrada ya
+    se podían editar).
+
+    Mismo permiso que crear un plan: coordinación (jefatura siempre pasa).
+
+    Ver el docstring de PlanMantenimientoUpdate en schemas.py para el
+    detalle completo de qué significa "editar los ítems": en resumen, un
+    ítem con id se actualiza, uno sin id se crea, y uno que ya estaba activo
+    y no vino en el pedido se da de baja lógica (nunca se borra de verdad,
+    por las respuestas de mantenimientos ya hechos que puedan estar
+    enganchadas a él).
+    """
+    plan = db.query(PlantillaMP).filter(PlantillaMP.id == plan_id).first()
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan de mantenimiento no encontrado")
+
+    datos = payload.model_dump(exclude_unset=True, exclude={"items"})
+    if "nombre" in datos:
+        nombre = (datos["nombre"] or "").strip()
+        if not nombre:
+            raise HTTPException(status_code=400, detail="El checklist necesita un nombre.")
+        datos["nombre"] = nombre
+    if "frecuencia_dias" in datos and (not datos["frecuencia_dias"] or datos["frecuencia_dias"] <= 0):
+        raise HTTPException(status_code=400, detail="La frecuencia tiene que ser mayor a 0 días.")
+    if "descripcion" in datos:
+        descripcion = (datos["descripcion"] or "").strip()
+        datos["descripcion"] = descripcion or None
+
+    for campo, valor in datos.items():
+        setattr(plan, campo, valor)
+
+    if payload.items is not None:
+        # Los ítems EDITABLES activos que tenía el plan antes de este pedido
+        # (los dos fijos -- "Necesidad de correctivo", "Equipo operativo" --
+        # quedan afuera de este diccionario: no se tocan acá, se preservan
+        # más abajo).
+        items_editables_antes = {
+            it.id: it
+            for it in plan.items
+            if it.activo and it.descripcion not in ITEMS_OBLIGATORIOS_TODO_PLAN
+        }
+        ids_recibidos = set()
+
+        for it_payload in payload.items:
+            descripcion = it_payload.descripcion.strip()
+            if not descripcion:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Un ítem del checklist no puede quedar sin descripción.",
+                )
+            if it_payload.id is not None and it_payload.id in items_editables_antes:
+                item = items_editables_antes[it_payload.id]
+                item.orden = it_payload.orden
+                item.descripcion = descripcion
+                item.obligatorio = it_payload.obligatorio
+                ids_recibidos.add(it_payload.id)
+            else:
+                db.add(ChecklistItem(
+                    plantilla_mp_id=plan.id,
+                    orden=it_payload.orden,
+                    descripcion=descripcion,
+                    obligatorio=it_payload.obligatorio,
+                ))
+
+        # Los que ya estaban activos y no vinieron en este pedido: baja lógica.
+        for item_id, item in items_editables_antes.items():
+            if item_id not in ids_recibidos:
+                item.activo = False
+
+        # Los dos ítems fijos de todo plan tienen que seguir activos pase lo
+        # que pase (si el plan es viejo y nunca los tuvo, o si alguno se
+        # había dado de baja por error antes de este cambio, se recrean acá
+        # — mismo criterio que al crear un plan nuevo).
+        orden_siguiente = max((it_p.orden for it_p in payload.items), default=0)
+        descripciones_fijas_activas = {
+            it.descripcion for it in plan.items
+            if it.activo and it.descripcion in ITEMS_OBLIGATORIOS_TODO_PLAN
+        }
+        for offset, descripcion_fija in enumerate(ITEMS_OBLIGATORIOS_TODO_PLAN, start=1):
+            if descripcion_fija not in descripciones_fijas_activas:
+                db.add(ChecklistItem(
+                    plantilla_mp_id=plan.id,
+                    orden=orden_siguiente + offset,
+                    descripcion=descripcion_fija,
+                    obligatorio=True,
+                ))
+
+    db.commit()
+    db.refresh(plan)
+    return _armar_detalle(plan)

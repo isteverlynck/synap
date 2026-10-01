@@ -92,8 +92,18 @@ function DetalleOrden() {
   // progreso sin registro de quién la empezó (OT viejas o migradas), la
   // sigue pudiendo trabajar cualquiera del grupo, para que no quede trabada.
   // Correctiva: solo su técnico asignado.
+  //
+  // Coordinación (pedido de Cami): también puede trabajar una preventiva —
+  // empezarla, completar su checklist, cerrarla — pero SOLO si es de un grupo
+  // que coordina. No hace falta chequear el grupo acá de nuevo: si llegamos
+  // hasta esta pantalla con la OT cargada, es porque GET /ordenes-trabajo/{id}
+  // ya la dejó pasar (ese endpoint corta con 403 si la OT no es de un grupo
+  // que coordina) — el backend es la fuente de verdad, acá solo reflejamos lo
+  // mismo. La regla de "la está trabajando otra persona" vale igual para
+  // coordinación: si ya la empezó un técnico, coordinación la puede ver pero
+  // no tocar hasta que se libere.
   const puedeTrabajar = ot?.tipo === "PREVENTIVA"
-    ? esDeMiGrupo && (!ot?.iniciada_por || ot.iniciada_por === perfil?.id)
+    ? (esDeMiGrupo || esCoordinacion) && (!ot?.iniciada_por || ot.iniciada_por === perfil?.id)
     : esMiOrden;
   const avisoPreventivo = textoPreventivo(ot?.activo_proxima_fecha_mp);
 
@@ -1251,7 +1261,7 @@ export default DetalleOrden;
 function textoPreventivo(fecha) {
   const dias = diasHasta(fecha);
   if (dias === null) return "";
-  if (dias === 0) return "Preventivo programado para hoy";
   if (dias < 0) return `Preventivo vencido hace ${Math.abs(dias)} días`;
+  if (dias === 0) return "Preventivo programado para hoy";
   return `Próximo preventivo en ${dias} días`;
 }

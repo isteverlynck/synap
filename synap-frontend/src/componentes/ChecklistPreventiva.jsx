@@ -21,6 +21,25 @@ import {
 import { completarOrden } from "../api/ordenes";
 import { color, cs, boton, insignia } from "../tema";
 
+// Este ítem fijo (lo agrega el backend solo a todo plan, ver
+// ITEMS_OBLIGATORIOS_TODO_PLAN en routers/planes_mantenimiento.py) es distinto
+// a los demás: no es un chequeo tipo "¿esto funciona?" sino una pregunta
+// directa ("¿hace falta un correctivo?"). Mostrarle al técnico los botones
+// genéricos "Pasa" / "No pasa" quedaba confuso ("Necesidad de correctivo: Pasa"
+// suena al revés de lo que significa) — pedido de Cami: para ESTE ítem puntual
+// se muestran "Sí" / "No" en vez de "Pasa" / "No pasa". Por abajo sigue siendo
+// el mismo resultado PASA/NO_PASA de siempre (no cambia nada en el backend):
+// "Sí, hace falta" guarda NO_PASA (y deja generar la correctiva, igual que
+// cualquier otro ítem que no pasa); "No, no hace falta" guarda PASA.
+const ITEM_NECESIDAD_CORRECTIVO = "Necesidad de correctivo";
+
+function etiquetaResultado(item, resultado) {
+  const esNecesidadCorrectivo = item.descripcion === ITEM_NECESIDAD_CORRECTIVO;
+  if (resultado === "PASA") return esNecesidadCorrectivo ? "No" : "Pasa";
+  if (resultado === "NO_PASA") return esNecesidadCorrectivo ? "Sí" : "No pasa";
+  return "Sin resultado";
+}
+
 // onCompletado(otActualizada): se llama cuando la orden ya se completó de
 // verdad (el backend la dejó PENDIENTE_CIERRE) — así el padre actualiza su
 // copia de la OT. Antes esto abría un panel aparte pidiendo de nuevo "qué se
@@ -48,24 +67,30 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
   const yaSeAbrio = useRef(false);
 
   // ─── Completar la orden (dentro del modal de validación) ───
-  const [observacionesOT, setObservacionesOT] = useState("");
+  // El campo "qué se hizo" se sacó (pedido de Cami): quedaba redundante con
+  // las observaciones que ya se cargan ítem por ítem en el checklist de
+  // arriba. Al completar ya no se manda ninguna observación de la OT en sí.
   const [justificacionRetraso, setJustificacionRetraso] = useState("");
   const [completando, setCompletando] = useState(false);
   const [errorCompletar, setErrorCompletar] = useState("");
 
   // Si hoy ya no estamos en el mes en que se abrió la OT, hubo un desvío y
-  // el backend va a pedir el motivo del retraso.
+  // el backend va a pedir el motivo del retraso. Esto es una ESTIMACIÓN para
+  // no pedirle el motivo a todo el mundo de entrada: compara contra la hora
+  // del navegador de quien está completando. La decisión real la toma el
+  // backend con la hora de Argentina (ver hoy_argentina() en fechas.py) —
+  // por eso, si de todos modos el backend contesta que hubo desvío (ver
+  // `desvioForzado` más abajo), mostramos el campo igual en vez de dejar a
+  // la persona trabada.
   const hoy = new Date();
   const apertura = ot.fecha_apertura ? new Date(ot.fecha_apertura) : null;
-  const conDesvio =
+  const conDesvioEstimado =
     apertura &&
     (apertura.getFullYear() !== hoy.getFullYear() || apertura.getMonth() !== hoy.getMonth());
+  const [desvioForzado, setDesvioForzado] = useState(false);
+  const conDesvio = conDesvioEstimado || desvioForzado;
 
   async function confirmarCompletar() {
-    if (!observacionesOT.trim()) {
-      setErrorCompletar("Contá qué se hizo: es lo que queda en el historial del equipo.");
-      return;
-    }
     if (conDesvio && !justificacionRetraso.trim()) {
       setErrorCompletar("Este mantenimiento se completa fuera del mes en que se abrió: contá el motivo del retraso.");
       return;
@@ -73,14 +98,23 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
     setCompletando(true);
     setErrorCompletar("");
     try {
-      const nuevaOrden = await completarOrden(ot.id, observacionesOT.trim(), justificacionRetraso.trim());
+      const nuevaOrden = await completarOrden(ot.id, "", justificacionRetraso.trim());
       toast.success(`OT-${String(ot.numero_ot).padStart(4, "0")} completada`, {
         description: "Queda pendiente de que coordinación autorice el cierre.",
       });
       setMostrarValidacion(false);
       onCompletado?.(nuevaOrden);
     } catch (e) {
-      setErrorCompletar(e.response?.data?.detail || "No pudimos completar la orden.");
+      const detalle = e.response?.data?.detail || "No pudimos completar la orden.";
+      // El navegador y el servidor pueden "pensar" que es un mes distinto
+      // cerca de la medianoche (uno mira la hora local, el otro Argentina) —
+      // si pasó esto, el backend corta pidiendo el motivo aunque acá
+      // creíamos que no hacía falta. En vez de dejar a la persona sin poder
+      // completar nunca la orden, mostramos el campo y que lo complete.
+      if (!conDesvio && detalle.includes("fuera del mes")) {
+        setDesvioForzado(true);
+      }
+      setErrorCompletar(detalle);
     } finally {
       setCompletando(false);
     }
@@ -253,12 +287,25 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
 
                 {mostrarBotones && (
                   <div style={estilos.botonesItem}>
-                    <button style={{ ...boton("secundario"), padding: "6px 12px" }} onClick={() => marcarPasa(item)} disabled={enviando}>
-                      Pasa
-                    </button>
-                    <button style={{ ...boton("peligro"), padding: "6px 12px" }} onClick={() => abrirNoPasa(item, r)} disabled={enviando}>
-                      No pasa
-                    </button>
+                    {item.descripcion === ITEM_NECESIDAD_CORRECTIVO ? (
+                      <>
+                        <button style={{ ...boton("peligro"), padding: "6px 12px" }} onClick={() => abrirNoPasa(item, r)} disabled={enviando}>
+                          Sí
+                        </button>
+                        <button style={{ ...boton("secundario"), padding: "6px 12px" }} onClick={() => marcarPasa(item)} disabled={enviando}>
+                          No
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button style={{ ...boton("secundario"), padding: "6px 12px" }} onClick={() => marcarPasa(item)} disabled={enviando}>
+                          Pasa
+                        </button>
+                        <button style={{ ...boton("peligro"), padding: "6px 12px" }} onClick={() => abrirNoPasa(item, r)} disabled={enviando}>
+                          No pasa
+                        </button>
+                      </>
+                    )}
                     {editando && (
                       <button style={{ ...boton("fantasma"), padding: "6px 12px" }} onClick={cancelarEdicion}>
                         Cancelar
@@ -270,7 +317,7 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
                 {r && !editando && itemAbierto !== item.id && (
                   <>
                     <span style={insignia(r.resultado === "PASA" ? "exito" : r.resultado === "NO_PASA" ? "peligro" : "neutro")}>
-                      {r.resultado === "PASA" ? "Pasa" : r.resultado === "NO_PASA" ? "No pasa" : "Sin resultado"}
+                      {etiquetaResultado(item, r.resultado)}
                     </span>
                     {puedeCompletar && (
                       <button style={estilos.linkCambiar} onClick={() => cambiarRespuesta(item)}>
@@ -368,7 +415,7 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
                     </div>
                     {r && (
                       <span style={insignia(r.resultado === "PASA" ? "exito" : "peligro")}>
-                        {r.resultado === "PASA" ? "Pasa" : "No pasa"}
+                        {etiquetaResultado(item, r.resultado)}
                       </span>
                     )}
                   </div>
@@ -383,18 +430,15 @@ function ChecklistPreventiva({ ot, perfil, puedeCompletar, onCorrectivaCreada, o
               </p>
             )}
 
-            <label style={cs.label}>Qué se hizo</label>
-            <textarea
-              style={{ ...cs.input, minHeight: 70, marginBottom: 12, resize: "vertical" }}
-              placeholder="Ej: se reemplazó el sensor de flujo y se calibró el equipo."
-              value={observacionesOT}
-              onChange={(e) => setObservacionesOT(e.target.value)}
-            />
-
             {conDesvio && (
               <>
                 <p style={estilos.modalAyuda}>
-                  Este mantenimiento se abrió en {apertura.toLocaleDateString("es-AR", { month: "2-digit", year: "numeric" })} y se está completando fuera de ese mes: hubo un desvío.
+                  {apertura
+                    ? `Este mantenimiento se abrió en ${apertura.toLocaleDateString("es-AR", { month: "2-digit", year: "numeric" })} y se está completando fuera de ese mes: hubo un desvío.`
+                    // desvioForzado sin "apertura" (no debería pasar, pero por las
+                    // dudas): el backend avisó el desvío igual, mostramos el motivo
+                    // sin la fecha de apertura en el texto.
+                    : "Este mantenimiento se está completando fuera del mes en que se programó: hubo un desvío."}
                 </p>
                 <label style={cs.label}>Motivo del retraso</label>
                 <textarea

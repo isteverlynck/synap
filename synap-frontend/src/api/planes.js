@@ -25,3 +25,14 @@ export async function crearPlan(datos) {
   const res = await cliente.post("/planes-mantenimiento", datos);
   return res.data;
 }
+
+// Editar un plan ya existente: nombre, frecuencia, descripción y/o los
+// ítems del checklist. Mismo permiso que crearPlan. Si mandás "items", la
+// lista reemplaza por completo los ítems editables del plan (ver
+// PanelEditarPlan en DetallePlan.jsx) — un ítem con id se actualiza, uno sin
+// id se crea, y uno que ya existía y no viene en la lista se da de baja
+// (nunca se borra del todo).
+export async function editarPlan(planId, datos) {
+  const res = await cliente.patch(`/planes-mantenimiento/${planId}`, datos);
+  return res.data;
+}

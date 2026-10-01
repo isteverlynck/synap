@@ -455,6 +455,14 @@ class ChecklistItem(Base):
     orden: Mapped[int] = mapped_column(Integer, nullable=False)   # número de paso en el checklist
     descripcion: Mapped[str] = mapped_column(String, nullable=False)
     obligatorio: Mapped[bool | None] = mapped_column(default=True, nullable=True)
+    # Baja lógica: al editar un plan (pedido de Cami, parte 3 de la edición
+    # con confirmación), un ítem que se saca del checklist NUNCA se borra de
+    # verdad — se marca activo=False. Borrarlo de verdad rompería los
+    # mantenimientos ya hechos que tengan una respuesta enganchada a este
+    # ítem (checklist_respuestas.checklist_item_id no admite nulos ni tiene
+    # borrado en cascada). Todo lo que lista o muestra ítems filtra por
+    # activo=True; el historial de respuestas viejas sigue intacto.
+    activo: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     # ─── Relaciones ───
     plantilla: Mapped["PlantillaMP"] = relationship(back_populates="items")

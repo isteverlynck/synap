@@ -19,6 +19,7 @@ from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..fechas import hoy_argentina
 from ..models import OrdenTrabajo, NotaOT, Usuario, MantenimientoPreventivo, Activo
 from ..notificaciones import notificar_bioingenieria
 from ..schemas import (
@@ -478,6 +479,17 @@ def completar_orden(
     _validar_permiso_sobre_ot(current_user, db, orden)
 
     ahora = datetime.utcnow()
+    # Para decidir "¿se completó en el mes en que se programó?" usamos la hora
+    # de Argentina, no UTC: cerca de la medianoche, UTC puede estar ya en el
+    # día/mes siguiente mientras en Argentina todavía no (UTC-3). Eso hacía
+    # que el backend a veces considerara "fuera de mes" (y pidiera motivo de
+    # retraso) cuando en Argentina todavía era el mes programado — el bug que
+    # reportó Cami: el frontend, con la hora local correcta, no mostraba el
+    # campo de motivo porque no esperaba que hiciera falta. Ver
+    # fechas.hoy_argentina(). ahora (UTC) se sigue usando para los timestamps
+    # de abajo (fecha_completada, duración de la parada): ahí lo que importa
+    # es comparar entre sí timestamps absolutos, no el día calendario.
+    hoy = hoy_argentina()
 
     # Si tiene MP enganchado, resolvemos el desvío ANTES de tocar nada más:
     # si hace falta justificación y no vino, cortamos acá con el 400 sin
@@ -486,7 +498,7 @@ def completar_orden(
         MantenimientoPreventivo.ot_id == orden.id
     ).first()
     if mp is not None:
-        a_tiempo = (ahora.year, ahora.month) == (mp.fecha_programada.year, mp.fecha_programada.month)
+        a_tiempo = (hoy.year, hoy.month) == (mp.fecha_programada.year, mp.fecha_programada.month)
         if not a_tiempo and not (payload.justificacion_retraso and payload.justificacion_retraso.strip()):
             raise HTTPException(
                 status_code=400,
@@ -496,12 +508,12 @@ def completar_orden(
                     "retraso para poder completarla."
                 ),
             )
-        mp.fecha_realizada = ahora.date()
+        mp.fecha_realizada = hoy.date()
         mp.estado = "REALIZADO"
         mp.justificacion_retraso = payload.justificacion_retraso.strip() if not a_tiempo else None
 
     if orden.activo is not None:
-        orden.activo.ultima_fecha_mp = ahora.date()
+        orden.activo.ultima_fecha_mp = hoy.date()
 
     orden.estado = "PENDIENTE_CIERRE"
     orden.completada_por = current_user.id

@@ -787,9 +787,56 @@ class PlanMantenimientoOut(BaseModel):
 class PlanMantenimientoDetalle(PlanMantenimientoOut):
     """Un plan con TODOS sus ítems de checklist adentro (para ver el detalle)."""
     items: list["ChecklistItemOut"] = []
-    
+
 
 PlanMantenimientoDetalle.model_rebuild()
+
+
+class ChecklistItemUpdate(BaseModel):
+    """Un ítem al editar un plan de mantenimiento (parte 3 de 3 del pedido de
+    Cami: ficha de equipo y OT ya se podían editar, esto suma los checklists).
+
+    - Si trae `id`: es un ítem que ya existía en el plan — se actualiza
+      (orden/descripción/obligatorio).
+    - Si NO trae `id`: es un ítem nuevo — se crea.
+
+    No incluye "activo": eso lo maneja el router solo (ver el docstring de
+    PlanMantenimientoUpdate más abajo).
+    """
+    id: uuid.UUID | None = None
+    orden: int
+    descripcion: str
+    obligatorio: bool = True
+
+
+class PlanMantenimientoUpdate(BaseModel):
+    """Editar un plan de mantenimiento ya existente.
+
+    nombre/frecuencia_dias/descripcion son un PATCH parcial normal: solo se
+    tocan los campos que vengan en el pedido.
+
+    `items`, cuando viene, reemplaza la lista completa de ítems EDITABLES del
+    plan (los dos ítems fijos de todo checklist — "Necesidad de correctivo" y
+    "Equipo operativo" — ni se piden acá ni hace falta mandarlos: el router
+    los preserva solo, igual que hace al crear un plan):
+      - Un ítem del pedido con `id` existente: se actualiza.
+      - Un ítem del pedido sin `id` (o con un `id` que no pertenece a este
+        plan): se crea como ítem nuevo.
+      - Un ítem que YA estaba activo en el plan y no vino en este pedido:
+        se da de baja lógica (columna `activo` en checklist_items), nunca se
+        borra de verdad — podría tener respuestas de mantenimientos ya
+        hechos enganchadas (`checklist_respuestas.checklist_item_id` no
+        admite nulos ni tiene borrado en cascada).
+
+    No se puede editar acá: `es_generica` ni `tipo_equipo_id` — cambiar "para
+    qué equipo sirve" este plan después de creado puede desincronizar qué
+    plan le corresponde a qué equipo ya instalado; si hace falta, se da de
+    baja este plan (dejándolo de usar) y se crea uno nuevo.
+    """
+    nombre: str | None = None
+    frecuencia_dias: int | None = None
+    descripcion: str | None = None
+    items: list[ChecklistItemUpdate] | None = None
 
 # ─── Seguimiento y cierre de OT ───
 class OrdenTrabajoAsignar(BaseModel):

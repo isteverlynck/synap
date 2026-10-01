@@ -90,11 +90,13 @@ def ver_checklist_de_plantilla(
     """Ver los ítems de checklist de una plantilla de MP, ordenados por paso.
 
     Esto es lo que se le muestra al técnico como guía cuando va a hacer el MP:
-    la lista de puntos a revisar, en orden.
+    la lista de puntos a revisar, en orden. Solo trae los ítems ACTIVOS: uno
+    dado de baja al editar el plan (ver ChecklistItem.activo en models.py) no
+    tiene que aparecer nunca en un checklist para completar.
     """
     items = (
         db.query(ChecklistItem)
-        .filter(ChecklistItem.plantilla_mp_id == plantilla_mp_id)
+        .filter(ChecklistItem.plantilla_mp_id == plantilla_mp_id, ChecklistItem.activo == True)  # noqa: E712
         .order_by(ChecklistItem.orden)
         .all()
     )
@@ -131,7 +133,7 @@ def ver_respuestas_de_mp(
 def registrar_respuesta(
     payload: ChecklistRespuestaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Registrar (o cambiar) la respuesta a un ítem del checklist en un MP.
 
@@ -142,6 +144,11 @@ def registrar_respuesta(
     crear una segunda. Así, si alguien marcó "No pasa" por error y en
     realidad "Pasa" (o al revés), puede volver a contestar y se corrige la
     misma fila en vez de acumular respuestas viejas.
+
+    Quién puede completar un checklist (pedido de Cami): un técnico/junior de
+    su propio grupo, o coordinación — pero coordinación SOLO en preventivas de
+    los grupos que coordina (lo valida _validar_permiso_sobre_mp más abajo,
+    mismo criterio que ya usa el resto de las acciones sobre una OT).
     """
     # 1. El MP tiene que existir.
     mp = db.query(MantenimientoPreventivo).filter(
@@ -195,13 +202,17 @@ def registrar_respuesta(
 def generar_correctiva_desde_checklist(
     payload: GenerarCorrectivaDesdeChecklist,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Registra un ítem como NO_PASA y crea la OT correctiva para ese equipo.
 
     Se usa SOLO cuando la persona elige generar la correctiva (ej: el equipo se
     puede reparar). Si en cambio decide NO generarla (ej: se da de baja), el
     frontend usa POST /checklists/respuestas y no llama a este endpoint.
+
+    Mismo criterio de permisos que /checklists/respuestas: coordinación puede
+    usar esto, pero solo en preventivas de los grupos que coordina (lo valida
+    _validar_permiso_sobre_mp).
 
     Hace todo junto (una sola transacción):
       1. Verifica que el mantenimiento y el ítem existan.
