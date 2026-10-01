@@ -389,7 +389,7 @@ class OrdenTrabajoOut(BaseModel):
     """
     id: uuid.UUID
     numero_ot: int
-    activo_codigo: str
+    activo_codigo: str | None = None
     tipo: str
     estado: str
     prioridad: str | None = None

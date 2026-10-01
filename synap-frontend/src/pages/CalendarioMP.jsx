@@ -402,7 +402,7 @@ function CalendarioMP() {
                     onClick={() => setGrupoGrafico(g.id)}
                     style={{ ...estilos.filtro, ...(grupoGrafico === g.id ? estilos.filtroActivo : {}) }}
                   >
-                    {g.nombre}
+                    {g.id}
                   </button>
                 ))}
               </div>

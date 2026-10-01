@@ -210,15 +210,17 @@ function DetalleOrden() {
         )}
       </div>
 
-      {/* El equipo, clickeable: desde la OT se llega a su ficha completa. */}
+      {/* El equipo, clickeable: desde la OT se llega a su ficha completa.
+          Si la OT es de una "cosa" (sin equipo registrado) no hay ficha a la
+          que ir: la tarjeta se muestra igual, pero sin clic. */}
       <div
-        className="sy-clickeable"
-        style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12, cursor: "pointer" }}
-        onClick={() => navegar(`/activos/${ot.activo_codigo}`)}
+        className={ot.activo_codigo ? "sy-clickeable" : undefined}
+        style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12, cursor: ot.activo_codigo ? "pointer" : "default" }}
+        onClick={ot.activo_codigo ? () => navegar(`/activos/${ot.activo_codigo}`) : undefined}
       >
         <p style={estilos.equipoNombre}>{ot.activo_descripcion || "Equipo sin descripción"}</p>
         <p style={estilos.equipoCodigo}>
-          {ot.activo_codigo}{ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
+          {ot.activo_codigo || "Sin equipo registrado"}{ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
         </p>
         {avisoPreventivo && !cerrada && <p style={estilos.equipoCodigo}>{avisoPreventivo}</p>}
         {/* Criticidad y riesgo PRIUX del equipo (ver backend/app/criticidad.py). */}

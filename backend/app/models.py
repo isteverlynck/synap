@@ -150,7 +150,7 @@ class OrdenTrabajo(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     numero_ot: Mapped[int] = mapped_column(Integer, nullable=False)
-    activo_codigo: Mapped[str] = mapped_column(String, ForeignKey("activos.codigo"), nullable=False)
+    activo_codigo: Mapped[str | None] = mapped_column(String, ForeignKey("activos.codigo"), nullable=True)
     tipo: Mapped[str] = mapped_column(String, nullable=False)          # correctiva / preventiva
     estado: Mapped[str] = mapped_column(String, nullable=False)        # abierta / en curso / cerrada
     prioridad: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -236,7 +236,7 @@ class OrdenTrabajo(Base):
         return f"{self.completador.nombre} {self.completador.apellido}"
 
     # ─── Relaciones ───
-    activo: Mapped["Activo"] = relationship(back_populates="ordenes_de_trabajo")
+    activo: Mapped["Activo | None"] = relationship(back_populates="ordenes_de_trabajo")
     fallas: Mapped[list["Falla"]] = relationship(back_populates="orden")
     mantenimientos: Mapped[list["MantenimientoPreventivo"]] = relationship(back_populates="orden")
     consumos: Mapped[list["ConsumoInsumo"]] = relationship(back_populates="orden")
@@ -250,12 +250,24 @@ class OrdenTrabajo(Base):
         un vistazo. Traemos también la descripción para que el listado diga
         "Bomba de infusión" y el código quede como dato de apoyo.
         """
-        return self.activo.descripcion if self.activo else None
+        if self.activo is not None:
+            return self.activo.descripcion
+        # OT de una "cosa" (sin equipo): se muestra lo que escribió quien
+        # hizo la solicitud (ej. "Pinza de oftalmología").
+        if self.solicitud is not None:
+            return self.solicitud.descripcion_cosa
+        return None
 
     @property
     def activo_ubicacion(self) -> str | None:
         """Dónde está el equipo. El técnico necesita saber adónde ir."""
-        return self.activo.ubicacion if self.activo else None
+        if self.activo is not None:
+            return self.activo.ubicacion
+        # OT de una "cosa": no hay ubicación de equipo, se usa la que se
+        # indicó en la solicitud (siempre es obligatoria al pedirla).
+        if self.solicitud is not None:
+            return self.solicitud.ubicacion
+        return None
     
     @property
     def activo_proxima_fecha_mp(self):

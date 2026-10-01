@@ -117,9 +117,15 @@ def obtener_kpis(
     hay_filtro = bool(grupo_id or tipo_equipo_id)
 
     def filtrar(items, obtener_codigo):
-        """Si hay un filtro de grupo/tipo activo, deja solo los items cuyo
-        activo cae dentro del subconjunto filtrado. Sin filtro, no toca nada
-        (mismo comportamiento que antes de que existiera este filtro)."""
+        """Deja afuera lo que no tiene equipo y, si hay un filtro de
+        grupo/tipo activo, deja solo los items cuyo activo cae dentro del
+        subconjunto filtrado.
+
+        Las OT de "cosas" (solicitudes de algo que no es un equipo médico
+        registrado) no tienen activo_codigo y no entran en ningún indicador:
+        el dashboard mide el parque de equipos médicos, y una pinza o una
+        lámpara distorsionarían las fallas, el MTTR o el MTBF."""
+        items = [i for i in items if obtener_codigo(i) is not None]
         if not hay_filtro:
             return items
         return [i for i in items if obtener_codigo(i) in codigos_filtrados]
@@ -275,7 +281,7 @@ def obtener_kpis(
     activos = list(tipo_de_activo.keys())
     activos_totales = len(activos)
     activos_en_baja = sum(
-        1 for a in activos_filtrados if str(a.estado).upper() == "BAJA"
+        1 for a in activos_filtrados if "BAJA" in str(a.estado).upper()
     )
 
     # ─── KPI 6: OT por estado (torta del dashboard) ───

@@ -242,7 +242,9 @@ function Ordenes() {
                   deja ver de un vistazo cuáles son rutina programada. */}
                   <div style={estilos.lineaTitulo}>
                     <p style={estilos.titulo}>
-                      OT-{String(ot.numero_ot).padStart(4, "0")} · {ot.activo_codigo}
+                      OT-{String(ot.numero_ot).padStart(4, "0")}
+                      {/* Sin equipo (OT de una "cosa") no hay código que mostrar. */}
+                      {ot.activo_codigo ? ` · ${ot.activo_codigo}` : ""}
                     </p>
                     {ot.tipo === "PREVENTIVA" && (
                       <span style={estilos.etiquetaPreventiva}>

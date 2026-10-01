@@ -257,9 +257,15 @@ def _items_del_mes(db: Session, anio: int, mes: int) -> list[ItemCalendarioPreve
             estado=orden.estado,
         ))
 
-    # Las que todavía son pronóstico: equipos cuya próxima MP (o alguna
-    # repetición futura) cae en este mes y que todavía no están arriba.
-    for activo in db.query(Activo).filter(Activo.proxima_fecha_mp.isnot(None)).all():
+    equipos_con_mp = (
+        db.query(Activo)
+        .filter(
+            Activo.proxima_fecha_mp.isnot(None),
+            Activo.estado.notilike("%BAJA%"),
+        )
+        .all()
+    )
+    for activo in equipos_con_mp:
         if activo.codigo in codigos_generados:
             continue
         if _proxima_cae_en_mes(activo, anio, mes):

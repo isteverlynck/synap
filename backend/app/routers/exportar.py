@@ -113,10 +113,26 @@ from sqlalchemy import or_, and_
 from ..models import OrdenTrabajo
 from ..security import requiere_rol_estricto, grupos_del_coordinador
 
+from datetime import timezone
+from zoneinfo import ZoneInfo
+
+_TZ_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
+
 
 def _fecha_hora(valor) -> str:
-    """Fecha y hora como dd/mm/aaaa hh:mm (vacío si no hay)."""
-    return valor.strftime("%d/%m/%Y %H:%M") if valor else ""
+    """Fecha y hora como dd/mm/aaaa hh:mm, en hora de Argentina (vacío si no hay).
+
+    En la base las fechas con hora se guardan en UTC y sin zona horaria
+    (datetime.utcnow()). Si se imprimieran tal cual, el CSV mostraría todo
+    tres horas adelantado respecto de lo que se ve en la app. Por eso primero
+    se aclara que el valor está en UTC y después se pasa a hora de Argentina,
+    que es lo mismo que hace el frontend al mostrar fechas.
+    """
+    if not valor:
+        return ""
+    if valor.tzinfo is None:
+        valor = valor.replace(tzinfo=timezone.utc)
+    return valor.astimezone(_TZ_ARGENTINA).strftime("%d/%m/%Y %H:%M")
 
 
 @router.get("/ordenes")
