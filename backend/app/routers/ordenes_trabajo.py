@@ -582,7 +582,12 @@ def devolver_orden(
 
     Vuelve a EN_PROGRESO y el motivo queda como entrada de la bitácora, para
     que el técnico lo vea apenas entra a la OT — no hace falta un campo
-    aparte, la bitácora ya está pensada justo para esto."""
+    aparte, la bitácora ya está pensada justo para esto.
+
+    El mantenimiento vinculado vuelve a PENDIENTE: si la orden se devolvió,
+    el trabajo todavía no está terminado. Cuando el técnico la complete de
+    nuevo, completar_orden le vuelve a poner la fecha de realización (la de
+    esa segunda ejecución) y vuelve a comparar con el mes programado."""
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
@@ -603,6 +608,17 @@ def devolver_orden(
     orden.estado = "EN_PROGRESO"
     orden.completada_por = None
     orden.fecha_completada = None
+
+    # NUEVO: deshacer lo que completar_orden le había marcado al mantenimiento.
+    # Antes quedaba REALIZADO con la fecha de la primera ejecución mientras la
+    # orden se corregía, y el dashboard lo contaba como cumplido antes de tiempo.
+    mp = db.query(MantenimientoPreventivo).filter(
+        MantenimientoPreventivo.ot_id == orden.id
+    ).first()
+    if mp is not None:
+        mp.estado = "PENDIENTE"
+        mp.fecha_realizada = None
+        mp.justificacion_retraso = None
 
     nota = NotaOT(
         ot_id=orden.id,
