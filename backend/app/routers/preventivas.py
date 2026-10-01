@@ -80,6 +80,12 @@ def generar_preventivas_core(db: Session, anio: int, mes: int) -> PreventivasGen
         .filter(
             Activo.proxima_fecha_mp.isnot(None),
             Activo.proxima_fecha_mp <= ultimo_dia,
+            # Un equipo dado de baja no genera preventivas. Se busca "BAJA"
+            # adentro del texto (y no una igualdad exacta) porque en la base
+            # conviven dos formas de escribirlo: "DE_BAJA", que es la que
+            # guarda la app al dar de alta o editar un equipo, y "BAJA", la
+            # de los datos cargados a mano. notilike no distingue mayúsculas.
+            Activo.estado.notilike("%BAJA%"),
         )
         .all()
     )
