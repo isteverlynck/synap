@@ -345,7 +345,10 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
             for m in miembros
         ]
 
-    if current_user.rol == "coordinacion":
+    if current_user.rol == "jefatura":
+        # Jefatura puede abrir (solo ver) cualquier OT, de cualquier grupo.
+        mios = {orden.grupo_id for orden in activo.ordenes_de_trabajo}
+    elif current_user.rol == "coordinacion":
         mios = set(grupos_del_coordinador(db, current_user))
     elif current_user.rol in ("tecnico", "junior"):
         mios = {current_user.grupo} if current_user.grupo else set()

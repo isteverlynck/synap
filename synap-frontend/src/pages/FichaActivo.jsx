@@ -134,7 +134,7 @@ function FichaActivo() {
   const cerradas = activo.ordenes_de_trabajo.filter((ot) => ot.estado === "CERRADA");
   // Mismo criterio que en Acciones: jefatura y enfermería no entran al detalle
   // de una OT, así que para ellas el historial no es clickeable.
-  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
+  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion" || rol === "jefatura";
   const puedeEditar = PUEDE_EDITAR.includes(rol);
 
   function actualizarActivoEditado(nuevo) {
@@ -652,7 +652,7 @@ function AvisoEstado({ situacion }) {
 
 function Acciones({ rol, situacion, activo, navegar }) {
   const acciones = [];
-  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
+  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion" || rol === "jefatura";
   // La acción principal la manda el ESTADO, no el rol: si el equipo está de
   // baja o ya tiene una OT abierta, nadie reporta un problema nuevo. Así no se
   // juntan cinco solicitudes del mismo monitor el mismo día.

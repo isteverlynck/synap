@@ -34,7 +34,7 @@ from ..schemas import (
     NotaOTOut,
     NotaOTCrear,
 )
-from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto, validar_a_cargo_de_preventiva
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador, validar_a_cargo_de_preventiva
 from ..criticidad import agregar_criticidad_a_ordenes
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
@@ -98,7 +98,7 @@ def listar_ordenes(
     mis_grupos: bool = False,
     limit: int = 50,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Listar OTs (hasta 'limit'), con filtros opcionales y combinables.
 
@@ -183,7 +183,7 @@ def mis_ordenes(
 def ver_orden(
     ot_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Ver una OT puntual por su id (el uuid de la orden).
 
@@ -872,7 +872,7 @@ from ..schemas import AdjuntoOut
 def listar_adjuntos(
     ot_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Nombres de los archivos adjuntos (sin el archivo en sí)."""
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
@@ -897,7 +897,7 @@ def ver_adjunto(
     ot_id: str,
     adjunto_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Devuelve el archivo en sí, para abrirlo o descargarlo."""
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
@@ -941,7 +941,7 @@ from ..informes import generar_informe_preventiva_pdf
 def informe_pdf(
     ot_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Descargar el informe en PDF de una preventiva ya cerrada."""
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()

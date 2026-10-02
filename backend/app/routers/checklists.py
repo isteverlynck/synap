@@ -45,7 +45,6 @@ from ..schemas import (
 
 from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto, validar_a_cargo_de_preventiva
 
-
 def _validar_permiso_sobre_mp(db: Session, current_user: Usuario, mp: MantenimientoPreventivo) -> None:
     """Valida que el usuario pueda tocar el checklist de este MP.
 
@@ -85,7 +84,7 @@ router = APIRouter(prefix="/checklists", tags=["checklists"])
 def ver_checklist_de_plantilla(
     plantilla_mp_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Ver los ítems de checklist de una plantilla de MP, ordenados por paso.
 
@@ -111,7 +110,7 @@ def ver_checklist_de_plantilla(
 def ver_respuestas_de_mp(
     mp_id: str,
     db: Session = Depends(get_db),
-        current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
+        current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Ver las respuestas registradas en un mantenimiento concreto.
 
