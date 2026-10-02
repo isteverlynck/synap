@@ -132,8 +132,6 @@ function FichaActivo() {
   const situacion = estadoDelEquipo(activo);
   const abiertas = activo.ordenes_de_trabajo.filter((ot) => ot.estado !== "CERRADA");
   const cerradas = activo.ordenes_de_trabajo.filter((ot) => ot.estado === "CERRADA");
-  // Mismo criterio que en Acciones: jefatura y enfermería no entran al detalle
-  // de una OT, así que para ellas el historial no es clickeable.
   const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion" || rol === "jefatura";
   const puedeEditar = PUEDE_EDITAR.includes(rol);
 
