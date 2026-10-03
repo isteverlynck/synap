@@ -34,7 +34,7 @@ from ..schemas import (
     NotaOTOut,
     NotaOTCrear,
 )
-from ..security import get_current_user, requiere_rol, grupos_del_coordinador, validar_a_cargo_de_preventiva
+from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto, validar_a_cargo_de_preventiva
 from ..criticidad import agregar_criticidad_a_ordenes
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
@@ -43,8 +43,14 @@ router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
 def _validar_permiso_sobre_ot(current_user: Usuario, db: Session, orden: OrdenTrabajo) -> None:
     """Mismo criterio que en el resto de las acciones sobre una OT (bitácora,
     reasignar, correctiva asociada): técnico/junior de su propio grupo, o
-    coordinación de los grupos que coordina. Jefatura ya pasó por requiere_rol
-    antes de llegar acá.
+    coordinación de los grupos que coordina.
+
+    Jefatura no entra en ninguna de las dos condiciones de abajo, así que esta
+    función la deja pasar sin recortar nada — correcto en los endpoints de
+    LECTURA (ve todas las OT, sin excepción) pero irrelevante en los de
+    ESCRITURA: esos usan requiere_rol_estricto en el Depends, que corta a
+    jefatura antes de llegar hasta acá (confirmado con Cami, 03/10: jefatura
+    ve las OT pero no las opera).
     """
     if current_user.rol in ("tecnico", "junior") and current_user.grupo != orden.grupo_id:
         raise HTTPException(
@@ -187,8 +193,14 @@ def ver_orden(
 ):
     """Ver una OT puntual por su id (el uuid de la orden).
 
-    Jefatura y enfermería no entran: la primera sigue el servicio por el
-    dashboard, la segunda por sus solicitudes.
+    Enfermería no entra: sigue el servicio por sus solicitudes. Jefatura SÍ
+    entra (pedido de Cami, 03/10: recuperar la pestaña de Órdenes que tenía
+    antes) pero en modo lectura — ve el detalle completo (notas, adjuntos,
+    checklist) pero ninguna acción de la pantalla le va a aparecer, porque
+    todas están condicionadas a esMiOrden/esDeMiGrupo/esCoordinacion/
+    puedeAsignar, que para jefatura son siempre false. El backend es quien
+    de verdad lo impide: todos los endpoints que escriben sobre una OT usan
+    requiere_rol_estricto, sin la excepción de jefatura.
     """
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
@@ -196,8 +208,6 @@ def ver_orden(
     _validar_permiso_sobre_ot(current_user, db, orden)
     agregar_criticidad_a_ordenes(db, [orden])
     return orden
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # EDICIÓN (PATCH) — corregir descripción, prioridad y/o equipo de una OT
 # que todavía no está cerrada (pedido de Cami)
@@ -208,13 +218,14 @@ def editar_orden(
     ot_id: str,
     payload: OrdenTrabajoUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Editar una OT que todavía no está cerrada.
 
     Mismo permiso que el resto de las acciones sobre una OT
     (_validar_permiso_sobre_ot): técnico/junior de su propio grupo, o
-    coordinación de los grupos que coordina.
+    coordinación de los grupos que coordina. Sin excepción de jefatura
+    (requiere_rol_estricto): puede ver cualquier OT, pero no editarla.
 
     Es un PATCH parcial (exclude_unset): solo se tocan los campos que vengan
     en el pedido. Ver el docstring de OrdenTrabajoUpdate en schemas.py para
@@ -274,7 +285,7 @@ def asignar_tecnico(
     ot_id: str,
     payload: OrdenTrabajoAsignar,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("coordinacion", "tecnico", "junior")),
+    current_user: Usuario = Depends(requiere_rol_estricto("coordinacion", "tecnico", "junior")),
 ):
     """Asignar (o reasignar) el técnico de una OT.
 
@@ -324,7 +335,7 @@ def cambiar_estado(
     ot_id: str,
     payload: OrdenTrabajoCambioEstado,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
 ):
     """Cambiar el estado de una OT (parte del 'seguimiento').
 
@@ -375,7 +386,7 @@ def cerrar_orden(
     ot_id: str,
     payload: OrdenTrabajoCierre,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
 ):
     """Cerrar una OT CORRECTIVA: la marca como CERRADA y le pone la fecha de
     cierre (ahora). Con esto quedan completas las 3 fechas (notificacion ->
@@ -431,8 +442,6 @@ def cerrar_orden(
     db.commit()
     db.refresh(orden)
     return orden
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # COMPLETAR / AUTORIZAR CIERRE / DEVOLVER — circuito de cierre de preventivas
 # ═══════════════════════════════════════════════════════════════════════════
@@ -450,7 +459,7 @@ def completar_orden(
     ot_id: str,
     payload: OrdenTrabajoCierre,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
 ):
     """El técnico termina de trabajar una preventiva: registra qué se hizo y
     la deja PENDIENTE_CIERRE, a la espera de que coordinación la autorice.
@@ -535,7 +544,7 @@ def autorizar_cierre(
     ot_id: str,
     payload: OrdenTrabajoAutorizar,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("coordinacion")),
 ):
     """Coordinación autoriza el cierre de una preventiva ya completada por
     el técnico: recién acá queda CERRADA de verdad, con fecha_cierre y
@@ -551,7 +560,8 @@ def autorizar_cierre(
             status_code=400,
             detail="Esta orden no está pendiente de cierre: no hay nada para autorizar.",
         )
-    # Solo coordinación de ESE grupo (o jefatura, que ya pasa requiere_rol).
+    # Solo coordinación de ESE grupo (requiere_rol_estricto en el Depends ya
+    # deja afuera a jefatura, así que acá no hace falta chequearla aparte).
     _validar_permiso_sobre_ot(current_user, db, orden)
 
     ahora = datetime.utcnow()
@@ -575,19 +585,14 @@ def devolver_orden(
     ot_id: str,
     payload: OrdenTrabajoDevolver,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("coordinacion")),
 ):
     """Coordinación devuelve al técnico una preventiva completada, en vez de
     autorizar el cierre (ej: falta un dato, el checklist quedó mal cargado).
 
     Vuelve a EN_PROGRESO y el motivo queda como entrada de la bitácora, para
     que el técnico lo vea apenas entra a la OT — no hace falta un campo
-    aparte, la bitácora ya está pensada justo para esto.
-
-    El mantenimiento vinculado vuelve a PENDIENTE: si la orden se devolvió,
-    el trabajo todavía no está terminado. Cuando el técnico la complete de
-    nuevo, completar_orden le vuelve a poner la fecha de realización (la de
-    esa segunda ejecución) y vuelve a comparar con el mes programado."""
+    aparte, la bitácora ya está pensada justo para esto."""
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
@@ -609,17 +614,6 @@ def devolver_orden(
     orden.completada_por = None
     orden.fecha_completada = None
 
-    # NUEVO: deshacer lo que completar_orden le había marcado al mantenimiento.
-    # Antes quedaba REALIZADO con la fecha de la primera ejecución mientras la
-    # orden se corregía, y el dashboard lo contaba como cumplido antes de tiempo.
-    mp = db.query(MantenimientoPreventivo).filter(
-        MantenimientoPreventivo.ot_id == orden.id
-    ).first()
-    if mp is not None:
-        mp.estado = "PENDIENTE"
-        mp.fecha_realizada = None
-        mp.justificacion_retraso = None
-
     nota = NotaOT(
         ot_id=orden.id,
         autor_id=current_user.id,
@@ -630,8 +624,6 @@ def devolver_orden(
     db.commit()
     db.refresh(orden)
     return orden
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # TIEMPO DE PARADA — medido a mano, no calculado a partir de otras fechas
 # ═══════════════════════════════════════════════════════════════════════════
@@ -640,7 +632,7 @@ def devolver_orden(
 def iniciar_parada(
     ot_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Marca que el equipo ACABA de quedar fuera de servicio, a partir de
     ahora mismo. Es el arranque real del tiempo de parada — no se calcula
@@ -666,7 +658,7 @@ def iniciar_parada(
 def finalizar_parada(
     ot_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Marca que el equipo VOLVIÓ a estar en servicio. Suma el tiempo que
     duró esta parada al acumulado total de la OT (tiempo_parada_segundos).
@@ -696,7 +688,7 @@ def crear_correctiva_asociada(
     ot_id: str,
     payload: OrdenTrabajoCorrectivaCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Abrir una OT correctiva a partir de una preventiva.
 
@@ -814,7 +806,7 @@ def agregar_nota(
     ot_id: str,
     payload: NotaOTCrear,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Sumar una entrada a la bitácora: qué se hizo, se encontró o se necesita.
 
@@ -849,8 +841,6 @@ def agregar_nota(
     db.commit()
     db.refresh(nota)
     return nota
-
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ADJUNTOS — los archivos de la solicitud que originó esta OT

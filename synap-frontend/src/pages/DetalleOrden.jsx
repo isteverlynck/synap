@@ -106,6 +106,10 @@ function DetalleOrden() {
     ? (esDeMiGrupo || esCoordinacion) && (!ot?.iniciada_por || ot.iniciada_por === perfil?.id)
     : esMiOrden;
   const avisoPreventivo = textoPreventivo(ot?.activo_proxima_fecha_mp);
+  // Para decidir si vale la pena dibujar la caja de "Acciones": si ninguna
+  // de estas es cierta (el caso de jefatura, que entra en modo lectura), no
+  // hay ningún botón que mostrar y la caja quedaría vacía.
+  const hayAlgunaAccion = puedeTrabajar || esCoordinacion || puedeAsignar;
 
   useEffect(() => {
     if (!puedeAsignar) return;
@@ -122,10 +126,12 @@ function DetalleOrden() {
   }, [ot?.parada_iniciada_en]);
 
   // "tecnicos" ya se pide más arriba (para el desplegable de asignar/
-  // reasignar) cuando puedeAsignar es true — que cubre a coordinación y a
-  // cualquier técnico del grupo de esta OT, o sea a todo el que llega hasta
-  // acá (jefatura no ve el detalle de una OT). La reusamos para mostrar el
-  // nombre en vez de pedirle más al backend.
+  // reasignar) cuando puedeAsignar es true — coordinación y cualquier
+  // técnico del grupo de esta OT. Jefatura SÍ llega hasta acá (ve el detalle
+  // en modo lectura) pero puedeAsignar es false para ese rol, así que no
+  // pide la lista de técnicos de más: no la necesita, no tiene ningún botón
+  // que la use. La reusamos para mostrar el nombre en vez de pedirle más al
+  // backend.
   function nombreTecnico(id) {
     if (!id) return null;
     const t = tecnicos.find((x) => x.id === id);
@@ -147,8 +153,7 @@ function DetalleOrden() {
       setError(e.response?.data?.detail || "No pudimos cambiar el estado.");
     }
   }
-
-  async function iniciarParadaClick() {
+    async function iniciarParadaClick() {
     try {
       setOt(await iniciarParada(id));
       toast.success("Parada del equipo iniciada");
@@ -210,17 +215,15 @@ function DetalleOrden() {
         )}
       </div>
 
-      {/* El equipo, clickeable: desde la OT se llega a su ficha completa.
-          Si la OT es de una "cosa" (sin equipo registrado) no hay ficha a la
-          que ir: la tarjeta se muestra igual, pero sin clic. */}
+      {/* El equipo, clickeable: desde la OT se llega a su ficha completa. */}
       <div
-        className={ot.activo_codigo ? "sy-clickeable" : undefined}
-        style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12, cursor: ot.activo_codigo ? "pointer" : "default" }}
-        onClick={ot.activo_codigo ? () => navegar(`/activos/${ot.activo_codigo}`) : undefined}
+        className="sy-clickeable"
+        style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12, cursor: "pointer" }}
+        onClick={() => navegar(`/activos/${ot.activo_codigo}`)}
       >
         <p style={estilos.equipoNombre}>{ot.activo_descripcion || "Equipo sin descripción"}</p>
         <p style={estilos.equipoCodigo}>
-          {ot.activo_codigo || "Sin equipo registrado"}{ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
+          {ot.activo_codigo}{ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
         </p>
         {avisoPreventivo && !cerrada && <p style={estilos.equipoCodigo}>{avisoPreventivo}</p>}
         {/* Criticidad y riesgo PRIUX del equipo (ver backend/app/criticidad.py). */}
@@ -318,7 +321,7 @@ function DetalleOrden() {
           </>
         )}
         <Dato etiqueta="Cerrada" valor={fechaHora(ot.fecha_cierre)} />
-        {/* Quién apretó "Confirmar cierre" (correctivas) o "Autorizar cierre"
+                {/* Quién apretó "Confirmar cierre" (correctivas) o "Autorizar cierre"
         (preventivas). Las OT cerradas ANTES de este cambio no tienen este
         dato: ahí se muestra "Sin registro". */}
         {cerrada && (
@@ -364,7 +367,7 @@ function DetalleOrden() {
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
       {/* ─── Acciones ─── */}
-      {!cerrada && !accion && (
+      {!cerrada && !accion && hayAlgunaAccion && (
         <div style={estilos.acciones}>
           {puedeTrabajar && ot.estado === "ABIERTA" && (
             <button style={boton("primario")} onClick={arrancar}>Empezar a trabajar</button>
@@ -486,8 +489,7 @@ function DetalleOrden() {
           navegar={navegar}
         />
       )}
-
-      {/* ─── Correctivas ya generadas desde esta preventiva ─── */}
+          {/* ─── Correctivas ya generadas desde esta preventiva ─── */}
       {ot.tipo === "PREVENTIVA" && correctivas.length > 0 && (
         <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
           <p style={estilos.panelTitulo}>Correctivas generadas desde esta OT</p>
@@ -647,7 +649,6 @@ function PanelCerrar({ ot, setOt, cerrar }) {
       setEnviando(false);
     }
   }
-
   return (
     <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
       <p style={estilos.panelTitulo}>Cerrar la orden</p>
@@ -841,8 +842,7 @@ function PanelAsignar({ ot, setOt, tecnicos, cerrar }) {
 function PanelEditarOT({ ot, setOt, cerrar }) {
   const [descripcion, setDescripcion] = useState(ot.descripcion || "");
   const [prioridad, setPrioridad] = useState(ot.prioridad || "");
-
-  // El equipo arranca "ya elegido" con el que tiene la OT hoy; buscar uno
+    // El equipo arranca "ya elegido" con el que tiene la OT hoy; buscar uno
   // nuevo reemplaza esa elección (mismo patrón que el buscador de ubicación
   // de EditarFicha, en FichaActivo.jsx).
   const [equipoElegido, setEquipoElegido] = useState({
@@ -1067,8 +1067,7 @@ function PanelCorrectivaAsociada({ ot, setCorrectivas, cerrar, navegar }) {
       setEnviando(false);
     }
   }
-
-  return (
+    return (
     <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
       <p style={estilos.panelTitulo}>Generar correctiva asociada</p>
       <p style={estilos.bitacoraAyuda}>
@@ -1263,7 +1262,7 @@ export default DetalleOrden;
 function textoPreventivo(fecha) {
   const dias = diasHasta(fecha);
   if (dias === null) return "";
-  if (dias < 0) return `Preventivo vencido hace ${Math.abs(dias)} días`;
   if (dias === 0) return "Preventivo programado para hoy";
+  if (dias < 0) return `Preventivo vencido hace ${Math.abs(dias)} días`;
   return `Próximo preventivo en ${dias} días`;
-}
+}  

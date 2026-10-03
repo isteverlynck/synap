@@ -40,17 +40,10 @@ _SECCION = ParagraphStyle(
     spaceBefore=14, spaceAfter=6,
 )
 _TEXTO = ParagraphStyle("TextoSynap", parent=_ESTILOS["Normal"], fontSize=9.5, leading=13)
-# Para las celdas de la tabla del checklist: más chico, y clave que sea un
-# Paragraph (no un string suelto) para que el texto largo haga salto de línea
-# dentro de la celda en vez de superponerse con la columna de al lado.
 _CELDA = ParagraphStyle("CeldaSynap", parent=_ESTILOS["Normal"], fontSize=8.5, leading=11)
 _CELDA_CABECERA = ParagraphStyle(
     "CeldaCabeceraSynap", parent=_CELDA, textColor=colors.white, fontName="Helvetica-Bold",
 )
-# Resultado "No pasa": en rojo y negrita para que salte a la vista sin tener
-# que leer la tabla entera. Va en un ParagraphStyle propio (no alcanza con
-# el TEXTCOLOR de la tabla) porque el contenido de la celda ahora es un
-# Paragraph, no un string suelto.
 _CELDA_NO_PASA = ParagraphStyle(
     "CeldaNoPasaSynap", parent=_CELDA, textColor=colors.HexColor("#b3261e"), fontName="Helvetica-Bold",
 )
@@ -139,10 +132,6 @@ def generar_informe_preventiva_pdf(
     if not respuestas:
         cuerpo.append(Paragraph("Este mantenimiento no tiene checklist cargado.", _TEXTO))
     else:
-        # Cada celda es un Paragraph (no un string suelto): así el texto largo
-        # hace salto de línea dentro de la celda en vez de superponerse con la
-        # columna de al lado, que es lo que pasaba con las descripciones más
-        # largas del checklist.
         filas = [[
             Paragraph("#", _CELDA_CABECERA),
             Paragraph("Punto revisado", _CELDA_CABECERA),
@@ -185,3 +174,121 @@ def _texto_resultado(resultado: str | None) -> str:
     if resultado == "NO_PASA":
         return "No pasa"
     return "Sin registrar"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# INFORME DE EQUIPO — ficha del activo + TODO su historial de OT
+# ═══════════════════════════════════════════════════════════════════════════
+# A diferencia del informe de arriba (una preventiva puntual, ya cerrada),
+# este es por EQUIPO: sus datos y la lista completa de órdenes de trabajo que
+# tuvo, correctivas y preventivas, sin filtrar por estado (pedido de Cami,
+# 03/10: "el reporte tiene que tener todas las ots").
+# ═══════════════════════════════════════════════════════════════════════════
+
+_TIPOS_OT = {"CORRECTIVA": "Correctiva", "PREVENTIVA": "Preventiva"}
+_ESTADOS_OT = {
+    "ABIERTA": "Abierta",
+    "EN_PROGRESO": "En progreso",
+    "PENDIENTE_CIERRE": "Pendiente de cierre",
+    "CERRADA": "Cerrada",
+}
+_ESTADOS_ACTIVO = {
+    "ACTIVO": "Activo / operativo",
+    "EN_REPARACION": "En reparación",
+    "DE_BAJA": "De baja",
+    "FUERA_DE_SERVICIO": "Fuera de servicio",
+}
+
+
+def generar_informe_activo_pdf(
+    *,
+    activo,
+    tipo_equipo_nombre: str | None,
+    sector_nombre: str | None,
+    ordenes: list[dict],
+) -> bytes:
+    """Arma el PDF del informe de equipo y devuelve los bytes listos para
+    mandar en la respuesta.
+
+    - activo: el Activo.
+    - tipo_equipo_nombre / sector_nombre: ya resueltos aparte (el modelo
+      Activo solo guarda el id de cada catálogo, no el nombre).
+    - ordenes: lista de dicts, ya ordenada de la más reciente a la más
+      vieja, con las claves numero_ot / tipo / estado / fecha_apertura /
+      fecha_cierre / tecnico_nombre / descripcion. Incluye TODAS las OT del
+      equipo, de cualquier estado.
+    """
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        topMargin=18 * mm, bottomMargin=16 * mm, leftMargin=18 * mm, rightMargin=18 * mm,
+    )
+    cuerpo = []
+
+    cuerpo.append(Paragraph("Informe de equipo", _TITULO))
+    cuerpo.append(Paragraph(f"{activo.codigo} · SYNAP — Bioingeniería, Hospital Alemán", _SUBTITULO))
+
+    # ─── Datos del equipo ───
+    cuerpo.append(Paragraph("Datos del equipo", _SECCION))
+    cuerpo.append(Paragraph(_dato("Código", activo.codigo), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Descripción", activo.descripcion), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Tipo de equipo", tipo_equipo_nombre), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Sector / Servicio", sector_nombre), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Marca", activo.marca), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Modelo", activo.modelo), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Número de serie", activo.numero_serie), _TEXTO))
+    cuerpo.append(Paragraph(_dato("N° de orden de compra", activo.numero_orden_compra), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Ubicación", activo.ubicacion), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Estado", _ESTADOS_ACTIVO.get(activo.estado, activo.estado)), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Fecha de instalación", _fecha(activo.fecha_instalacion)), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Último mantenimiento", _fecha(activo.ultima_fecha_mp)), _TEXTO))
+    cuerpo.append(Paragraph(_dato("Próximo mantenimiento", _fecha(activo.proxima_fecha_mp)), _TEXTO))
+
+    # ─── Historial de OT ───
+    cuerpo.append(Paragraph("Historial de órdenes de trabajo", _SECCION))
+    if not ordenes:
+        cuerpo.append(Paragraph("Este equipo todavía no tiene órdenes de trabajo registradas.", _TEXTO))
+    else:
+        filas = [[
+            Paragraph("OT", _CELDA_CABECERA),
+            Paragraph("Tipo", _CELDA_CABECERA),
+            Paragraph("Estado", _CELDA_CABECERA),
+            Paragraph("Abierta", _CELDA_CABECERA),
+            Paragraph("Cerrada", _CELDA_CABECERA),
+            Paragraph("Técnico", _CELDA_CABECERA),
+            Paragraph("Descripción", _CELDA_CABECERA),
+        ]]
+        for o in ordenes:
+            filas.append([
+                Paragraph(f"OT-{str(o['numero_ot']).zfill(4)}", _CELDA),
+                Paragraph(_TIPOS_OT.get(o["tipo"], o["tipo"]), _CELDA),
+                Paragraph(_ESTADOS_OT.get(o["estado"], o["estado"]), _CELDA),
+                Paragraph(_fecha(o["fecha_apertura"]), _CELDA),
+                Paragraph(_fecha(o["fecha_cierre"]), _CELDA),
+                Paragraph(o["tecnico_nombre"] or "—", _CELDA),
+                Paragraph(o["descripcion"] or "—", _CELDA),
+            ])
+        tabla = Table(
+            filas,
+            colWidths=[18 * mm, 20 * mm, 24 * mm, 20 * mm, 20 * mm, 28 * mm, 44 * mm],
+            repeatRows=1,
+        )
+        estilo = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2f3b52")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f5f7")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]
+        tabla.setStyle(TableStyle(estilo))
+        cuerpo.append(tabla)
+
+    cuerpo.append(Spacer(1, 18))
+    cuerpo.append(Paragraph(
+        f"Generado automáticamente por SYNAP el {datetime.utcnow().strftime('%d/%m/%Y %H:%M')} UTC.",
+        ParagraphStyle("PieActivo", parent=_ESTILOS["Normal"], fontSize=7.5, textColor=colors.HexColor("#888888")),
+    ))
+
+    doc.build(cuerpo)
+    return buffer.getvalue()

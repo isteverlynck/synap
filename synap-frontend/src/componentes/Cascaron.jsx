@@ -51,6 +51,11 @@ const MENUS = {
   jefatura: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
     { id: "dashboard", texto: "Dashboard", ruta: "/dashboard", icono: "grafico", listo: true },
+    // Jefatura ve la pantalla de Órdenes (lista + detalle de cada una), pero
+    // en modo lectura: ningún botón de acción le aparece ahí (ver
+    // DetalleOrden.jsx) y el backend bloquea cualquier intento de todas
+    // formas. Esta pestaña ya existía antes y Cami la había sacado del menú
+    // de jefatura el 13/09 (commit 6377289); la repone el 03/10.
     { id: "ot", texto: "Órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
@@ -63,8 +68,11 @@ const MENUS = {
 const DESCARGAS = [
   { texto: "Descargar CSV de activos", ruta: "/exportar/activos", archivo: "equipos",
     roles: ["tecnico", "coordinacion", "jefatura"] },
-  { texto: "Descargar CSV de órdenes", ruta: "/exportar/ordenes", archivo: "ordenes",
-    roles: ["tecnico", "coordinacion"] },
+  // "Descargar CSV de órdenes" ya NO está en este menú general: los tres
+  // roles que pueden ver OT (técnico, coordinación y, desde el 03/10,
+  // jefatura) tienen su propio botón "Descargar CSV" en la pantalla de
+  // Órdenes, que respeta los filtros puestos ahí — más útil que bajar
+  // siempre el historial completo sin filtrar.
   { texto: "Descargar CSV de insumos", ruta: "/exportar/insumos", archivo: "insumos",
     roles: ["tecnico", "coordinacion", "jefatura"] },
   { texto: "Descargar CSV de mantenimientos", ruta: "/exportar/mantenimientos", archivo: "mantenimientos",
@@ -246,7 +254,6 @@ function Cascaron() {
     </div>
   );
 }
-
 // ─────────────────────────────────────────────────────────────────────────
 // Piezas chicas
 // ─────────────────────────────────────────────────────────────────────────

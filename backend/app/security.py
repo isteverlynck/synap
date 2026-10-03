@@ -101,10 +101,11 @@ def requiere_rol(*roles_permitidos: str):
 def requiere_rol_estricto(*roles_permitidos: str):
     """Igual que requiere_rol, pero SIN la excepción de jefatura.
 
-    Se usa en los endpoints operativos: el detalle de una OT, marcar un ítem
-    del checklist. Jefatura tiene visión del servicio a través del dashboard,
-    que consulta la base directo y no pasa por acá; lo que no hace es entrar
-    al trabajo de una orden puntual.
+    Se usa en los endpoints que ESCRIBEN sobre una OT puntual (asignar,
+    cambiar estado, cerrar, editar, agregar nota, etc.) y en los que
+    completan un checklist. Jefatura puede VER las órdenes de trabajo (lista
+    y detalle usan requiere_rol, no esta función) y el dashboard, pero no
+    opera ninguna OT puntual — confirmado con Cami, 03/10.
     """
     def verificar(current_user: Usuario = Depends(get_current_user)) -> Usuario:
         if current_user.rol not in roles_permitidos:

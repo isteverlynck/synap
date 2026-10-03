@@ -48,6 +48,22 @@ const COLOR_ESTADO_OT = {
   CERRADA: "#667085",
 };
 
+// Vida útil de los equipos, según antigüedad (criterio del Hospital Alemán,
+// ver dashboard.py::_estado_vida_util). Colores en degradé de "está bien" a
+// "ya no" — mismo criterio de colores reservados que el resto del dashboard.
+const NOMBRE_VIDA_UTIL = {
+  MODERNO: "Moderno",
+  ACEPTABLE: "Aceptable",
+  MEDIANAMENTE_ACEPTABLE: "Medianamente aceptable",
+  OBSOLETO: "Obsoleto",
+};
+const COLOR_VIDA_UTIL = {
+  MODERNO: color.exito,
+  ACEPTABLE: "#14538C",
+  MEDIANAMENTE_ACEPTABLE: color.advertencia,
+  OBSOLETO: color.peligro,
+};
+
 function Dashboard() {
   const navegar = useNavigate();
   const [kpis, setKpis] = useState(null);
@@ -203,7 +219,7 @@ function Dashboard() {
           nota={`de ${kpis.ot_totales} en total`}
           progreso={kpis.ot_totales > 0 ? { valor: kpis.ot_abiertas, total: kpis.ot_totales } : null}
         />
-        <Tarjeta
+               <Tarjeta
           icono={ClipboardCheck}
           acento="azul"
           etiqueta="Cumplimiento de preventivos"
@@ -277,6 +293,11 @@ function Dashboard() {
           <p style={estilos.tituloGrafico}>Carga laboral por grupo</p>
           <p style={estilos.ayudaGrafico}>OT abiertas ahora mismo (no cerradas), por grupo técnico.</p>
           <GraficoCargaGrupo datos={kpis.carga_por_grupo} />
+        </div>
+        <div style={{ ...cs.tarjeta, padding: "18px 20px" }}>
+          <p style={estilos.tituloGrafico}>Vida útil de los equipos</p>
+          <p style={estilos.ayudaGrafico}>Según la antigüedad (criterio del Hospital Alemán): moderno, aceptable, medianamente aceptable u obsoleto.</p>
+          <GraficoTortaVidaUtil datos={kpis.vida_util_por_estado} />
         </div>
       </div>
 
@@ -410,7 +431,6 @@ const ACENTOS = {
 
 // Alto de tarjeta compartido por las 6 (ver comentario en Tarjeta).
 const ALTURA_TARJETA = 176;
-
 function Tarjeta({ etiqueta, valor, nota, acento, extra, icono: Icono, progreso }) {
   // valor null = no hay datos suficientes. Distinto de valor 0.
   const sinDatos = valor === null || valor === undefined;
@@ -617,6 +637,70 @@ function TooltipTorta({ active, payload, total }) {
   );
 }
 
+// ─── Torta: vida útil de los equipos ───
+// Mismo patrón exacto que GraficoTortaEstados de arriba (dona + leyenda),
+// solo que agrupa equipos por estado de vida útil en vez de OT por estado de
+// avance. Los equipos sin fecha de instalación no entran en ninguna porción
+// (el backend ya los dejó afuera del conteo).
+function GraficoTortaVidaUtil({ datos }) {
+  if (!datos || datos.length === 0) {
+    return <p style={estilos.mensajeGrafico}>Todavía no hay equipos con fecha de instalación cargada.</p>;
+  }
+  const total = datos.reduce((acc, d) => acc + d.cantidad, 0);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+      <div style={{ position: "relative", width: 160, height: 160, flexShrink: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={datos}
+              dataKey="cantidad"
+              nameKey="estado"
+              innerRadius={52}
+              outerRadius={78}
+              paddingAngle={2}
+              stroke={color.tarjeta}
+              strokeWidth={2}
+              isAnimationActive={false}
+            >
+              {datos.map((d) => (
+                <Cell key={d.estado} fill={COLOR_VIDA_UTIL[d.estado] || color.textoDebil} />
+              ))}
+            </Pie>
+            <Tooltip content={<TooltipTortaVidaUtil total={total} />} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div style={estilos.centroTorta}>
+          <span style={estilos.centroTortaValor}>{total}</span>
+          <span style={estilos.centroTortaEtiqueta}>{total === 1 ? "equipo" : "equipos"}</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {datos.map((d) => (
+          <div key={d.estado} style={estilos.filaLeyenda}>
+            <span style={{ ...estilos.puntoLeyenda, background: COLOR_VIDA_UTIL[d.estado] || color.textoDebil }} />
+            <span style={estilos.leyendaTexto}>{NOMBRE_VIDA_UTIL[d.estado] || d.estado}</span>
+            <span style={estilos.leyendaValor}>{d.cantidad}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TooltipTortaVidaUtil({ active, payload, total }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const d = payload[0].payload;
+  const pct = total > 0 ? Math.round((d.cantidad / total) * 100) : 0;
+  return (
+    <div style={estilos.tooltip}>
+      <p style={estilos.tooltipValor}>{d.cantidad} {d.cantidad === 1 ? "equipo" : "equipos"} ({pct}%)</p>
+      <p style={estilos.tooltipEtiqueta}>{NOMBRE_VIDA_UTIL[d.estado] || d.estado}</p>
+    </div>
+  );
+}
+
 // Nombres de grupo largos ("Quirófano, anestesia y cirugía") no entran en el
 // ancho fijo del eje: por default Recharts los corta a la fuerza en varias
 // líneas, y con filas tan bajas terminan pisando al grupo de al lado (bug
@@ -629,7 +713,6 @@ function truncarNombreGrupo(nombre) {
     ? `${nombre.slice(0, LARGO_MAXIMO_ETIQUETA_GRUPO - 1)}…`
     : nombre;
 }
-
 // ─── Barras horizontales: carga laboral por grupo ───
 // Una sola serie (cantidad de OT abiertas), un solo color — el grupo con más
 // carga (el primero: el backend ya lo manda ordenado de mayor a menor) se

@@ -45,15 +45,19 @@ from ..schemas import (
 
 from ..security import get_current_user, requiere_rol, grupos_del_coordinador, requiere_rol_estricto, validar_a_cargo_de_preventiva
 
+
 def _validar_permiso_sobre_mp(db: Session, current_user: Usuario, mp: MantenimientoPreventivo) -> None:
     """Valida que el usuario pueda tocar el checklist de este MP.
 
     Mismo criterio que en el resto de las acciones sobre una OT (bitácora,
     reasignar, correctiva asociada): técnico/junior del grupo de la OT
-    preventiva, o coordinación de ese grupo. Jefatura pasa siempre (lo
-    resuelve requiere_rol antes de llegar acá). Si el MP no está enganchado
-    a ninguna OT (no debería pasar con los generados por /preventivas/generar,
-    pero por las dudas), no se restringe por grupo.
+    preventiva, o coordinación de ese grupo. Esta función solo se llama
+    desde los endpoints que ESCRIBEN una respuesta (POST /respuestas,
+    POST /generar-correctiva), que usan requiere_rol_estricto — jefatura ya
+    quedó afuera antes de llegar hasta acá (puede ver el checklist, GET más
+    abajo, pero no completarlo). Si el MP no está enganchado a ninguna OT (no
+    debería pasar con los generados por /preventivas/generar, pero por las
+    dudas), no se restringe por grupo.
     """
     if not mp.ot_id:
         return
@@ -191,8 +195,6 @@ def registrar_respuesta(
     db.commit()
     db.refresh(respuesta)
     return respuesta
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # COMBO: registrar NO_PASA + generar OT correctiva (opcional, elige la persona)
 # ═══════════════════════════════════════════════════════════════════════════

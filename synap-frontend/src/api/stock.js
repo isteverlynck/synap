@@ -21,6 +21,13 @@ export async function crearInsumo(datos) {
   return res.data;
 }
 
+// Eliminar un insumo del catálogo (coordinación/jefatura). El backend
+// rechaza el borrado si el insumo ya tiene movimientos (compra, consumo o
+// ajuste) registrados, para no perder ese historial.
+export async function eliminarInsumo(insumoId) {
+  await cliente.delete(`/stock/insumos/${insumoId}`);
+}
+
 // Estado de stock con nivel (ok/reponer/critico). Por defecto solo trae los
 // que necesitan atención; con soloAlertas=false trae todos (para pintar la
 // tabla completa por color).

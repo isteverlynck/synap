@@ -53,11 +53,6 @@ from ..security import get_current_user, requiere_rol, validar_a_cargo_de_preven
 router = APIRouter(prefix="/stock", tags=["stock"])
 
 
-# ───────────────────────────────────────────────────────────────────────────
-# Helper compartido: dado un insumo, calcula en qué nivel de stock está.
-# Lo usan tanto el endpoint de alertas como el de consumo, así la regla vive
-# en UN solo lugar (si algún día cambia, se cambia acá y listo).
-# ───────────────────────────────────────────────────────────────────────────
 def calcular_nivel(stock_actual: int | None,
                    stock_minimo: int | None,
                    punto_reorden: int | None) -> str:
@@ -83,13 +78,7 @@ def _tiene_compra_pedida(db: Session, insumo_id) -> bool:
 
 
 def _siguiente_codigo_insumo(db: Session) -> str:
-    """Arma el próximo código correlativo de insumo (INS-0001, INS-0002...).
-
-    Mira los códigos existentes con el patrón INS-####, toma el número más
-    alto y le suma 1. Así no importa si algún insumo viejo quedó sin código
-    (de antes de que esto existiera) o con uno cargado a mano: el
-    correlativo sigue funcionando igual.
-    """
+    """Arma el próximo código correlativo de insumo (INS-0001, INS-0002...)."""
     existentes = db.query(Insumo.codigo).filter(Insumo.codigo.like("INS-%")).all()
     maximo = 0
     for (codigo,) in existentes:
@@ -100,10 +89,6 @@ def _siguiente_codigo_insumo(db: Session) -> str:
         maximo = max(maximo, numero)
     return f"INS-{maximo + 1:04d}"
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SEGUIMIENTO DE STOCK (GET) — funcionando
-# ═══════════════════════════════════════════════════════════════════════════
 
 @router.get("/insumos", response_model=list[InsumoOut])
 def listar_insumos(
@@ -128,10 +113,6 @@ def ver_insumo(
     return insumo
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ALTA DE INSUMO (POST) — nuevo, no existía forma de cargar uno desde la app
-# ═══════════════════════════════════════════════════════════════════════════
-
 @router.post("/insumos", response_model=InsumoOut, status_code=201)
 def crear_insumo(
     payload: InsumoCreate,
@@ -140,13 +121,8 @@ def crear_insumo(
 ):
     """Dar de alta un insumo/repuesto nuevo en el catálogo de stock.
 
-    Solo coordinación (y jefatura, que siempre pasa) — igual criterio que dar
-    de alta un tipo de equipo o un servicio en Catálogos.jsx: es carga de
-    catálogo, no una acción del día a día de cualquier técnico.
-
-    El código lo asigna el backend solo (correlativo INS-0001, INS-0002...) —
-    no se pide en el formulario, así nunca queda vacío ni se repite por un
-    error de tipeo.
+    Solo coordinación (y jefatura, que siempre pasa). El código lo asigna
+    el backend solo (correlativo INS-0001, INS-0002...).
     """
     if payload.stock_minimo < 0 or payload.punto_reorden < 0 or payload.stock_actual < 0:
         raise HTTPException(status_code=400, detail="Las cantidades no pueden ser negativas.")
@@ -166,9 +142,42 @@ def crear_insumo(
     return insumo
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ALERTAS DE REPOSICIÓN (GET) — funcionando · 3 NIVELES
-# ═══════════════════════════════════════════════════════════════════════════
+@router.delete("/insumos/{insumo_id}", status_code=204)
+def eliminar_insumo(
+    insumo_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Sacar un insumo del catálogo de stock (ej: se cargó mal, o no era en
+    realidad un insumo/accesorio del servicio). Mismo permiso que darlo de
+    alta: coordinación (y jefatura, que siempre pasa).
+
+    Si el insumo ya tiene movimientos registrados (una compra, un consumo
+    vinculado a una OT, o un ajuste manual) NO se puede eliminar: borrarlo
+    rompería ese historial. En ese caso conviene dejarlo con stock en 0 en
+    vez de eliminarlo. Un insumo recién cargado, sin ningún movimiento
+    todavía, se puede eliminar sin problema.
+    """
+    insumo = db.query(Insumo).filter(Insumo.id == insumo_id).first()
+    if insumo is None:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado.")
+
+    tiene_compras = db.query(Compra).filter(Compra.insumo_id == insumo_id).first() is not None
+    tiene_consumos = db.query(ConsumoInsumo).filter(ConsumoInsumo.insumo_id == insumo_id).first() is not None
+    tiene_ajustes = db.query(AjusteInventario).filter(AjusteInventario.insumo_id == insumo_id).first() is not None
+    if tiene_compras or tiene_consumos or tiene_ajustes:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Este insumo ya tiene movimientos registrados (compra, consumo o "
+                "ajuste) y no se puede eliminar, porque se perdería ese historial. "
+                "Si ya no se usa, lo podés dejar con stock en 0."
+            ),
+        )
+
+    db.delete(insumo)
+    db.commit()
+
 
 @router.get("/alertas", response_model=list[InsumoConAlerta])
 def alertas_reposicion(
@@ -176,15 +185,7 @@ def alertas_reposicion(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Estado de stock de los insumos, con su nivel (ok / reponer / critico).
-
-    Por defecto (solo_alertas=True) devuelve solo los que necesitan atención
-    (nivel 'reponer' o 'critico'). Con solo_alertas=False devuelve todos, cada
-    uno con su nivel — útil para pintar toda la tabla de stock por color.
-
-    Cada insumo trae además tiene_compra_pedida: si ya está encargado, el
-    frontend puede mostrar 'reposición en camino' y evitar pedidos duplicados.
-    """
+    """Estado de stock de los insumos, con su nivel (ok / reponer / critico)."""
     insumos = db.query(Insumo).all()
     resultado = []
     for i in insumos:
@@ -201,10 +202,6 @@ def alertas_reposicion(
     return resultado
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CONSULTA DE COMPRAS Y CONSUMOS (GET) — funcionando
-# ═══════════════════════════════════════════════════════════════════════════
-
 @router.get("/compras", response_model=list[CompraOut])
 def listar_compras(
     insumo_id: str | None = None,
@@ -213,10 +210,7 @@ def listar_compras(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Historial de compras. Filtrable por insumo y por estado (pedida/recibida).
-
-    Filtrar estado='pedida' muestra lo que está encargado y todavía no llegó.
-    """
+    """Historial de compras. Filtrable por insumo y por estado (pedida/recibida)."""
     q = db.query(Compra)
     if insumo_id is not None:
         q = q.filter(Compra.insumo_id == insumo_id)
@@ -242,12 +236,6 @@ def listar_consumos(
     return q.limit(limit).all()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# REGISTRAR PEDIDO DE COMPRA (POST) — activado (ya hay insumos cargados)
-# ═══════════════════════════════════════════════════════════════════════════
-# Crea la compra como 'pedida'. NO toca el stock (el insumo todavía no llegó).
-# ═══════════════════════════════════════════════════════════════════════════
-
 @router.post("/compras", response_model=CompraOut, status_code=201)
 def registrar_pedido_compra(
     payload: CompraCreate,
@@ -264,7 +252,7 @@ def registrar_pedido_compra(
         insumo_id=payload.insumo_id,
         cantidad=payload.cantidad,
         fecha=payload.fecha,
-        estado="pedida",              # nace pedida; NO suma stock todavía
+        estado="pedida",
         proveedor=payload.proveedor,
         numero_orden=payload.numero_orden,
         observaciones=payload.observaciones,
@@ -275,13 +263,6 @@ def registrar_pedido_compra(
     db.refresh(compra)
     return compra
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# RECIBIR UNA COMPRA (PATCH) — activado (ya hay insumos cargados)
-# ═══════════════════════════════════════════════════════════════════════════
-# Marca la compra como 'recibida' y RECIÉN AHÍ sube el stock. Es el momento en
-# que el insumo llegó físicamente y el encargado lo confirma.
-# ═══════════════════════════════════════════════════════════════════════════
 
 @router.patch("/compras/{compra_id}/recibir", response_model=CompraOut)
 def recibir_compra(
@@ -299,7 +280,6 @@ def recibir_compra(
     if insumo is None:
         raise HTTPException(status_code=404, detail="El insumo de la compra no existe.")
 
-    # Marcar recibida y subir el stock, juntos (un solo commit).
     compra.estado = "recibida"
     compra.fecha_recepcion = date.today()
     insumo.stock_actual = (insumo.stock_actual or 0) + compra.cantidad
@@ -308,13 +288,6 @@ def recibir_compra(
     db.refresh(compra)
     return compra
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# REGISTRAR CONSUMO (POST) — funcionando · NUNCA SE RECHAZA
-# ═══════════════════════════════════════════════════════════════════════════
-# Descuento automático vinculado a OT. Siempre descuenta y devuelve un aviso con
-# el nivel resultante. Si queda bajo el mínimo, se registra igual y avisa crítico.
-# ═══════════════════════════════════════════════════════════════════════════
 
 @router.post("/consumos", response_model=ConsumoResultado, status_code=201)
 def registrar_consumo(
@@ -332,7 +305,6 @@ def registrar_consumo(
     if payload.cantidad <= 0:
         raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0.")
 
-    # Descontar SIEMPRE (nunca se rechaza por falta de stock).
     consumo = ConsumoInsumo(
         ot_id=payload.ot_id,
         insumo_id=payload.insumo_id,
@@ -345,7 +317,6 @@ def registrar_consumo(
     db.commit()
     db.refresh(consumo)
 
-    # Evaluar cómo quedó el stock y armar el aviso legible.
     nivel = calcular_nivel(insumo.stock_actual, insumo.stock_minimo, insumo.punto_reorden)
     aviso = None
     if nivel == "critico":
@@ -359,9 +330,6 @@ def registrar_consumo(
             f"punto de reorden {insumo.punto_reorden}."
         )
 
-    # Avisar a bioingeniería cuando un consumo deja el stock en nivel crítico
-    # (uno de los 3 disparadores de notificación automática). "reponer" es
-    # una alerta más suave, todavía no dispara mail — solo "critico".
     if nivel == "critico":
         notificar_bioingenieria(
             "Stock crítico",
@@ -379,10 +347,6 @@ def registrar_consumo(
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# AJUSTE MANUAL DE STOCK (POST) — nuevo, no existía forma de corregir a mano
-# ═══════════════════════════════════════════════════════════════════════════
-
 @router.post("/ajustes", response_model=AjusteOut, status_code=201)
 def registrar_ajuste(
     payload: AjusteCreate,
@@ -390,8 +354,7 @@ def registrar_ajuste(
     current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Corregir el stock de un insumo a mano (merma, rotura, conteo físico,
-    stock encontrado sin registrar). No es ni compra ni consumo: no pasa por
-    el flujo de pedido/recepción ni queda atado a una OT."""
+    stock encontrado sin registrar)."""
     if payload.tipo not in ("entrada", "salida"):
         raise HTTPException(status_code=400, detail="El tipo debe ser 'entrada' o 'salida'.")
     if payload.cantidad <= 0:
@@ -418,9 +381,6 @@ def registrar_ajuste(
     db.commit()
     db.refresh(ajuste)
 
-    # Un ajuste de "salida" también puede dejar el stock en nivel crítico
-    # (una merma, una rotura). Mismo disparador que en /consumos; una
-    # "entrada" nunca hace falta avisarla, porque sube el stock.
     if payload.tipo == "salida":
         nivel = calcular_nivel(insumo.stock_actual, insumo.stock_minimo, insumo.punto_reorden)
         if nivel == "critico":
@@ -435,10 +395,6 @@ def registrar_ajuste(
     return ajuste
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# HISTORIAL UNIFICADO DE MOVIMIENTOS (GET) — nuevo, tipo kárdex
-# ═══════════════════════════════════════════════════════════════════════════
-
 @router.get("/movimientos", response_model=list[MovimientoOut])
 def listar_movimientos(
     insumo_id: str | None = None,
@@ -447,8 +403,7 @@ def listar_movimientos(
     current_user: Usuario = Depends(get_current_user),
 ):
     """Historial de TODO lo que mueve stock: compras ya recibidas, consumos
-    en OT y ajustes manuales, ordenado del más reciente al más viejo. Antes
-    compras y consumos se veían en dos listas separadas."""
+    en OT y ajustes manuales, ordenado del más reciente al más viejo."""
     movimientos = []
 
     compras_q = db.query(Compra).filter(Compra.estado == "recibida")

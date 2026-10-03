@@ -11,9 +11,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Plus, History } from "lucide-react";
+import { Plus, History, Trash2 } from "lucide-react";
 import {
-  listarInsumos, crearInsumo, alertasDeStock, registrarPedidoCompra,
+  listarInsumos, crearInsumo, eliminarInsumo, alertasDeStock, registrarPedidoCompra,
   recibirCompra, listarCompras, registrarAjuste, listarMovimientos,
 } from "../api/stock";
 import { catalogosParaAlta } from "../api/activos";
@@ -35,7 +35,7 @@ const SIN_TIPO = "__sin_tipo__";
 function Stock() {
   const puedeCrearInsumo = PUEDE_CREAR_INSUMO.includes(rolActual());
   const [insumos, setInsumos] = useState([]);
-  const [todosInsumos, setTodosInsumos] = useState([]); // para nombre/unidad en el historial, sin importar el filtro de alertas
+  const [todosInsumos, setTodosInsumos] = useState([]);
   const [tipos, setTipos] = useState([]);
   const [soloAlertas, setSoloAlertas] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -86,6 +86,16 @@ function Stock() {
     cargarMovimientos();
   }
 
+  async function eliminar(insumoId) {
+    try {
+      await eliminarInsumo(insumoId);
+      toast.success("Insumo eliminado.");
+      cargarInsumos();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "No pudimos eliminar el insumo.");
+    }
+  }
+
   async function marcarRecibida(insumoId) {
     try {
       const pendientes = await listarCompras({ insumoId, estado: "pedida" });
@@ -110,12 +120,6 @@ function Stock() {
     return i.tipo_equipo_id === tipoFiltro;
   });
 
-  // El desplegable NO usa el catálogo completo de tipos de equipo (ese es el
-  // mismo de Activos y tiene equipos que ningún insumo usa todavía) — solo
-  // los tipos que ya tienen al menos un insumo cargado, para que la lista sea
-  // corta y relevante. Se calcula sobre todosInsumos (no sobre "insumos",
-  // que puede estar recortado por el toggle de alertas) para que las
-  // opciones no cambien según si estás viendo "solo alertas" o no.
   const tiposConInsumos = tipos.filter((t) => todosInsumos.some((i) => i.tipo_equipo_id === t.id));
   const hayInsumosSinTipo = todosInsumos.some((i) => !i.tipo_equipo_id);
   const opcionesFiltroTipo = [
@@ -167,9 +171,6 @@ function Stock() {
 
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
-      {/* Mientras carga, un mensaje propio en vez de dejar el hueco en blanco
-      — así no da la sensación de que lo único que "llegó" es el historial
-      de más abajo. */}
       {cargando && <p style={estilos.mensaje}>Cargando insumos...</p>}
 
       {!cargando && !error && insumosFiltrados.length === 0 && (
@@ -186,9 +187,11 @@ function Stock() {
             <InsumoCard
               key={i.id}
               insumo={i}
+              puedeEliminar={puedeCrearInsumo}
               onPedidoRegistrado={alCambiarStock}
               onRecibida={() => marcarRecibida(i.id)}
               onAjusteRegistrado={alCambiarStock}
+              onEliminar={() => eliminar(i.id)}
             />
           ))}
         </div>
@@ -209,9 +212,7 @@ function Stock() {
   );
 }
 
-// ─── Cada insumo: nivel de alerta + acciones de pedido/recepción/ajuste ───
-
-function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado }) {
+function InsumoCard({ insumo, puedeEliminar, onPedidoRegistrado, onRecibida, onAjusteRegistrado, onEliminar }) {
   const [pidiendo, setPidiendo] = useState(false);
   const [cantidad, setCantidad] = useState("");
   const [proveedor, setProveedor] = useState("");
@@ -219,6 +220,19 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
   const [enviando, setEnviando] = useState(false);
   const [recibiendo, setRecibiendo] = useState(false);
   const [error, setError] = useState("");
+
+  const [confirmandoBaja, setConfirmandoBaja] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+
+  async function confirmarBaja() {
+    setBorrando(true);
+    try {
+      await onEliminar();
+    } finally {
+      setBorrando(false);
+      setConfirmandoBaja(false);
+    }
+  }
 
   const [ajustando, setAjustando] = useState(false);
   const [tipoAjuste, setTipoAjuste] = useState("salida");
@@ -333,7 +347,34 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
             Ajustar stock
           </button>
         )}
+        {puedeEliminar && !confirmandoBaja && (
+          <button
+            style={{ ...boton("secundario"), ...estilos.botonEliminar, gap: 6 }}
+            onClick={() => setConfirmandoBaja(true)}
+          >
+            <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+            Eliminar
+          </button>
+        )}
       </div>
+
+      {confirmandoBaja && (
+        <div style={estilos.formPedido}>
+          <p style={estilos.textoConfirmacion}>
+            ¿Seguro que querés eliminar "{insumo.nombre}" del catálogo? Esta acción no
+            se puede deshacer. Si ya tiene compras, consumos o ajustes registrados, no
+            se va a poder borrar (para no perder ese historial).
+          </p>
+          <div style={estilos.filaBotonesForm}>
+            <button style={boton("peligro")} onClick={confirmarBaja} disabled={borrando}>
+              {borrando ? "Eliminando..." : "Sí, eliminar"}
+            </button>
+            <button style={boton("secundario")} onClick={() => setConfirmandoBaja(false)} disabled={borrando}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {pidiendo && (
         <div style={estilos.formPedido}>
@@ -409,9 +450,6 @@ function InsumoCard({ insumo, onPedidoRegistrado, onRecibida, onAjusteRegistrado
     </div>
   );
 }
-
-// ─── Historial unificado: compras recibidas + consumos + ajustes, todo junto ───
-
 function MovimientosHistorial({ innerRef, movimientos, cargando, nombrePorId, unidadPorId }) {
   return (
     <div style={estilos.tarjetaHistorial} ref={innerRef}>
@@ -443,8 +481,6 @@ function MovimientosHistorial({ innerRef, movimientos, cargando, nombrePorId, un
   );
 }
 
-// ─── Filtro por tipo de insumo (mismo patrón que Activos.jsx) ───
-
 function Filtro({ etiqueta, valor, onChange, opciones }) {
   return (
     <div>
@@ -458,8 +494,6 @@ function Filtro({ etiqueta, valor, onChange, opciones }) {
     </div>
   );
 }
-
-// ─── Modal: alta de un insumo nuevo ───
 
 function ModalNuevoInsumo({ tipos, onCancelar, onCreado }) {
   const [nombre, setNombre] = useState("");
@@ -507,8 +541,6 @@ function ModalNuevoInsumo({ tipos, onCancelar, onCreado }) {
       <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
         <p style={estilos.modalTitulo}>Nuevo insumo</p>
 
-        {/* Cuerpo con scroll propio: así los botones de abajo quedan siempre
-        a la vista, sin tener que bajar hasta el final del formulario. */}
         <div style={estilos.modalCuerpo}>
           <p style={estilos.ayudaCodigo}>El código (INS-0001, INS-0002...) lo asigna el sistema solo.</p>
 
@@ -608,9 +640,11 @@ const estilos = {
   },
   detalle: { fontSize: "0.82rem", color: color.textoSuave, marginTop: 3 },
   filaAcciones: { display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" },
+  botonEliminar: { color: color.peligro, borderColor: color.peligro },
   formPedido: {
     marginTop: 12, paddingTop: 12, borderTop: `1px solid ${color.bordeSuave}`,
   },
+  textoConfirmacion: { fontSize: "0.85rem", color: color.texto, lineHeight: 1.5, margin: "0 0 12px" },
   filaBotonesForm: { display: "flex", gap: 10 },
   tarjetaHistorial: { ...cs.tarjeta, padding: 18, marginTop: 20 },
   panelTitulo: { margin: "0 0 12px", fontSize: "0.95rem", fontWeight: 700, color: color.texto },
@@ -634,8 +668,6 @@ const estilos = {
     display: "flex", alignItems: "center", justifyContent: "center",
     padding: 16, zIndex: 50,
   },
-  // display:flex column + el cuerpo con su propio scroll: el título queda
-  // fijo arriba y los botones fijos abajo, aunque el formulario sea largo.
   modal: {
     ...cs.tarjeta, padding: 22, width: "100%", maxWidth: 460,
     maxHeight: "88vh", display: "flex", flexDirection: "column",

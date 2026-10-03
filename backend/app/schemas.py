@@ -929,6 +929,14 @@ class ConteoEstadoOT(BaseModel):
     cantidad: int
 
 
+
+class ConteoVidaUtil(BaseModel):
+    """Cuántos equipos hay en cada estado de vida útil (según antigüedad) —
+    para la torta "Vida útil de los equipos" del dashboard. estado es uno de
+    MODERNO / ACEPTABLE / MEDIANAMENTE_ACEPTABLE / OBSOLETO."""
+    estado: str
+    cantidad: int
+    
 class CargaGrupoItem(BaseModel):
     """Cuántas OT abiertas (sin cerrar) tiene un grupo técnico ahora mismo —
     para el gráfico de "carga laboral por grupo" del dashboard."""
@@ -989,6 +997,10 @@ class DashboardKPIs(BaseModel):
     fallas_por_trimestre: list[FallasTrimestreItem] = []
     ot_sin_asignar: int = 0
     preventivos_vencidos: int = 0
+    
+    
+    # KPI 9 — vida útil de los equipos, según antigüedad (torta)
+    vida_util_por_estado: list[ConteoVidaUtil] = []
 
 # ─── Solicitudes de servicio ───
 class SolicitudCrear(BaseModel):

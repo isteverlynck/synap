@@ -46,8 +46,6 @@ def listar_activos(
 
     if buscar:
         texto = buscar.strip()
-        # Para el código normalizamos igual que el frontend: espacios a guiones
-        # y mayúsculas. Para el resto de los campos buscamos el texto tal cual.
         como_codigo = re.sub(r"[\s-]+", "-", texto.upper()).strip("-")
         patron = f"%{texto}%"
         q = q.filter(
@@ -88,10 +86,6 @@ def opciones_de_filtro(
         (a.estado or "").strip() for a in db.query(Activo.estado).all() if a.estado
     })
 
-    # A qué grupo técnico pertenece cada tipo de equipo (tabla de enlace
-    # grupo_tipo_equipo). Va adentro de cada tipo para que el frontend pueda
-    # filtrar "Tipo de equipo" en cascada cuando ya se eligió un "Grupo
-    # técnico" (si no, quedan mezclados tipos de otros grupos).
     grupo_por_tipo = {
         r.tipo_equipo_id: r.grupo_id for r in db.query(GrupoTipoEquipo).all()
     }
@@ -222,9 +216,6 @@ def crear_activo(
     if sector is None:
         raise HTTPException(status_code=404, detail="El servicio/sector no existe.")
 
-    # 1. Número correlativo para este tipo de equipo (el máximo actual + 1).
-    #    Se busca por tipo_equipo_id (la columna), no adivinando el número
-    #    dentro del texto del código de otros equipos con formatos viejos.
     maximo = 0
     for a in db.query(Activo.codigo).filter(Activo.tipo_equipo_id == payload.tipo_equipo_id).all():
         sufijo = a.codigo.rsplit("-", 1)[-1]
@@ -233,21 +224,17 @@ def crear_activo(
     numero = maximo + 1
     codigo = f"B-{payload.area}-{payload.tipo_equipo_id}-{numero:03d}"
 
-    # Por las dudas (formato manual antiguo que pisara el que armamos ahora).
     if db.query(Activo).filter(Activo.codigo == codigo).first():
         raise HTTPException(
             status_code=409,
             detail=f"El código {codigo} ya existe. Probá de nuevo (puede haberse creado otro equipo del mismo tipo justo ahora).",
         )
 
-    # 2. Grupo técnico: se deduce del tipo de equipo, igual que en el resto
-    #    del sistema (no lo elige la persona a mano).
     rel_grupo = db.query(GrupoTipoEquipo).filter(
         GrupoTipoEquipo.tipo_equipo_id == payload.tipo_equipo_id
     ).first()
     grupo_id = rel_grupo.grupo_id if rel_grupo else None
 
-    # 3. Mantenimiento preventivo (opcional).
     plantilla_mp_id = None
     proxima_fecha_mp = None
     frecuencia_mp_meses = None
@@ -277,9 +264,6 @@ def crear_activo(
                 ),
             )
         plantilla_mp_id = plan.id
-        # El validador del schema ya normalizó el día a 1; el .replace de acá
-        # es solo un resguardo por si algún día se llama a este endpoint sin
-        # pasar por el schema (ej. un script).
         proxima_fecha_mp = payload.proxima_fecha_mp.replace(day=1)
         frecuencia_mp_meses = payload.frecuencia_meses
 
@@ -324,10 +308,6 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
     if activo is None:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
 
-    # Cadena para llegar al grupo responsable: activo → tipo de equipo →
-    # grupo. Es la misma que usa solicitudes para el ruteo. Se muestra a
-    # TODO el grupo (no solo a quien lo coordina): cualquiera de ellos puede
-    # atender el contacto directo del bioingeniero.
     detalle = ActivoDetalle.model_validate(activo)
 
     rel = db.query(GrupoTipoEquipo).filter(
@@ -345,10 +325,7 @@ def ver_activo_detalle(codigo: str, db: Session = Depends(get_db), current_user:
             for m in miembros
         ]
 
-    if current_user.rol == "jefatura":
-        # Jefatura puede abrir (solo ver) cualquier OT, de cualquier grupo.
-        mios = {orden.grupo_id for orden in activo.ordenes_de_trabajo}
-    elif current_user.rol == "coordinacion":
+    if current_user.rol == "coordinacion":
         mios = set(grupos_del_coordinador(db, current_user))
     elif current_user.rol in ("tecnico", "junior"):
         mios = {current_user.grupo} if current_user.grupo else set()
@@ -375,6 +352,77 @@ def ver_criticidad(
     if activo is None:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
     return criticidad_de_activo(db, activo)
+# ═══════════════════════════════════════════════════════════════════════════
+# INFORME DE EQUIPO EN PDF — ficha del activo + TODO su historial de OT
+# ═══════════════════════════════════════════════════════════════════════════
+# Pedido de Cami (03/10): un botón en la ficha del equipo para descargar un
+# PDF con sus datos y el historial completo de órdenes de trabajo (todas,
+# correctivas y preventivas, de cualquier estado — no solo las cerradas).
+# Se arma siempre al vuelo (no se guarda en ningún lado), mismo criterio que
+# el informe de preventiva de ordenes_trabajo.py.
+# ═══════════════════════════════════════════════════════════════════════════
+
+from urllib.parse import quote
+from fastapi import Response
+from ..models import OrdenTrabajo
+from ..informes import generar_informe_activo_pdf
+
+
+@router.get("/{codigo}/informe-pdf")
+def informe_pdf_activo(
+    codigo: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Descargar el informe en PDF de un equipo: sus datos + todo su historial
+    de órdenes de trabajo."""
+    activo = db.query(Activo).filter(Activo.codigo == codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+
+    tipo_equipo = db.query(TipoEquipo).filter(TipoEquipo.id == activo.tipo_equipo_id).first()
+    sector = db.query(Servicio).filter(Servicio.id == activo.sector_id).first()
+
+    ordenes_db = (
+        db.query(OrdenTrabajo)
+        .filter(OrdenTrabajo.activo_codigo == codigo)
+        .order_by(OrdenTrabajo.fecha_apertura.desc().nullslast(), OrdenTrabajo.numero_ot.desc())
+        .all()
+    )
+    # Resolvemos los nombres de técnico en un solo query (no uno por OT).
+    ids_tecnicos = {o.tecnico_id for o in ordenes_db if o.tecnico_id is not None}
+    tecnicos_por_id = {}
+    if ids_tecnicos:
+        for t in db.query(Usuario).filter(Usuario.id.in_(ids_tecnicos)).all():
+            tecnicos_por_id[t.id] = f"{t.nombre} {t.apellido}"
+
+    ordenes = [
+        {
+            "numero_ot": o.numero_ot,
+            "tipo": o.tipo,
+            "estado": o.estado,
+            "fecha_apertura": o.fecha_apertura,
+            "fecha_cierre": o.fecha_cierre,
+            "tecnico_nombre": tecnicos_por_id.get(o.tecnico_id),
+            "descripcion": o.descripcion,
+        }
+        for o in ordenes_db
+    ]
+
+    pdf_bytes = generar_informe_activo_pdf(
+        activo=activo,
+        tipo_equipo_nombre=tipo_equipo.nombre if tipo_equipo else None,
+        sector_nombre=sector.nombre if sector else None,
+        ordenes=ordenes,
+    )
+
+    nombre_archivo = f"Informe_{activo.codigo}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(nombre_archivo)}"},
+    )
+
 
 @router.patch("/{codigo}/programar-segun-plan", response_model=ActivoOut)
 def programar_segun_plan(
@@ -439,8 +487,6 @@ def editar_activo(
 
     datos = payload.model_dump(exclude_unset=True)
 
-    # Si cambia el tipo de equipo, la descripción y el grupo técnico se
-    # recalculan solos (mismo criterio que al crear) — no se editan a mano.
     if "tipo_equipo_id" in datos and datos["tipo_equipo_id"] != activo.tipo_equipo_id:
         tipo = db.query(TipoEquipo).filter(TipoEquipo.id == datos["tipo_equipo_id"]).first()
         if tipo is None:
@@ -459,9 +505,6 @@ def editar_activo(
     for campo, valor in datos.items():
         setattr(activo, campo, valor)
 
-    # sin_backup solo tiene sentido si es equipo médico (mismo criterio que
-    # al crear: NuevoActivo.jsx manda sin_backup=False cuando se destilda
-    # "es equipo médico").
     if activo.es_equipo_medico is False:
         activo.sin_backup = False
 

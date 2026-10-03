@@ -54,6 +54,7 @@ from ..schemas import (
     FallasPorTipo,
     MTBFItem,
     ConteoEstadoOT,
+    ConteoVidaUtil,
     CargaGrupoItem,
     FallasTrimestreItem,
 )
@@ -67,6 +68,30 @@ def _dias_entre(desde, hasta):
     if desde is None or hasta is None:
         return None
     return (hasta - desde).total_seconds() / 86400.0
+
+
+
+# Criterio del Hospital Alemán para la vida útil de un equipo, SOLO según su
+# antigüedad (no depende del PRIUX ni de si es equipo médico, a diferencia
+# de "antiguedad"/"fuera_de_vida_util" en criticidad.py, que son otra cosa:
+# un nivel de 1 a 5 que alimenta la fórmula de riesgo, y solo se calcula para
+# equipos médicos con datos PRIUX cargados). Esto aplica a CUALQUIER equipo
+# que tenga fecha de instalación. Confirmado con Cami (03/10):
+#   menos de 5 años     → Moderno
+#   de 5 a 10 años       → Aceptable
+#   de 10 a 15 años      → Medianamente aceptable
+#   más de 15 años       → Obsoleto
+# Los bordes (5, 10 y 15 años exactos) se asignaron al tramo de ARRIBA
+# (ej: exactamente 10 años → Medianamente aceptable, no Aceptable) — si Cami
+# prefiere otro criterio en esos bordes puntuales, se ajusta acá nomás.
+def _estado_vida_util(anios: float) -> str:
+    if anios < 5:
+        return "MODERNO"
+    if anios < 10:
+        return "ACEPTABLE"
+    if anios < 15:
+        return "MEDIANAMENTE_ACEPTABLE"
+    return "OBSOLETO"
 
 
 def _mtbf_de_fechas(fechas):
@@ -117,15 +142,9 @@ def obtener_kpis(
     hay_filtro = bool(grupo_id or tipo_equipo_id)
 
     def filtrar(items, obtener_codigo):
-        """Deja afuera lo que no tiene equipo y, si hay un filtro de
-        grupo/tipo activo, deja solo los items cuyo activo cae dentro del
-        subconjunto filtrado.
-
-        Las OT de "cosas" (solicitudes de algo que no es un equipo médico
-        registrado) no tienen activo_codigo y no entran en ningún indicador:
-        el dashboard mide el parque de equipos médicos, y una pinza o una
-        lámpara distorsionarían las fallas, el MTTR o el MTBF."""
-        items = [i for i in items if obtener_codigo(i) is not None]
+        """Si hay un filtro de grupo/tipo activo, deja solo los items cuyo
+        activo cae dentro del subconjunto filtrado. Sin filtro, no toca nada
+        (mismo comportamiento que antes de que existiera este filtro)."""
         if not hay_filtro:
             return items
         return [i for i in items if obtener_codigo(i) in codigos_filtrados]
@@ -281,7 +300,7 @@ def obtener_kpis(
     activos = list(tipo_de_activo.keys())
     activos_totales = len(activos)
     activos_en_baja = sum(
-        1 for a in activos_filtrados if "BAJA" in str(a.estado).upper()
+        1 for a in activos_filtrados if str(a.estado).upper() == "BAJA"
     )
 
     # ─── KPI 6: OT por estado (torta del dashboard) ───
@@ -338,6 +357,24 @@ def obtener_kpis(
         and (m.fecha_programada.year, m.fecha_programada.month) < (hoy.year, hoy.month)
     )
 
+    # ─── KPI 9: vida útil de los equipos, según antigüedad (torta) ───
+    # Respeta el mismo filtro de grupo/tipo que el resto (activos_filtrados).
+    # Los equipos sin fecha de instalación no entran en ningún estado (no se
+    # puede calcular su antigüedad) — mismo criterio que el resto de los KPI
+    # que dependen de un dato que puede faltar.
+    ESTADOS_VIDA_UTIL = ["MODERNO", "ACEPTABLE", "MEDIANAMENTE_ACEPTABLE", "OBSOLETO"]
+    cuenta_vida_util = {e: 0 for e in ESTADOS_VIDA_UTIL}
+    for a in activos_filtrados:
+        if a.fecha_instalacion is None:
+            continue
+        anios = (hoy - a.fecha_instalacion).days / 365.25
+        cuenta_vida_util[_estado_vida_util(anios)] += 1
+    vida_util_por_estado = [
+        ConteoVidaUtil(estado=e, cantidad=cuenta_vida_util[e])
+        for e in ESTADOS_VIDA_UTIL
+        if cuenta_vida_util[e] > 0
+    ]
+
     return DashboardKPIs(
         mp_totales=mp_totales,
         mp_realizados=mp_realizados,
@@ -360,4 +397,5 @@ def obtener_kpis(
         fallas_por_trimestre=fallas_por_trimestre,
         ot_sin_asignar=ot_sin_asignar,
         preventivos_vencidos=preventivos_vencidos,
+        vida_util_por_estado=vida_util_por_estado,
     )

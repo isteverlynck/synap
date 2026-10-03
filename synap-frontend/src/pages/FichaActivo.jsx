@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { logout, rolActual } from "../api/auth";
-import { verActivoDetalle, catalogosParaAlta, editarActivo } from "../api/activos";
+import { verActivoDetalle, catalogosParaAlta, editarActivo, descargarInformeActivo } from "../api/activos";
 import { listarSiglas, listarUbicaciones } from "../api/catalogos";
 import Encabezado from "../componentes/Encabezado";
 import CodigoConGlosario from "../componentes/CodigoConGlosario";
 import { armarDiccionarioSiglas } from "../utiles/codigos";
 import { color, cs, boton, insignia, estadoDelEquipo, tonoRiesgo } from "../tema";
 import VentanaRiesgo from "../componentes/VentanaRiesgo";
-import { Info, Pencil } from "lucide-react";
+import { Info, Pencil, FileDown } from "lucide-react";
 import Volver from "../componentes/Volver";
 import { diasHasta, parsearFecha, formatearFechaOT } from "../utiles/fechas";
 import { programarSegunPlan, verCriticidad } from "../api/activos";
@@ -43,6 +43,19 @@ function FichaActivo() {
   const [diccionarioUbicaciones, setDiccionarioUbicaciones] = useState({});
   const [criticidad, setCriticidad] = useState(null);
   const [verCalculo, setVerCalculo] = useState(false);
+  const [descargandoInforme, setDescargandoInforme] = useState(false);
+
+  async function descargarReporte() {
+    if (descargandoInforme) return;
+    setDescargandoInforme(true);
+    try {
+      await descargarInformeActivo(codigo);
+    } catch (e) {
+      toast.error("No pudimos generar el informe. Probá de nuevo.");
+    } finally {
+      setDescargandoInforme(false);
+    }
+  }
 
   // ─── Edición de la ficha ───
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -132,7 +145,9 @@ function FichaActivo() {
   const situacion = estadoDelEquipo(activo);
   const abiertas = activo.ordenes_de_trabajo.filter((ot) => ot.estado !== "CERRADA");
   const cerradas = activo.ordenes_de_trabajo.filter((ot) => ot.estado === "CERRADA");
-  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion" || rol === "jefatura";
+  // Mismo criterio que en Acciones: jefatura y enfermería no entran al detalle
+  // de una OT, así que para ellas el historial no es clickeable.
+  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
   const puedeEditar = PUEDE_EDITAR.includes(rol);
 
   function actualizarActivoEditado(nuevo) {
@@ -147,7 +162,14 @@ function FichaActivo() {
       <div style={cs.contenido}>
         <Volver />
         <Encabezado titulo="Ficha del equipo">
-          {/* <button style={boton("secundario")} onClick={() => navegar("/escanear")}>Escanear otro</button> */}
+          <button
+            style={{ ...boton("secundario"), gap: 6 }}
+            onClick={descargarReporte}
+            disabled={descargandoInforme}
+          >
+            <FileDown size={15} strokeWidth={2} aria-hidden="true" />
+            {descargandoInforme ? "Generando..." : "Descargar reporte"}
+          </button>
         </Encabezado>
 
         {/* Aviso de estado: ancho completo y ANTES del nombre del equipo, para
@@ -171,8 +193,7 @@ function FichaActivo() {
             </button>
           )}
         </div>
-
-        {rol === "coordinacion" && activo.proxima_fecha_mp && !activo.frecuencia_mp_meses && (
+                {rol === "coordinacion" && activo.proxima_fecha_mp && !activo.frecuencia_mp_meses && (
           <div style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12 }}>
             <p style={{ margin: 0, fontSize: "0.88rem", color: color.texto }}>
               Este equipo tiene mantenimiento programado pero no tiene definido cada
@@ -218,8 +239,15 @@ function FichaActivo() {
             />
             <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
             <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
-            {/* Criticidad y riesgo PRIUX: información interna de Bioingeniería,
-            enfermería no la ve. */}
+            {/* Vida útil y Criticidad/riesgo PRIUX: información interna de
+            Bioingeniería, enfermería no la ve. Vida útil se calcula acá
+            mismo según la antigüedad (criterio del Hospital Alemán) y no
+            depende del PRIUX, a diferencia de Criticidad/Nivel de riesgo de
+            abajo — por eso se muestra aunque el equipo no sea médico o no
+            tenga datos PRIUX cargados (alcanza con la fecha de instalación). */}
+            {rol !== "enfermeria" && (
+              <Dato etiqueta="Vida útil" valor={<VidaUtil fechaInstalacion={activo.fecha_instalacion} />} />
+            )}
             {rol !== "enfermeria" && criticidad && (
               <>
                 <Dato etiqueta="Criticidad" valor={textoCriticidad(criticidad)} />
@@ -389,8 +417,7 @@ function EditarFicha({ activo, catalogos, ubicacionesCatalogo, diccionarioUbicac
     setUbicacionElegida(null);
     setUbicacionTexto("");
   }
-
-  // Solo se manda lo que realmente cambió respecto de la ficha actual — un
+    // Solo se manda lo que realmente cambió respecto de la ficha actual — un
   // PATCH parcial de verdad, no todos los campos de nuevo cada vez.
   function armarCambios() {
     const cambios = {};
@@ -650,7 +677,7 @@ function AvisoEstado({ situacion }) {
 
 function Acciones({ rol, situacion, activo, navegar }) {
   const acciones = [];
-  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion" || rol === "jefatura";
+  const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
   // La acción principal la manda el ESTADO, no el rol: si el equipo está de
   // baja o ya tiene una OT abierta, nadie reporta un problema nuevo. Así no se
   // juntan cinco solicitudes del mismo monitor el mismo día.
@@ -686,7 +713,6 @@ function Acciones({ rol, situacion, activo, navegar }) {
     </div>
   );
 }
-
 // ─────────────────────────────────────────────────────────────────────────
 // Piezas chicas
 // ─────────────────────────────────────────────────────────────────────────
@@ -757,6 +783,33 @@ function NivelRiesgo({ datos, alTocar }) {
       <Info size={12} strokeWidth={2.4} aria-hidden="true" />
     </button>
   );
+}
+
+// Vida útil del equipo, SOLO según su antigüedad (criterio del Hospital
+// Alemán, confirmado por Cami el 03/10 — mismos bordes que
+// dashboard.py::_estado_vida_util, mantené los dos en sync si cambian):
+//   menos de 5 años  → Moderno
+//   de 5 a 10 años    → Aceptable
+//   de 10 a 15 años   → Medianamente aceptable
+//   más de 15 años    → Obsoleto
+// A diferencia de Criticidad/Nivel de riesgo (que dependen del PRIUX y solo
+// se calculan para equipos médicos con esos datos cargados), esto alcanza
+// con la fecha de instalación y aplica a cualquier equipo.
+function estadoVidaUtil(fechaInstalacion) {
+  if (!fechaInstalacion) return null;
+  const anios = (Date.now() - new Date(fechaInstalacion).getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  if (anios < 5) return { texto: "Moderno", tono: "exito" };
+  if (anios < 10) return { texto: "Aceptable", tono: "primario" };
+  if (anios < 15) return { texto: "Medianamente aceptable", tono: "advertencia" };
+  return { texto: "Obsoleto", tono: "peligro" };
+}
+
+function VidaUtil({ fechaInstalacion }) {
+  const estado = estadoVidaUtil(fechaInstalacion);
+  if (!estado) {
+    return <span style={{ color: color.textoSuave }}>Sin dato — falta la fecha de instalación</span>;
+  }
+  return <span style={insignia(estado.tono)}>{estado.texto}</span>;
 }
 
 function Dato({ etiqueta, valor }) {

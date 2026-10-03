@@ -82,3 +82,18 @@ export async function verCriticidad(codigo) {
   const res = await cliente.get(`/activos/${codigo}/criticidad`);
   return res.data;
 }
+
+// ─── Informe en PDF (datos del equipo + todo su historial de OT) ───
+// Se pide como blob (igual que el informe de OT en api/ordenes.js) porque el
+// backend exige el token de sesión, así que no alcanza con un link común.
+export async function descargarInformeActivo(codigo) {
+  const res = await cliente.get(`/activos/${codigo}/informe-pdf`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Informe_${codigo}.pdf`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}

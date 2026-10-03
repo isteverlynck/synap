@@ -39,7 +39,7 @@ def respuesta_csv(nombre_base: str, encabezados: list[str], filas: list[list]) -
     bajan varias veces no se pisan entre sí.
     """
     salida = io.StringIO()
-    salida.write("\ufeff")  # BOM: para que Excel lea bien las tildes
+    salida.write("﻿")  # BOM: para que Excel lea bien las tildes
     escritor = csv.writer(salida, delimiter=";")
     escritor.writerow(encabezados)
     for fila in filas:
@@ -104,50 +104,47 @@ def exportar_activos(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ÓRDENES DE TRABAJO — técnicos y coordinación (jefatura NO: no ve el detalle
-# de las OT, solo los indicadores del dashboard)
+# ÓRDENES DE TRABAJO — técnicos, coordinación y (desde 03/10) jefatura
 # ═══════════════════════════════════════════════════════════════════════════
+# Jefatura no tiene la pantalla de Órdenes (no ve el detalle operativo de
+# cada OT, solo los indicadores del dashboard), pero sí puede bajar este CSV
+# con el historial completo — mismo criterio que ya tenía el CSV de
+# mantenimientos. A diferencia de técnico/coordinación, jefatura ve TODAS las
+# OT, sin recorte por grupo ni por asignación.
 
 from sqlalchemy import or_, and_
 
 from ..models import OrdenTrabajo
-from ..security import requiere_rol_estricto, grupos_del_coordinador
-
-from datetime import timezone
-from zoneinfo import ZoneInfo
-
-_TZ_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
+from ..security import requiere_rol, grupos_del_coordinador
 
 
 def _fecha_hora(valor) -> str:
-    """Fecha y hora como dd/mm/aaaa hh:mm, en hora de Argentina (vacío si no hay).
-
-    En la base las fechas con hora se guardan en UTC y sin zona horaria
-    (datetime.utcnow()). Si se imprimieran tal cual, el CSV mostraría todo
-    tres horas adelantado respecto de lo que se ve en la app. Por eso primero
-    se aclara que el valor está en UTC y después se pasa a hora de Argentina,
-    que es lo mismo que hace el frontend al mostrar fechas.
-    """
-    if not valor:
-        return ""
-    if valor.tzinfo is None:
-        valor = valor.replace(tzinfo=timezone.utc)
-    return valor.astimezone(_TZ_ARGENTINA).strftime("%d/%m/%Y %H:%M")
+    """Fecha y hora como dd/mm/aaaa hh:mm (vacío si no hay)."""
+    return valor.strftime("%d/%m/%Y %H:%M") if valor else ""
 
 
 @router.get("/ordenes")
 def exportar_ordenes(
+    estado: str | None = None,
+    tipo: str | None = None,
+    sin_asignar: bool | None = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
-    """Las OT que esta persona ve en su pantalla de Órdenes:
+    """Las OT que esta persona ve en su pantalla de Órdenes, respetando los
+    mismos filtros que ya tiene esa pantalla (estado, tipo, y "sin asignar"
+    para coordinación) si se los pasan por query string; si no se pasa
+    ninguno, descarga todo lo que ese rol puede ver:
       - Técnico: las asignadas a él, más las de su grupo sin técnico (mismo
         criterio que "Mis órdenes").
       - Coordinación: todas las de los grupos que coordina.
+      - Jefatura: todas, sin recorte (requiere_rol la deja pasar siempre).
     """
     q = db.query(OrdenTrabajo)
     if current_user.rol == "coordinacion":
         q = q.filter(OrdenTrabajo.grupo_id.in_(grupos_del_coordinador(db, current_user)))
+    elif current_user.rol == "jefatura":
+        pass  # ve todas, sin recorte
     else:
         q = q.filter(
             or_(
@@ -158,6 +155,18 @@ def exportar_ordenes(
                 ),
             )
         )
+
+    # Filtros opcionales, iguales a los que ya usa /ordenes-trabajo (estado y
+    # tipo se guardan en mayúsculas, se normaliza lo que llega).
+    if estado is not None:
+        q = q.filter(OrdenTrabajo.estado == estado.upper())
+    if tipo is not None:
+        q = q.filter(OrdenTrabajo.tipo == tipo.upper())
+    if sin_asignar is True:
+        q = q.filter(OrdenTrabajo.tecnico_id.is_(None))
+    elif sin_asignar is False:
+        q = q.filter(OrdenTrabajo.tecnico_id.isnot(None))
+
     ordenes = q.order_by(OrdenTrabajo.numero_ot).all()
 
     # Nombres de las personas, para no mostrar ids.
@@ -195,9 +204,6 @@ def exportar_ordenes(
         for o in ordenes
     ]
     return respuesta_csv("ordenes", encabezados, filas)
-
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # INSUMOS — técnicos, coordinación y jefatura (los que tienen la pantalla)
 # ═══════════════════════════════════════════════════════════════════════════

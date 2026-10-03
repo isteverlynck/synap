@@ -24,13 +24,15 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { misOrdenes, listarOrdenes } from "../api/ordenes";
 import { tecnicosDisponibles } from "../api/coordinacion";
 import { obtenerPerfil } from "../api/auth";
+import { descargarCSV } from "../api/exportar";
 import { agruparPorFecha, formatearFechaOT } from "../utiles/fechas";
 import Encabezado from "../componentes/Encabezado";
-import { color, cs, insignia } from "../tema";
-import { AlertTriangle, CalendarClock, Search, X } from "lucide-react";
+import { color, cs, insignia, boton } from "../tema";
+import { AlertTriangle, CalendarClock, Download, Search, X } from "lucide-react";
 
 // ¿La OT coincide con lo que se escribió en el buscador? Dos formas de
 // coincidir, cualquiera alcanza:
@@ -85,6 +87,7 @@ function Ordenes() {
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [descargando, setDescargando] = useState(false);
 
   useEffect(() => {
     obtenerPerfil().then(setPerfil).catch(() => setPerfil(null));
@@ -127,6 +130,31 @@ function Ordenes() {
     }
   }
 
+  // Descarga el CSV de OT respetando los mismos filtros que están puestos
+  // en esta pantalla (estado, tipo, y "sin asignar" para coordinación) — si
+  // no hay ningún filtro activo ("Todas"), descarga todo lo que este rol
+  // puede ver, igual que antes.
+  async function descargarOrdenes() {
+    if (descargando) return;
+    setDescargando(true);
+    try {
+      const params = new URLSearchParams();
+      if (filtro === "SIN_ASIGNAR") {
+        params.set("sin_asignar", "true");
+        if (tipoFiltro) params.set("tipo", tipoFiltro);
+      } else {
+        if (filtro) params.set("estado", filtro);
+        if (tipoFiltro) params.set("tipo", tipoFiltro);
+      }
+      const query = params.toString();
+      await descargarCSV(query ? `/exportar/ordenes?${query}` : "/exportar/ordenes", "ordenes");
+    } catch {
+      toast.error("No pudimos descargar el CSV. Probá de nuevo.");
+    } finally {
+      setDescargando(false);
+    }
+  }
+
   // Coordinación necesita ver a quién está asignada cada OT, así que traemos
   // la gente una sola vez y mapeamos el id al nombre acá, sin pedirle más al
   // backend.
@@ -153,7 +181,12 @@ function Ordenes() {
       <Encabezado
         titulo={rol === "tecnico" ? "Mis órdenes de trabajo" : "Órdenes de trabajo"}
         subtitulo={cargando ? "Cargando..." : `${ordenesFiltradas.length} en esta vista`}
-      />
+      >
+        <button style={{ ...boton("secundario"), gap: 6 }} onClick={descargarOrdenes} disabled={descargando}>
+          <Download size={15} strokeWidth={2} aria-hidden="true" />
+          {descargando ? "Generando..." : "Descargar CSV"}
+        </button>
+      </Encabezado>
 
       {/* ─── Buscador: por número de OT o código de equipo ─── */}
       <div style={estilos.campoBusqueda}>
@@ -202,7 +235,6 @@ function Ordenes() {
           </button>
         ))}
       </div>
-
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
       {!cargando && ordenesFiltradas.length === 0 && !error && (
@@ -242,9 +274,7 @@ function Ordenes() {
                   deja ver de un vistazo cuáles son rutina programada. */}
                   <div style={estilos.lineaTitulo}>
                     <p style={estilos.titulo}>
-                      OT-{String(ot.numero_ot).padStart(4, "0")}
-                      {/* Sin equipo (OT de una "cosa") no hay código que mostrar. */}
-                      {ot.activo_codigo ? ` · ${ot.activo_codigo}` : ""}
+                      OT-{String(ot.numero_ot).padStart(4, "0")} · {ot.activo_codigo}
                     </p>
                     {ot.tipo === "PREVENTIVA" && (
                       <span style={estilos.etiquetaPreventiva}>
