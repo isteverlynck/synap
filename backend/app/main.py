@@ -53,6 +53,11 @@ app = FastAPI(
 # Con allow_origin_regex alcanza un solo middleware: deja pasar cualquier
 # puerto de localhost/127.0.0.1 (el que sea que Vite elija) más lo que venga
 # de config.py, así no vuelve a pasar.
+#
+# expose_headers=["X-Total-Count"]: por defecto el navegador le esconde a
+# JavaScript cualquier header que no sea uno de los "básicos", así que sin
+# esto el frontend no podía leer el total de activos que manda /activos para
+# el botón "Cargar más" (quedaba undefined aunque el header sí viajaba).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -60,6 +65,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],
 )
 
 # Conectar los endpoints de autenticación (login, activar, estado).

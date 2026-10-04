@@ -1,14 +1,16 @@
-// Activos.jsx — el listado de equipos, con búsqueda y filtros.
+// Activos.jsx — el listado de equipos, con búsqueda, filtros y paginación.
 //
 // La búsqueda y los filtros los resuelve el BACKEND, no el navegador: filtrar
 // una lista que ya está en pantalla solo alcanzaría si estuvieran todos los
-// equipos cargados, y traemos hasta 200. Con los datos reales del hospital eso
-// dejaría equipos afuera sin que nadie se entere.
+// equipos cargados. Con los datos reales del hospital (más de 6000 equipos)
+// eso tampoco entra de una: el backend manda de a 200 (limit/offset) y acá
+// se van agregando de a tanda con el botón "Cargar más", hasta llegar al
+// total real (que viene en el header X-Total-Count de cada respuesta).
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, SlidersHorizontal, X, Plus, Download } from "lucide-react";
-import { listarActivos, opcionesDeFiltro } from "../api/activos";
+import { listarActivosConTotal, opcionesDeFiltro } from "../api/activos";
 import { listarSiglas, listarUbicaciones } from "../api/catalogos";
 import { rolActual } from "../api/auth";
 import { descargarCSV } from "../api/exportar";
@@ -27,10 +29,12 @@ function Activos() {
   const puedeCrear = PUEDE_CREAR.includes(rolActual());
   const PUEDE_DESCARGAR = ["coordinacion", "tecnico", "jefatura"];
   const [activos, setActivos] = useState([]);
+  const [total, setTotal] = useState(0);
   const [opciones, setOpciones] = useState({ tipos: [], sectores: [], grupos: [], estados: [] });
   const [siglas, setSiglas] = useState([]);
   const [ubicacionesCatalogo, setUbicacionesCatalogo] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [error, setError] = useState("");
   const [verFiltros, setVerFiltros] = useState(false);
 
@@ -65,16 +69,35 @@ function Activos() {
     return () => clearTimeout(t);
   }, [textoEscrito]);
 
+  // Cada vez que cambia la búsqueda o los filtros, se vuelve a pedir desde
+  // cero (offset 0): es una lista nueva, no una continuación de la anterior.
   useEffect(() => {
     setCargando(true);
     setError("");
-    listarActivos({ buscar: busqueda, ...filtros })
-      .then(setActivos)
+    listarActivosConTotal({ buscar: busqueda, ...filtros })
+      .then(({ items, total: totalNuevo }) => {
+        setActivos(items);
+        setTotal(totalNuevo);
+      })
       .catch(() => setError("No se pudieron cargar los activos."))
       .finally(() => setCargando(false));
   }, [busqueda, filtros]);
 
+  // "Cargar más": pide la próxima tanda a partir de lo que ya hay en pantalla
+  // y la agrega al final, sin pisar lo que ya se cargó.
+  function cargarMas() {
+    setCargandoMas(true);
+    listarActivosConTotal({ buscar: busqueda, ...filtros, offset: activos.length })
+      .then(({ items, total: totalNuevo }) => {
+        setActivos((previos) => [...previos, ...items]);
+        setTotal(totalNuevo);
+      })
+      .catch(() => toast.error("No se pudo cargar más equipos. Probá de nuevo."))
+      .finally(() => setCargandoMas(false));
+  }
+
   const filtrosActivos = Object.values(filtros).filter(Boolean).length;
+  const quedanMas = !cargando && activos.length < total;
 
   function limpiarFiltros() {
     setFiltros({ estado: "", tipoEquipoId: "", sectorId: "", grupoId: "" });
@@ -84,7 +107,7 @@ function Activos() {
     <>
       <Encabezado
         titulo="Activos"
-        subtitulo={cargando ? "Buscando..." : textoDelSubtitulo(activos.length, busqueda, filtrosActivos)}
+        subtitulo={cargando ? "Buscando..." : textoDelSubtitulo(activos.length, total, busqueda, filtrosActivos)}
       >
         {puedeCrear && (
           <button style={{ ...boton("primario"), gap: 7 }} onClick={() => navegar("/activos/nuevo")}>
@@ -96,7 +119,7 @@ function Activos() {
           Escanear equipo (QR)
         </button>
       </Encabezado>
-      
+
 
       {/* ─── Buscador ─── */}
       <div style={estilos.barraBusqueda}>
@@ -182,8 +205,10 @@ function Activos() {
           >
             <div style={{ minWidth: 0 }}>
               {/* El código primero, grande: es el identificador con el que se
-              ubica un equipo puntual (QR, etiqueta física) y con el que está
-              ordenada la lista. El nombre queda abajo, como dato secundario. */}
+              ubica un equipo puntual (QR, etiqueta física). La lista viene
+              ordenada del backend por fecha de instalación (más nuevo
+              primero); el código es solo desempate. El nombre queda abajo,
+              como dato secundario. */}
               <div style={estilos.codigo}>
                 <CodigoConGlosario codigo={a.codigo} diccionario={diccionarioSiglas} />
                 {a.ubicacion && (
@@ -206,6 +231,16 @@ function Activos() {
           </div>
         ))}
       </div>
+
+      {quedanMas && (
+        <button
+          style={{ ...boton("secundario"), marginTop: 16, alignSelf: "center" }}
+          onClick={cargarMas}
+          disabled={cargandoMas}
+        >
+          {cargandoMas ? "Cargando..." : `Cargar más (${activos.length} de ${total})`}
+        </button>
+      )}
     </>
   );
 }
@@ -225,12 +260,17 @@ function Filtro({ etiqueta, valor, onChange, opciones }) {
 }
 
 // El subtítulo dice si estás viendo todo o un recorte, para que nadie crea que
-// el hospital tiene 12 equipos cuando en realidad hay un filtro puesto.
-function textoDelSubtitulo(cantidad, busqueda, filtrosActivos) {
+// el hospital tiene 12 equipos cuando en realidad hay un filtro puesto (o 200
+// cuando en realidad hay varios miles y todavía no se pidió el resto).
+function textoDelSubtitulo(cantidad, total, busqueda, filtrosActivos) {
+  const hayRecorte = total > cantidad;
   if (busqueda || filtrosActivos > 0) {
-    return `${cantidad} ${cantidad === 1 ? "resultado" : "resultados"}`;
+    const palabra = total === 1 ? "resultado" : "resultados";
+    return hayRecorte ? `Mostrando ${cantidad} de ${total} ${palabra}` : `${cantidad} ${palabra}`;
   }
-  return `${cantidad} equipos registrados`;
+  return hayRecorte
+    ? `Mostrando ${cantidad} de ${total} equipos registrados`
+    : `${cantidad} equipos registrados`;
 }
 
 const estilos = {

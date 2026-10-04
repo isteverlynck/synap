@@ -16,15 +16,38 @@ export async function verActivoDetalle(codigo) {
 }
 
 // Listado con búsqueda y filtros. Todos opcionales y combinables.
-export async function listarActivos({ buscar, estado, tipoEquipoId, sectorId, grupoId } = {}) {
+export async function listarActivos({ buscar, estado, tipoEquipoId, sectorId, grupoId, limit, offset } = {}) {
   const params = {};
   if (buscar) params.buscar = buscar;
   if (estado) params.estado = estado;
   if (tipoEquipoId) params.tipo_equipo_id = tipoEquipoId;
   if (sectorId) params.sector_id = sectorId;
   if (grupoId) params.grupo_id = grupoId;
+  if (limit) params.limit = limit;
+  if (offset) params.offset = offset;
   const res = await cliente.get("/activos", { params });
   return res.data;
+}
+
+// Como listarActivos, pero además devuelve el total de resultados que hay SIN
+// paginar (header X-Total-Count que manda el backend). La usa la pantalla de
+// Activos para el botón "Cargar más": las otras pantallas que buscan equipos
+// (el buscador de CalendarioMP y el de DetalleOrden) siguen usando
+// listarActivos a secas, sin tocarlas, porque a ellas les alcanza con la
+// primera página y esperan un array simple como respuesta.
+export async function listarActivosConTotal(opciones = {}) {
+  const { buscar, estado, tipoEquipoId, sectorId, grupoId, limit, offset } = opciones;
+  const params = {};
+  if (buscar) params.buscar = buscar;
+  if (estado) params.estado = estado;
+  if (tipoEquipoId) params.tipo_equipo_id = tipoEquipoId;
+  if (sectorId) params.sector_id = sectorId;
+  if (grupoId) params.grupo_id = grupoId;
+  if (limit) params.limit = limit;
+  if (offset) params.offset = offset;
+  const res = await cliente.get("/activos", { params });
+  const total = Number(res.headers["x-total-count"]);
+  return { items: res.data, total: Number.isNaN(total) ? res.data.length : total };
 }
 
 // Opciones para los desplegables de filtro.
@@ -67,6 +90,33 @@ export async function crearServicio(datos) {
 
 export async function programarSegunPlan(codigo) {
   const { data } = await cliente.patch(`/activos/${codigo}/programar-segun-plan`);
+  return data;
+}
+
+// Asignar a mano un plan de mantenimiento a un equipo que todavía no tiene
+// uno. A diferencia de programarSegunPlan (que adivina solo), acá se elige
+// explícitamente CUÁL plan (planId) y en qué mes arranca (proximaFechaMp,
+// formato "YYYY-MM-DD" — el día se ignora, el backend lo normaliza al 1).
+export async function asignarPlan(codigo, planId, proximaFechaMp) {
+  const { data } = await cliente.patch(
+    `/activos/${codigo}/asignar-plan/${planId}`,
+    null,
+    { params: { proxima_fecha_mp: proximaFechaMp } }
+  );
+  return data;
+}
+
+// Cambiar el mes del próximo mantenimiento de un equipo que YA tiene uno
+// asignado (no toca el plan ni la frecuencia, solo la fecha). nuevaFecha en
+// formato "YYYY-MM-DD" — el día se ignora, el backend lo normaliza al 1. Si
+// el equipo todavía no tiene ningún mantenimiento asignado, usar
+// asignarPlan en lugar de esta función.
+export async function reprogramarMp(codigo, nuevaFecha) {
+  const { data } = await cliente.patch(
+    `/activos/${codigo}/reprogramar-mp`,
+    null,
+    { params: { nueva_fecha: nuevaFecha } }
+  );
   return data;
 }
 

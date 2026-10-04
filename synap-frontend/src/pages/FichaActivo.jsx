@@ -11,7 +11,8 @@ import VentanaRiesgo from "../componentes/VentanaRiesgo";
 import { Info, Pencil, FileDown } from "lucide-react";
 import Volver from "../componentes/Volver";
 import { diasHasta, parsearFecha, formatearFechaOT } from "../utiles/fechas";
-import { programarSegunPlan, verCriticidad } from "../api/activos";
+import { programarSegunPlan, asignarPlan, reprogramarMp, verCriticidad } from "../api/activos";
+import { listarPlanes } from "../api/planes";
 import { toast } from "sonner";
 
 // Mismas opciones que en el alta (NuevoActivo.jsx) — se repiten acá porque
@@ -45,6 +46,18 @@ function FichaActivo() {
   const [verCalculo, setVerCalculo] = useState(false);
   const [descargandoInforme, setDescargandoInforme] = useState(false);
 
+  // ─── Asignar un plan de mantenimiento a mano (equipos sin mantenimiento) ───
+  const [planes, setPlanes] = useState([]);
+  const [asignandoPlan, setAsignandoPlan] = useState(false);
+  const [planElegido, setPlanElegido] = useState("");
+  const [primerMes, setPrimerMes] = useState("");
+  const [guardandoPlan, setGuardandoPlan] = useState(false);
+
+  // ─── Reprogramar el mes del próximo MP (equipo que YA tiene uno asignado) ───
+  const [reprogramando, setReprogramando] = useState(false);
+  const [nuevoMes, setNuevoMes] = useState("");
+  const [guardandoReprogramacion, setGuardandoReprogramacion] = useState(false);
+
   async function descargarReporte() {
     if (descargandoInforme) return;
     setDescargandoInforme(true);
@@ -76,6 +89,47 @@ function FichaActivo() {
     }
   }
 
+  // Asignar a mano un plan de mantenimiento a un equipo que todavía no tiene
+  // ninguno. A diferencia de programarMP (que adivina solo: el plan del tipo,
+  // o si no hay, el único genérico), acá coordinación elige explícitamente
+  // cuál plan usar y en qué mes arranca — hace falta desde que puede haber
+  // más de un plan genérico (ej: uno semestral y uno anual).
+  async function confirmarAsignarPlan() {
+    if (!planElegido || !primerMes || guardandoPlan) return;
+    setGuardandoPlan(true);
+    try {
+      const actualizado = await asignarPlan(activo.codigo, planElegido, `${primerMes}-01`);
+      setActivo((antes) => ({ ...antes, ...actualizado }));
+      setAsignandoPlan(false);
+      setPlanElegido("");
+      setPrimerMes("");
+      toast.success("Mantenimiento asignado.");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "No pudimos asignar el plan.");
+    } finally {
+      setGuardandoPlan(false);
+    }
+  }
+
+  // Cambiar el mes del próximo MP de un equipo que YA tiene uno asignado.
+  // A diferencia de confirmarAsignarPlan (que elige plan + primer mes para un
+  // equipo sin nada todavía), esto solo mueve la fecha, sin tocar el plan.
+  async function confirmarReprogramar() {
+    if (!nuevoMes || guardandoReprogramacion) return;
+    setGuardandoReprogramacion(true);
+    try {
+      const actualizado = await reprogramarMp(activo.codigo, `${nuevoMes}-01`);
+      setActivo((antes) => ({ ...antes, ...actualizado }));
+      setReprogramando(false);
+      setNuevoMes("");
+      toast.success("Mantenimiento reprogramado.");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "No pudimos reprogramarlo.");
+    } finally {
+      setGuardandoReprogramacion(false);
+    }
+  }
+
   useEffect(() => {
     setCargando(true);
     setError("");
@@ -85,14 +139,17 @@ function FichaActivo() {
       .finally(() => setCargando(false));
   }, [codigo]);
 
-  // Glosario para el cartelito del código/ubicación al pasar el mouse, y de
-  // paso los catálogos de tipo de equipo/servicio para el formulario de
-  // edición — no bloquean la carga de la ficha si fallan, son un extra.
+  // Glosario para el cartelito del código/ubicación al pasar el mouse, los
+  // catálogos de tipo de equipo/servicio para el formulario de edición, y
+  // los planes de mantenimiento (para el selector de "Asignar mantenimiento
+  // preventivo") — ninguno de los tres bloquea la carga de la ficha si
+  // falla, son un extra.
   useEffect(() => {
-    Promise.all([listarSiglas(), catalogosParaAlta()])
-      .then(([siglas, cat]) => {
+    Promise.all([listarSiglas(), catalogosParaAlta(), listarPlanes()])
+      .then(([siglas, cat, listaPlanes]) => {
         setDiccionarioSiglas(armarDiccionarioSiglas(siglas, cat.tipos));
         setCatalogos(cat);
+        setPlanes(listaPlanes);
       })
       .catch(() => {});
   }, []);
@@ -149,6 +206,12 @@ function FichaActivo() {
   // de una OT, así que para ellas el historial no es clickeable.
   const veOrdenes = rol === "tecnico" || rol === "junior" || rol === "coordinacion";
   const puedeEditar = PUEDE_EDITAR.includes(rol);
+  // Planes que se le pueden ofrecer a ESTE equipo: los específicos de su tipo
+  // más todos los genéricos (puede haber más de uno — ej. semestral y anual
+  // — así que no se adivina cuál, se le muestran todos y elige coordinación).
+  const planesDisponibles = planes.filter(
+    (p) => p.tipo_equipo_id === activo.tipo_equipo_id || p.es_generica
+  );
 
   function actualizarActivoEditado(nuevo) {
     // El backend devuelve la ficha "chica" (ActivoOut); la ficha completa
@@ -210,6 +273,86 @@ function FichaActivo() {
           </div>
         )}
 
+        {/* Equipo sin ningún mantenimiento asignado todavía (ej: los 6178
+        equipos migrados del hospital, que no trajeron ese dato). A
+        diferencia del aviso de arriba (que adivina el plan solo), acá
+        coordinación elige a mano cuál plan usar — puede haber más de un
+        plan genérico (uno semestral, uno anual) y el sistema no tiene forma
+        de adivinar cuál corresponde. */}
+        {rol === "coordinacion" && !activo.proxima_fecha_mp && (
+          <div style={{ ...cs.tarjeta, padding: "14px 18px", marginBottom: 12 }}>
+            {!asignandoPlan ? (
+              <>
+                <p style={{ margin: 0, fontSize: "0.88rem", color: color.texto }}>
+                  Este equipo todavía no tiene un mantenimiento preventivo asignado.
+                </p>
+                <button
+                  style={{ ...boton("primario"), marginTop: 12 }}
+                  onClick={() => setAsignandoPlan(true)}
+                >
+                  Asignar mantenimiento preventivo
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 12px", fontSize: "0.88rem", color: color.texto, fontWeight: 600 }}>
+                  Asignar mantenimiento preventivo
+                </p>
+                {planesDisponibles.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: "0.85rem", color: color.textoSuave }}>
+                    No hay ningún plan de mantenimiento cargado todavía (ni
+                    para este tipo de equipo, ni uno genérico). Cargá uno
+                    primero en Planes de mantenimiento.
+                  </p>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                      <Campo etiqueta="Plan de mantenimiento">
+                        <select
+                          style={cs.input}
+                          value={planElegido}
+                          onChange={(e) => setPlanElegido(e.target.value)}
+                        >
+                          <option value="">Elegí un plan</option>
+                          {planesDisponibles.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nombre} ({p.es_generica ? "genérico" : "de este tipo"} · cada {p.frecuencia_dias} días)
+                            </option>
+                          ))}
+                        </select>
+                      </Campo>
+                      <Campo etiqueta="Mes de la primera orden">
+                        <input
+                          type="month"
+                          style={cs.input}
+                          value={primerMes}
+                          onChange={(e) => setPrimerMes(e.target.value)}
+                        />
+                      </Campo>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                      <button
+                        style={boton("primario")}
+                        onClick={confirmarAsignarPlan}
+                        disabled={guardandoPlan || !planElegido || !primerMes}
+                      >
+                        {guardandoPlan ? "Asignando..." : "Asignar"}
+                      </button>
+                      <button
+                        style={boton("secundario")}
+                        onClick={() => setAsignandoPlan(false)}
+                        disabled={guardandoPlan}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {modoEdicion ? (
           <EditarFicha
             activo={activo}
@@ -238,7 +381,49 @@ function FichaActivo() {
                 : "—"}
             />
             <Dato etiqueta="N° de serie" valor={activo.numero_serie || "—"} />
-            <Dato etiqueta="Próximo preventivo" valor={textoProximoMP(activo.proxima_fecha_mp)} />
+            <div>
+              <div style={estilos.datoEtiqueta}>Próximo preventivo</div>
+              <div style={estilos.datoValor}>{textoProximoMP(activo.proxima_fecha_mp)}</div>
+              {/* Reprogramar: solo coordinación, y solo si ya hay una fecha
+              asignada (si no la hay todavía, corresponde "Asignar
+              mantenimiento preventivo" más arriba, no esto). */}
+              {rol === "coordinacion" && activo.proxima_fecha_mp && (
+                reprogramando ? (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+                    <input
+                      type="month"
+                      style={{ ...cs.input, padding: "4px 8px", fontSize: "0.82rem", width: "auto" }}
+                      value={nuevoMes}
+                      onChange={(e) => setNuevoMes(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      style={estilosEdicion.linkCambiar}
+                      onClick={confirmarReprogramar}
+                      disabled={guardandoReprogramacion || !nuevoMes}
+                    >
+                      {guardandoReprogramacion ? "Guardando..." : "Guardar"}
+                    </button>
+                    <button
+                      type="button"
+                      style={estilosEdicion.linkCambiar}
+                      onClick={() => { setReprogramando(false); setNuevoMes(""); }}
+                      disabled={guardandoReprogramacion}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    style={{ ...estilosEdicion.linkCambiar, marginTop: 4 }}
+                    onClick={() => setReprogramando(true)}
+                  >
+                    Reprogramar
+                  </button>
+                )
+              )}
+            </div>
             {/* Vida útil y Criticidad/riesgo PRIUX: información interna de
             Bioingeniería, enfermería no la ve. Vida útil se calcula acá
             mismo según la antigüedad (criterio del Hospital Alemán) y no

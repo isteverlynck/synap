@@ -1,6 +1,8 @@
 """Endpoints de activos (equipos médicos)."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 import re
 from sqlalchemy import or_
@@ -26,12 +28,14 @@ router = APIRouter(prefix="/activos", tags=["activos"])
 
 @router.get("", response_model=list[ActivoOut])
 def listar_activos(
+    response: Response,
     buscar: str | None = None,
     estado: str | None = None,
     tipo_equipo_id: str | None = None,
     sector_id: str | None = None,
     grupo_id: str | None = None,
     limit: int = 200,
+    offset: int = 0,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
@@ -41,6 +45,15 @@ def listar_activos(
       serie. Acepta el código con espacios (B TERA MOMU 001) o con guiones,
       porque las etiquetas del hospital usan espacios y la base guarda guiones.
     - estado / tipo_equipo_id / sector_id / grupo_id: filtros exactos.
+    - limit / offset: paginación. Con los datos reales del hospital (más de
+      6000 equipos) no entran todos en una sola página — el frontend pide de
+      a `limit` con "Cargar más" (ver Activos.jsx). Además del listado,
+      devolvemos el total de resultados (sin paginar) en el header
+      X-Total-Count, para que el frontend sepa si queda algo más por pedir.
+
+    Orden: de más nuevo a más viejo según fecha_instalacion (el equipo
+    instalado más recientemente primero). Los que no tienen fecha de
+    instalación cargada quedan al final (nullslast), no se pierden.
     """
     q = db.query(Activo)
 
@@ -67,7 +80,14 @@ def listar_activos(
     if grupo_id:
         q = q.filter(Activo.grupo_id == grupo_id)
 
-    return q.order_by(Activo.descripcion, Activo.codigo).limit(limit).all()
+    response.headers["X-Total-Count"] = str(q.count())
+
+    return (
+        q.order_by(Activo.fecha_instalacion.desc().nullslast(), Activo.codigo)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 @router.get("/filtros")
 def opciones_de_filtro(
@@ -363,7 +383,6 @@ def ver_criticidad(
 # ═══════════════════════════════════════════════════════════════════════════
 
 from urllib.parse import quote
-from fastapi import Response
 from ..models import OrdenTrabajo
 from ..informes import generar_informe_activo_pdf
 
@@ -457,6 +476,83 @@ def programar_segun_plan(
 
     meses = max(1, round(plan.frecuencia_dias / 30))
     activo.frecuencia_mp_meses = meses
+    db.commit()
+    db.refresh(activo)
+    return activo
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ASIGNAR UN PLAN A MANO — para equipos que todavía no tienen mantenimiento
+# ═══════════════════════════════════════════════════════════════════════════
+# Pedido de Cami (03/10): los equipos migrados (y cualquier otro que se haya
+# creado sin "crear_mantenimiento") no tienen forma de que se les asigne un
+# plan después. A diferencia de /programar-segun-plan (que ADIVINA: el plan
+# del tipo del equipo, o si no hay, el único genérico), acá coordinación
+# elige a mano CUÁL plan usar y en qué mes arranca — hace falta desde que
+# puede haber más de un plan genérico (ej: uno semestral y uno anual) y el
+# sistema no tiene forma de adivinar cuál le corresponde a cada equipo.
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.patch("/{codigo}/asignar-plan/{plan_id}", response_model=ActivoOut)
+def asignar_plan(
+    codigo: str,
+    plan_id: str,
+    proxima_fecha_mp: date,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Asignar a mano un plan de mantenimiento a un equipo.
+
+    proxima_fecha_mp es el MES en que debería abrirse la primera orden — se
+    normaliza al día 1, mismo criterio que al dar de alta un equipo con
+    mantenimiento (ver ActivoCreate en schemas.py).
+    """
+    activo = db.query(Activo).filter(Activo.codigo == codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    plan = db.query(PlantillaMP).filter(PlantillaMP.id == plan_id).first()
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan de mantenimiento no encontrado")
+
+    meses = max(1, round(plan.frecuencia_dias / 30))
+    activo.plantilla_mp_id = plan.id
+    activo.frecuencia_mp_meses = meses
+    activo.proxima_fecha_mp = proxima_fecha_mp.replace(day=1)
+    db.commit()
+    db.refresh(activo)
+    return activo
+
+
+@router.patch("/{codigo}/reprogramar-mp", response_model=ActivoOut)
+def reprogramar_mp(
+    codigo: str,
+    nueva_fecha: date,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Cambiar el MES del próximo mantenimiento preventivo de un equipo que
+    YA tiene uno asignado (pedido de Cami: poder reprogramarlo, no solo
+    asignarlo la primera vez).
+
+    No toca el plan ni la frecuencia, solo la fecha — para eso existe
+    asignar_plan, que es el que corresponde cuando el equipo todavía no
+    tiene ningún mantenimiento asignado (por eso se exige acá que
+    proxima_fecha_mp ya esté seteada; si no lo está, se usa ese otro
+    endpoint). nueva_fecha es el MES, se normaliza al día 1 igual que en
+    asignar_plan y en el alta.
+    """
+    activo = db.query(Activo).filter(Activo.codigo == codigo).first()
+    if activo is None:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado")
+
+    if activo.proxima_fecha_mp is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Este equipo todavía no tiene un mantenimiento asignado. Usá 'Asignar mantenimiento preventivo' primero.",
+        )
+
+    activo.proxima_fecha_mp = nueva_fecha.replace(day=1)
     db.commit()
     db.refresh(activo)
     return activo
