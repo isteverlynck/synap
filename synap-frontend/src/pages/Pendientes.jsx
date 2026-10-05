@@ -174,6 +174,10 @@ function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
   const [tecnicoId, setTecnicoId] = useState("");
   const [tecnicosDelGrupo, setTecnicosDelGrupo] = useState(tecnicos);
   const [prioridad, setPrioridad] = useState("");
+  // Clasificación de la falla: obligatoria y SIN valor por defecto, para que
+  // coordinación tenga que decidir a conciencia. Solo las técnicas cuentan en
+  // los KPIs de fallas del dashboard.
+  const [origenFalla, setOrigenFalla] = useState("");
   // Nivel de riesgo del equipo (PRIUX), si se pudo sugerir una prioridad a
   // partir de él — para mostrar de dónde salió el valor precargado.
   const [sugerencia, setSugerencia] = useState(null);
@@ -212,10 +216,15 @@ function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
       setError("Elegí a qué grupo le corresponde.");
       return;
     }
+    if (!origenFalla) {
+      setError("Indicá si la falla es técnica o de usuario.");
+      return;
+    }
     setEnviando(true);
     setError("");
     try {
       await aceptarSolicitud(s.id, {
+        origenFalla,
         asignarAId: tecnicoId || null,
         grupoId: requiereGrupo ? grupoId : null,
         prioridad: prioridad || null,
@@ -271,6 +280,17 @@ function PanelAceptar({ s, tecnicos, grupos, cerrar, alResolver }) {
         {(requiereGrupo ? tecnicosDelGrupo : tecnicos).map((t) => (
           <option key={t.id} value={t.id}>{t.nombre} {t.apellido}</option>
         ))}
+      </select>
+
+      <label style={cs.label}>Clasificación de la falla</label>
+      <p style={estilos.sugerencia}>
+        Las fallas de usuario (mal uso) no cuentan en los indicadores de fallas del dashboard.
+      </p>
+      <select style={{ ...cs.input, marginBottom: 12 }} value={origenFalla}
+              onChange={(e) => setOrigenFalla(e.target.value)}>
+        <option value="">Elegir clasificación...</option>
+        <option value="TECNICA">Técnica (falló el equipo)</option>
+        <option value="USUARIO">De usuario (mal uso)</option>
       </select>
 
       <label style={cs.label}>Prioridad</label>

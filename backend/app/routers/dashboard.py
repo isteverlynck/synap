@@ -29,6 +29,16 @@ notificación/apertura de la OT como fallback.
 
 Protegido con login. (Pendiente: restringir a rol jefatura con permisos por rol.)
 
+Fallas técnicas vs. de usuario: al aceptar una solicitud, coordinación
+clasifica la falla (OrdenTrabajo.origen_falla = TECNICA / USUARIO). Los KPIs
+que miden FALLAS del equipo (tiempo de inactividad, fallas, MTTR y MTBF: los
+KPIs 2 a 5) solo cuentan las técnicas — una falla por mal uso no habla de la confiabilidad del
+equipo. Las OT sin clasificar (migradas de Máximo, nacidas de un checklist, o
+anteriores a esta clasificación) cuentan como técnicas, para no dejar sin datos
+al historial. Los KPIs de CARGA de trabajo (OT por estado, carga por grupo, OT
+sin asignar, totales) siguen contando TODAS las OT: una falla de usuario igual
+da trabajo al equipo.
+
 Filtros (grupo_id / tipo_equipo_id): opcionales, se pueden combinar. Cuando se
 pasan, TODOS los KPIs se recalculan solo sobre los activos que matchean ese
 filtro (y lo que cuelga de ellos — sus OT, sus MP, sus solicitudes). Sin
@@ -92,6 +102,15 @@ def _estado_vida_util(anios: float) -> str:
     if anios < 15:
         return "MEDIANAMENTE_ACEPTABLE"
     return "OBSOLETO"
+
+
+def _es_falla_tecnica(orden) -> bool:
+    """True si la correctiva cuenta como falla del equipo en los KPIs.
+
+    Solo se excluyen las que coordinación marcó expresamente como falla de
+    USUARIO. Sin clasificar (None) = técnica, ver el docstring del módulo.
+    """
+    return (orden.origen_falla or "TECNICA") != "USUARIO"
 
 
 def _mtbf_de_fechas(fechas):
@@ -173,10 +192,15 @@ def obtener_kpis(
     cumplimiento = round(100 * mp_cumplidos_en_tiempo / mp_totales, 1) if mp_totales else None
 
     # ─── KPI 2: tiempo de inactividad (correctivas) ───
-    correctivas = filtrar(
-        db.query(OrdenTrabajo).filter(OrdenTrabajo.tipo == "CORRECTIVA").all(),
-        lambda o: o.activo_codigo,
-    )
+    # Solo las fallas TÉCNICAS: son las que miden la confiabilidad del equipo
+    # (ver el docstring del módulo). Esta lista alimenta los KPIs 2, 3, 4 y 5.
+    correctivas = [
+        o for o in filtrar(
+            db.query(OrdenTrabajo).filter(OrdenTrabajo.tipo == "CORRECTIVA").all(),
+            lambda o: o.activo_codigo,
+        )
+        if _es_falla_tecnica(o)
+    ]
     # Antes esto se ESTIMABA restando fechas (notificación → cierre). Eso no
     # reflejaba cuánto tiempo estuvo el equipo REALMENTE parado: una OT puede
     # tardar en tramitarse sin que el equipo esté fuera de servicio todo ese

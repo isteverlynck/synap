@@ -173,6 +173,16 @@ class OrdenTrabajo(Base):
         UUID(as_uuid=True), ForeignKey("ordenes_de_trabajo.id"), nullable=True
     )
 
+    # origen_falla: de quién fue la falla que originó esta correctiva —
+    # "TECNICA" (el equipo falló) o "USUARIO" (mal uso, error de manejo, etc.).
+    # Lo elige coordinación al aceptar la solicitud (y lo puede corregir
+    # mientras la OT no esté cerrada). Es lo que decide si la falla cuenta o
+    # no en los KPIs de fallas del dashboard: las de USUARIO no cuentan.
+    # Nula = "sin clasificar" (OT migradas de Máximo, correctivas que nacen de
+    # un checklist, y las que ya existían antes de esta columna): en los KPIs
+    # se tratan como TECNICA, para no dejar sin datos al historial anterior.
+    origen_falla: Mapped[str | None] = mapped_column(String, nullable=True)
+
     # ─── Tiempo real de parada del equipo ───
     # Antes el "tiempo fuera de servicio" se ESTIMABA restando fechas
     # (notificación/apertura → cierre). Para OT viejas de prueba (o cualquier

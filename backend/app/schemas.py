@@ -17,6 +17,24 @@ from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
+# ─── Origen de una falla: técnica (el equipo falló) o de usuario (mal uso) ───
+ORIGENES_FALLA = ("TECNICA", "USUARIO")
+
+
+def validar_origen_falla(v: str | None) -> str | None:
+    """Normaliza a mayúsculas y valida que sea TECNICA o USUARIO.
+
+    Acepta None (significa "no se indicó"); quien necesite que sea obligatorio
+    (aceptar una solicitud) lo exige aparte, en el router.
+    """
+    if v is None:
+        return None
+    normalizado = v.strip().upper()
+    if normalizado not in ORIGENES_FALLA:
+        raise ValueError("El origen de la falla tiene que ser TECNICA o USUARIO.")
+    return normalizado
+
+
 # ─── Número de identificación: siempre "u" + DNI (ej: DNI 44.324.107 → u44324107) ───
 NUMERO_IDENTIFICACION_REGEX = re.compile(r"^u\d{6,10}$")
 
@@ -406,6 +424,10 @@ class OrdenTrabajoOut(BaseModel):
     # el mantenimiento se encontró algo que no funciona), acá queda el id de
     # esa preventiva. Nulo en el resto de las OT.
     ot_origen_id: uuid.UUID | None = None
+    # De quién fue la falla (TECNICA / USUARIO) — solo las correctivas que
+    # pasaron por una solicitud la tienen; nula = sin clasificar (cuenta como
+    # técnica en los KPIs). Ver OrdenTrabajo.origen_falla en models.py.
+    origen_falla: str | None = None
     # Tiempo real de parada del equipo (medido con los botones "Iniciar
     # parada" / "Finalizar parada", no calculado a partir de otras fechas).
     # parada_iniciada_en tiene valor mientras hay una parada corriendo; el
@@ -466,6 +488,17 @@ class OrdenTrabajoUpdate(BaseModel):
     descripcion: str | None = None
     prioridad: str | None = None
     activo_codigo: str | None = None
+    # Solo coordinación puede cambiarlo (lo exige el router) y solo en
+    # correctivas. No acepta null: una vez clasificada, la falla no vuelve a
+    # quedar "sin clasificar".
+    origen_falla: str | None = None
+
+    @field_validator("origen_falla")
+    @classmethod
+    def _origen_falla_valido(cls, v):
+        if v is None:
+            raise ValueError("El origen de la falla tiene que ser TECNICA o USUARIO.")
+        return validar_origen_falla(v)
 
 
 class NotaOTOut(BaseModel):
@@ -1067,10 +1100,19 @@ class SolicitudAceptar(BaseModel):
       grupo no se puede deducir del activo. Para solicitudes de equipo se ignora
       (el grupo sale del equipo).
     - prioridad: opcional, para la OT que se genera.
+    - origen_falla: TECNICA o USUARIO. Es OBLIGATORIO para aceptar (lo exige
+      el router con un 400 claro): coordinación clasifica la falla al aceptar.
+      Solo las de origen TECNICA cuentan en los KPIs de fallas del dashboard.
     """
     asignar_a_id: uuid.UUID | None = None
     grupo_id: str | None = None
     prioridad: str | None = None
+    origen_falla: str | None = None
+
+    @field_validator("origen_falla")
+    @classmethod
+    def _origen_falla_valido(cls, v):
+        return validar_origen_falla(v)
 
 
 class SolicitudRechazar(BaseModel):

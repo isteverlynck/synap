@@ -28,10 +28,13 @@ export async function listarGrupos() {
   return res.data;
 }
 
-// Aceptar: genera la OT. Todo el cuerpo es opcional — sin asignar_a_id la OT
-// nace sin técnico y se asigna después.
-export async function aceptarSolicitud(id, { asignarAId, grupoId, prioridad } = {}) {
+// Aceptar: genera la OT. asignar_a_id, grupo_id y prioridad son opcionales
+// (sin asignar_a_id la OT nace sin técnico y se asigna después). En cambio
+// origenFalla es OBLIGATORIO: "TECNICA" o "USUARIO" (el backend rechaza el
+// pedido si falta). Solo las fallas técnicas cuentan en los KPIs del dashboard.
+export async function aceptarSolicitud(id, { asignarAId, grupoId, prioridad, origenFalla } = {}) {
   const cuerpo = {};
+  if (origenFalla) cuerpo.origen_falla = origenFalla;
   if (asignarAId) cuerpo.asignar_a_id = asignarAId;
   if (grupoId) cuerpo.grupo_id = grupoId;
   if (prioridad) cuerpo.prioridad = prioridad;

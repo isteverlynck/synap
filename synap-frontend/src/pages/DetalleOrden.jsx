@@ -213,6 +213,12 @@ function DetalleOrden() {
         {ot.parada_iniciada_en && (
           <span style={insignia("peligro")}>Equipo parado momentáneamente</span>
         )}
+        {/* Clasificación de la falla (solo correctivas que ya la tienen). */}
+        {ot.tipo === "CORRECTIVA" && ot.origen_falla && (
+          <span style={insignia(ot.origen_falla === "USUARIO" ? "advertencia" : "neutro")}>
+            {ot.origen_falla === "USUARIO" ? "Falla de usuario" : "Falla técnica"}
+          </span>
+        )}
       </div>
 
       {/* El equipo, clickeable: desde la OT se llega a su ficha completa. */}
@@ -471,7 +477,12 @@ function DetalleOrden() {
         <PanelDevolver ot={ot} setOt={setOt} setNotas={setNotas} cerrar={() => setAccion(null)} />
       )}
       {accion === "editar" && (
-        <PanelEditarOT ot={ot} setOt={setOt} cerrar={() => setAccion(null)} />
+        <PanelEditarOT
+          ot={ot}
+          setOt={setOt}
+          cerrar={() => setAccion(null)}
+          puedeClasificar={esCoordinacion && ot.tipo === "CORRECTIVA"}
+        />
       )}
 
       {/* ─── Checklist del mantenimiento: se completa ítem por ítem, y desde
@@ -839,9 +850,12 @@ function PanelAsignar({ ot, setOt, tecnicos, cerrar }) {
 // cartel de confirmación antes de guardar (pedido de Cami: un "seguro" para
 // no editar por error, igual que en la ficha del equipo).
 
-function PanelEditarOT({ ot, setOt, cerrar }) {
+function PanelEditarOT({ ot, setOt, cerrar, puedeClasificar }) {
   const [descripcion, setDescripcion] = useState(ot.descripcion || "");
   const [prioridad, setPrioridad] = useState(ot.prioridad || "");
+  // Clasificación de la falla (solo coordinación, solo correctivas). Una OT sin
+  // clasificar cuenta como técnica en los KPIs, así que arranca en "TECNICA".
+  const [origenFalla, setOrigenFalla] = useState(ot.origen_falla || "TECNICA");
     // El equipo arranca "ya elegido" con el que tiene la OT hoy; buscar uno
   // nuevo reemplaza esa elección (mismo patrón que el buscador de ubicación
   // de EditarFicha, en FichaActivo.jsx).
@@ -892,6 +906,9 @@ function PanelEditarOT({ ot, setOt, cerrar }) {
     if (prioridadNueva !== (ot.prioridad || null)) cambios.prioridad = prioridadNueva;
     if (equipoElegido?.codigo && equipoElegido.codigo !== ot.activo_codigo) {
       cambios.activo_codigo = equipoElegido.codigo;
+    }
+    if (puedeClasificar && origenFalla !== (ot.origen_falla || "TECNICA")) {
+      cambios.origen_falla = origenFalla;
     }
     return cambios;
   }
@@ -952,6 +969,23 @@ function PanelEditarOT({ ot, setOt, cerrar }) {
         <option value="ALTA">Alta</option>
         <option value="URGENTE">Urgente</option>
       </select>
+
+      {puedeClasificar && (
+        <>
+          <label style={cs.label}>Clasificación de la falla</label>
+          <p style={estilos.bitacoraAyuda}>
+            Las fallas de usuario (mal uso) no cuentan en los indicadores de fallas del dashboard.
+          </p>
+          <select
+            style={{ ...cs.input, marginBottom: 12 }}
+            value={origenFalla}
+            onChange={(e) => setOrigenFalla(e.target.value)}
+          >
+            <option value="TECNICA">Técnica (falló el equipo)</option>
+            <option value="USUARIO">De usuario (mal uso)</option>
+          </select>
+        </>
+      )}
 
       <label style={cs.label}>Equipo asociado</label>
       <p style={estilos.bitacoraAyuda}>
@@ -1265,4 +1299,4 @@ function textoPreventivo(fecha) {
   if (dias === 0) return "Preventivo programado para hoy";
   if (dias < 0) return `Preventivo vencido hace ${Math.abs(dias)} días`;
   return `Próximo preventivo en ${dias} días`;
-}  
+}

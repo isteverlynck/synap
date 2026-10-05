@@ -244,6 +244,22 @@ def editar_orden(
 
     datos = payload.model_dump(exclude_unset=True)
 
+    # Clasificación de la falla (técnica / de usuario): decide si la falla
+    # cuenta en los KPIs del dashboard, así que solo la corrige coordinación
+    # (un técnico podría, sin querer o queriendo, sacar sus propias fallas de
+    # las estadísticas) y solo tiene sentido en correctivas.
+    if "origen_falla" in datos:
+        if current_user.rol != "coordinacion":
+            raise HTTPException(
+                status_code=403,
+                detail="Solo coordinación puede cambiar la clasificación de la falla.",
+            )
+        if orden.tipo != "CORRECTIVA":
+            raise HTTPException(
+                status_code=400,
+                detail="Solo las órdenes correctivas tienen clasificación de falla.",
+            )
+
     # Reasignar el equipo: recalculamos el grupo a partir del nuevo activo
     # (mismo criterio que al crear una OT) y, si el técnico ya asignado no
     # pertenece a ese grupo nuevo, lo desasignamos — mismo invariante que ya

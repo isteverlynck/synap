@@ -217,6 +217,8 @@ def aceptar_solicitud(
         asigna después con PATCH /ordenes-trabajo/{id}/asignar).
       - Para solicitudes de equipo, el grupo sale del equipo. Para las de 'cosa',
         el coordinador manda grupo_id.
+      - origen_falla (TECNICA / USUARIO) es obligatorio: queda guardado en la
+        OT y decide si la falla cuenta en los KPIs del dashboard.
     """
     sol = db.query(SolicitudServicio).filter(
         SolicitudServicio.id == solicitud_id
@@ -225,6 +227,15 @@ def aceptar_solicitud(
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
     if sol.estado != "PENDIENTE":
         raise HTTPException(status_code=400, detail=f"La solicitud ya está {sol.estado}.")
+
+    # Clasificar la falla es obligatorio al aceptar: de eso depende si cuenta
+    # o no en los KPIs de fallas del dashboard (solo cuentan las TECNICA).
+    # El valor ya viene validado y normalizado por SolicitudAceptar.
+    if payload.origen_falla is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Indicá si la falla es técnica o de usuario.",
+        )
 
     mis_grupos = grupos_del_coordinador(db, current_user)
 
@@ -280,6 +291,7 @@ def aceptar_solicitud(
         tipo="CORRECTIVA",
         estado="ABIERTA",
         prioridad=(payload.prioridad.upper() if payload.prioridad else None),
+        origen_falla=payload.origen_falla,
         descripcion=f"{sol.titulo}: {sol.descripcion_problema}",
         tecnico_id=tecnico_id,
         grupo_id=grupo_destino,
