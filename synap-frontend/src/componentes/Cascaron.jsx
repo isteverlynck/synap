@@ -33,7 +33,7 @@ const MENUS = {
     { id: "ot", texto: "Mis órdenes", ruta: "/ordenes", icono: "orden", listo: true },
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
-    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: true },
+    { id: "insumos", texto: "Accesorios", ruta: "/insumos", icono: "caja", listo: true },
   ],
   coordinacion: [
     { id: "escanear", texto: "Escanear", ruta: "/escanear", icono: "qr", listo: true },
@@ -42,7 +42,7 @@ const MENUS = {
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
-    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: true },
+    { id: "insumos", texto: "Accesorios", ruta: "/insumos", icono: "caja", listo: true },
     // Tipos de equipo y servicios/áreas: antes solo se cargaban a mano en la
     // base. Coordinación es quien los da de alta (ej: entra un tipo de
     // equipo nuevo), por eso vive en su menú y en el de jefatura.
@@ -60,7 +60,7 @@ const MENUS = {
     { id: "activos", texto: "Equipos", ruta: "/activos", icono: "equipo", listo: true },
     { id: "mp", texto: "Mantenimientos", ruta: "/mantenimientos", icono: "calendario", listo: true },
     { id: "calendario-mp", texto: "Calendario MP", ruta: "/calendario-mp", icono: "calendario-dias", listo: true },
-    { id: "insumos", texto: "Insumos", ruta: "/insumos", icono: "caja", listo: true },
+    { id: "insumos", texto: "Accesorios", ruta: "/insumos", icono: "caja", listo: true },
     { id: "catalogos", texto: "Catálogos", ruta: "/catalogos", icono: "catalogos", listo: true },
   ],
 };
@@ -68,12 +68,14 @@ const MENUS = {
 const DESCARGAS = [
   { texto: "Descargar CSV de activos", ruta: "/exportar/activos", archivo: "equipos",
     roles: ["tecnico", "coordinacion", "jefatura"] },
-  // "Descargar CSV de órdenes" ya NO está en este menú general: los tres
-  // roles que pueden ver OT (técnico, coordinación y, desde el 03/10,
-  // jefatura) tienen su propio botón "Descargar CSV" en la pantalla de
-  // Órdenes, que respeta los filtros puestos ahí — más útil que bajar
-  // siempre el historial completo sin filtrar.
-  { texto: "Descargar CSV de insumos", ruta: "/exportar/insumos", archivo: "insumos",
+  // Este menú general tiene TODAS las descargas (completas, sin filtrar).
+  // Además, las pantallas de Equipos y de Órdenes tienen su propio botón
+  // "Descargar CSV" que respeta los filtros puestos ahí.
+  { texto: "Descargar CSV de órdenes", ruta: "/exportar/ordenes", archivo: "ordenes",
+    roles: ["tecnico", "coordinacion", "jefatura"] },
+  // La pantalla se llama "Accesorios" (antes "Insumos"); la ruta y la tabla
+  // del backend siguen llamándose "insumos".
+  { texto: "Descargar CSV de accesorios", ruta: "/exportar/insumos", archivo: "accesorios",
     roles: ["tecnico", "coordinacion", "jefatura"] },
   { texto: "Descargar CSV de mantenimientos", ruta: "/exportar/mantenimientos", archivo: "mantenimientos",
     roles: ["tecnico", "coordinacion", "jefatura"] },

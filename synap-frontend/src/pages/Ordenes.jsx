@@ -17,6 +17,17 @@
 // etiqueta violeta + un borde de color para que se distinga de un vistazo,
 // incluso mirando "Todas" mezcladas.
 //
+// Fecha de notificación: dos casilleros "Desde" y "Hasta" (días de Argentina,
+// los dos incluidos) que recortan la lista y también el CSV. Se piden al
+// backend, no se filtran acá, para que valgan sobre TODAS las órdenes y no
+// solo sobre las que ya se trajeron. Las OT sin fecha de notificación
+// (típicamente las preventivas) cuentan con su fecha de apertura.
+//
+// Formato: igual que Activos y Accesorios — el buscador arriba con un botón
+// "Filtros" que despliega (y esconde) los filtros de estado, tipo y fecha, y
+// las flechas de página ("Anterior / Siguiente") arriba de la lista. La
+// paginación es de a 50 sobre lo que ya se trajo del backend.
+//
 // Buscador: filtra, sobre lo que ya se trajo del backend, por número de OT o
 // por código de equipo. El número de OT es flexible en el formato — "037",
 // "37", "OT 37", "OT-037", etc. todos encuentran la OT-0037 — porque en el
@@ -31,8 +42,10 @@ import { obtenerPerfil } from "../api/auth";
 import { descargarCSV } from "../api/exportar";
 import { agruparPorFecha, formatearFechaOT } from "../utiles/fechas";
 import Encabezado from "../componentes/Encabezado";
+import BarraFiltros, { GrupoFiltro } from "../componentes/BarraFiltros";
+import Paginador from "../componentes/Paginador";
 import { color, cs, insignia, boton } from "../tema";
-import { AlertTriangle, CalendarClock, Download, Search, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Download } from "lucide-react";
 
 // ¿La OT coincide con lo que se escribió en el buscador? Dos formas de
 // coincidir, cualquiera alcanza:
@@ -77,6 +90,13 @@ const FILTROS_TIPO = [
   { id: "CORRECTIVA", texto: "Correctivas" },
 ];
 
+// Cuántas órdenes se muestran por página.
+const POR_PAGINA = 50;
+
+// Cuántas se le piden al backend como máximo en cada carga (el técnico, con
+// "mis órdenes", ya recibe todas). Las páginas se arman acá sobre esa lista.
+const LIMITE_CARGA = 1000;
+
 function Ordenes() {
   const navegar = useNavigate();
   const [perfil, setPerfil] = useState(null);
@@ -85,9 +105,23 @@ function Ordenes() {
   const [filtro, setFiltro] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [notifDesde, setNotifDesde] = useState("");   // "AAAA-MM-DD" o ""
+  const [notifHasta, setNotifHasta] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [descargando, setDescargando] = useState(false);
+
+  // Página actual (0 = la primera), guardada junto con la búsqueda y los
+  // filtros a los que corresponde: si cambia cualquiera de ellos, vuelve sola
+  // a la primera.
+  const clavePagina = JSON.stringify([busqueda, filtro, tipoFiltro, notifDesde, notifHasta]);
+  const [paginaGuardada, setPaginaGuardada] = useState({ clave: clavePagina, pagina: 0 });
+  // Si cambió la búsqueda o algún filtro, la página guardada ya no corresponde:
+  // se vuelve a la primera (así, al limpiar los filtros, tampoco reaparece una
+  // página vieja).
+  if (paginaGuardada.clave !== clavePagina) {
+    setPaginaGuardada({ clave: clavePagina, pagina: 0 });
+  }
 
   useEffect(() => {
     obtenerPerfil().then(setPerfil).catch(() => setPerfil(null));
@@ -97,30 +131,51 @@ function Ordenes() {
   useEffect(() => {
     if (!perfil) return;
     cargar();
-  }, [perfil, filtro, tipoFiltro]);
+  }, [perfil, filtro, tipoFiltro, notifDesde, notifHasta]);
+
+  // "Desde" posterior a "Hasta": no tiene sentido, no se pide nada hasta que
+  // se corrija (las fechas ISO se pueden comparar como texto).
+  const rangoInvalido = !!notifDesde && !!notifHasta && notifDesde > notifHasta;
+  const hayFiltroFecha = !!notifDesde || !!notifHasta;
+  // Cuántos filtros hay puestos (las dos fechas cuentan como uno solo).
+  const filtrosActivos = (filtro ? 1 : 0) + (tipoFiltro ? 1 : 0) + (hayFiltroFecha ? 1 : 0);
+
+  function limpiarFiltros() {
+    setFiltro("");
+    setTipoFiltro("");
+    setNotifDesde("");
+    setNotifHasta("");
+  }
 
   const rol = perfil?.rol === "junior" ? "tecnico" : perfil?.rol;
   const esCoordinacion = rol === "coordinacion";
   const esTecnico = rol === "tecnico";
 
   async function cargar() {
+    if (rangoInvalido) {
+      setOrdenes([]);
+      setCargando(false);
+      setError("La fecha \"Desde\" no puede ser posterior a la fecha \"Hasta\".");
+      return;
+    }
     setCargando(true);
     setError("");
+    const fechas = { notificadaDesde: notifDesde || undefined, notificadaHasta: notifHasta || undefined };
     try {
-      // limite más alto que el default (50): el buscador filtra sobre esta
-      // misma lista sin volver a pedirle nada al backend, así que conviene
-      // traer de entrada un margen mayor (misOrdenes, la del técnico, ya
-      // trae todas sin límite).
+      // limite más alto que el default (50): el buscador y las páginas
+      // trabajan sobre esta misma lista sin volver a pedirle nada al backend,
+      // así que conviene traer de entrada un margen mayor (misOrdenes, la del
+      // técnico, ya trae todas sin límite).
       let lista;
       if (rol === "tecnico") {
-        lista = await misOrdenes({ estado: filtro || undefined, tipo: tipoFiltro || undefined });
+        lista = await misOrdenes({ estado: filtro || undefined, tipo: tipoFiltro || undefined, ...fechas });
       } else if (esCoordinacion) {
         // "sin_asignar" se pide como recorte, no como estado.
         lista = filtro === "SIN_ASIGNAR"
-          ? await listarOrdenes({ misGrupos: true, sinAsignar: true, tipo: tipoFiltro || "CORRECTIVA", limite: 200 })
-          : await listarOrdenes({ misGrupos: true, estado: filtro || undefined, tipo: tipoFiltro || undefined, limite: 200 });
+          ? await listarOrdenes({ misGrupos: true, sinAsignar: true, tipo: tipoFiltro || "CORRECTIVA", limite: LIMITE_CARGA, ...fechas })
+          : await listarOrdenes({ misGrupos: true, estado: filtro || undefined, tipo: tipoFiltro || undefined, limite: LIMITE_CARGA, ...fechas });
       } else {
-        lista = await listarOrdenes({ estado: filtro || undefined, tipo: tipoFiltro || undefined, limite: 200 });
+        lista = await listarOrdenes({ estado: filtro || undefined, tipo: tipoFiltro || undefined, limite: LIMITE_CARGA, ...fechas });
       }
       setOrdenes(lista);
     } catch {
@@ -131,11 +186,16 @@ function Ordenes() {
   }
 
   // Descarga el CSV de OT respetando los mismos filtros que están puestos
-  // en esta pantalla (estado, tipo, y "sin asignar" para coordinación) — si
+  // en esta pantalla (estado, tipo, fecha de notificación, y "sin asignar"
+  // para coordinación) — si
   // no hay ningún filtro activo ("Todas"), descarga todo lo que este rol
   // puede ver, igual que antes.
   async function descargarOrdenes() {
     if (descargando) return;
+    if (rangoInvalido) {
+      toast.error("Corregí las fechas: \"Desde\" no puede ser posterior a \"Hasta\".");
+      return;
+    }
     setDescargando(true);
     try {
       const params = new URLSearchParams();
@@ -146,6 +206,8 @@ function Ordenes() {
         if (filtro) params.set("estado", filtro);
         if (tipoFiltro) params.set("tipo", tipoFiltro);
       }
+      if (notifDesde) params.set("notificada_desde", notifDesde);
+      if (notifHasta) params.set("notificada_hasta", notifHasta);
       const query = params.toString();
       await descargarCSV(query ? `/exportar/ordenes?${query}` : "/exportar/ordenes", "ordenes");
     } catch {
@@ -174,13 +236,24 @@ function Ordenes() {
     : FILTROS_BASE;
 
   const ordenesFiltradas = busqueda ? ordenes.filter((ot) => coincideBusqueda(ot, busqueda)) : ordenes;
-  const grupos = agruparPorFecha(ordenesFiltradas, (o) => o.fecha_apertura, formatearFechaOT);
+
+  const totalPaginas = Math.max(1, Math.ceil(ordenesFiltradas.length / POR_PAGINA));
+  const pagina = Math.min(paginaGuardada.clave === clavePagina ? paginaGuardada.pagina : 0, totalPaginas - 1);
+  const primera = pagina * POR_PAGINA;
+  const ordenesPagina = ordenesFiltradas.slice(primera, primera + POR_PAGINA);
+  const grupos = agruparPorFecha(ordenesPagina, (o) => o.fecha_apertura, formatearFechaOT);
+
+  const subtitulo = cargando
+    ? "Cargando..."
+    : totalPaginas > 1
+      ? `Mostrando ${primera + 1}–${primera + ordenesPagina.length} de ${ordenesFiltradas.length}`
+      : `${ordenesFiltradas.length} en esta vista`;
 
   return (
     <>
       <Encabezado
         titulo={rol === "tecnico" ? "Mis órdenes de trabajo" : "Órdenes de trabajo"}
-        subtitulo={cargando ? "Cargando..." : `${ordenesFiltradas.length} en esta vista`}
+        subtitulo={subtitulo}
       >
         <button style={{ ...boton("secundario"), gap: 6 }} onClick={descargarOrdenes} disabled={descargando}>
           <Download size={15} strokeWidth={2} aria-hidden="true" />
@@ -188,64 +261,92 @@ function Ordenes() {
         </button>
       </Encabezado>
 
-      {/* ─── Buscador: por número de OT o código de equipo ─── */}
-      <div style={estilos.campoBusqueda}>
-        <Search size={17} strokeWidth={1.9} color={color.textoDebil} aria-hidden="true" />
-        <input
-          style={estilos.inputBusqueda}
-          placeholder="Buscar por número de OT (ej: 37, OT-037) o código de equipo"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-        {busqueda && (
-          <button style={estilos.limpiarBusqueda} onClick={() => setBusqueda("")} title="Limpiar">
-            <X size={15} strokeWidth={2.2} aria-hidden="true" />
-          </button>
-        )}
-      </div>
+      {/* ─── Buscador (por número de OT o código de equipo) + filtros plegables ─── */}
+      <BarraFiltros
+        placeholder="Buscar por número de OT (ej: 37, OT-037) o código de equipo"
+        texto={busqueda}
+        onTexto={setBusqueda}
+        filtrosActivos={filtrosActivos}
+        onLimpiar={limpiarFiltros}
+      >
+        <GrupoFiltro etiqueta="Estado">
+          {filtros.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFiltro(f.id)}
+              style={{
+                ...estilos.filtro,
+                ...(filtro === f.id ? estilos.filtroActivo : {}),
+              }}
+            >
+              {f.texto}
+            </button>
+          ))}
+        </GrupoFiltro>
 
-      <div style={estilos.filtros}>
-        {filtros.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFiltro(f.id)}
-            style={{
-              ...estilos.filtro,
-              ...(filtro === f.id ? estilos.filtroActivo : {}),
-            }}
-          >
-            {f.texto}
-          </button>
-        ))}
-      </div>
+        {/* Recorte por tipo, aparte del de estado: preventivas vs correctivas
+        son dos tipos de trabajo distintos (rutina programada vs falla puntual). */}
+        <GrupoFiltro etiqueta="Tipo">
+          {FILTROS_TIPO.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setTipoFiltro(f.id)}
+              style={{
+                ...estilos.filtroTipo,
+                ...(tipoFiltro === f.id ? estilos.filtroTipoActivo : {}),
+              }}
+            >
+              {f.texto}
+            </button>
+          ))}
+        </GrupoFiltro>
 
-      {/* Recorte por tipo, aparte del de estado: preventivas vs correctivas
-      son dos tipos de trabajo distintos (rutina programada vs falla puntual). */}
-      <div style={estilos.filtros}>
-        {FILTROS_TIPO.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setTipoFiltro(f.id)}
-            style={{
-              ...estilos.filtroTipo,
-              ...(tipoFiltro === f.id ? estilos.filtroTipoActivo : {}),
-            }}
-          >
-            {f.texto}
-          </button>
-        ))}
-      </div>
+        {/* Fecha de notificación: rango de días, los dos extremos incluidos. */}
+        <GrupoFiltro etiqueta="Notificada">
+          <label style={estilos.campoFecha}>
+            Desde
+            <input
+              type="date"
+              style={estilos.inputFecha}
+              value={notifDesde}
+              max={notifHasta || undefined}
+              onChange={(e) => setNotifDesde(e.target.value)}
+            />
+          </label>
+          <label style={estilos.campoFecha}>
+            Hasta
+            <input
+              type="date"
+              style={estilos.inputFecha}
+              value={notifHasta}
+              min={notifDesde || undefined}
+              onChange={(e) => setNotifHasta(e.target.value)}
+            />
+          </label>
+        </GrupoFiltro>
+      </BarraFiltros>
+
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
       {!cargando && ordenesFiltradas.length === 0 && !error && (
         <p style={estilos.mensaje}>
           {busqueda
             ? "No encontramos ninguna OT con esa búsqueda."
+            : hayFiltroFecha
+            ? "No hay órdenes notificadas en ese rango de fechas."
             : filtro === "SIN_ASIGNAR"
             ? "No hay órdenes esperando técnico."
             : "No hay órdenes en esta vista."}
         </p>
       )}
+
+      {/* ─── Páginas: flechas arriba de la lista ─── */}
+      <Paginador
+        pagina={pagina}
+        totalPaginas={totalPaginas}
+        onCambiar={(n) => setPaginaGuardada({ clave: clavePagina, pagina: n })}
+        deshabilitado={cargando}
+      />
 
       {grupos.map((grupo) => (
         <div key={grupo.fecha} style={{ marginBottom: 20 }}>
@@ -287,6 +388,14 @@ function Ordenes() {
                     {ot.activo_descripcion || "Equipo sin descripción"}
                     {ot.activo_ubicacion ? ` · ${ot.activo_ubicacion}` : ""}
                   </p>
+                  {/* Con el filtro de fechas puesto, mostramos la fecha por la
+                  que se filtró: la lista sigue agrupada por fecha de apertura
+                  y, sin esto, no se entendería por qué entró cada orden. */}
+                  {hayFiltroFecha && (
+                    <p style={estilos.asignacion}>
+                      Notificada: {formatearFechaOT(ot.fecha_notificacion || ot.fecha_apertura)}
+                    </p>
+                  )}
 
                   {esCoordinacion && (
                     <p style={ot.tecnico_id || ot.tipo === "PREVENTIVA" ? estilos.asignacion : estilos.sinAsignar}>
@@ -294,7 +403,7 @@ function Ordenes() {
                         ? nombreTecnico(ot)
                         : ot.tipo === "PREVENTIVA"
                           ? `Asignada al grupo ${ot.grupo_id || "sin definir"}`
-                          : "Sin técnico asignado"}                  
+                          : "Sin técnico asignado"}
                     </p>
                   )}
 
@@ -326,7 +435,7 @@ function Ordenes() {
                     </span>
                   )}
                 </div>
-                
+
               </div>
             ))}
           </div>
@@ -358,29 +467,12 @@ function textoEstado(estado) {
 
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "18px 0" },
-  // Mismo aspecto que el buscador de la lista de Equipos, para que las dos
-  // pantallas se sientan consistentes.
-  campoBusqueda: {
-    ...cs.input,
-    display: "flex", alignItems: "center", gap: 9,
-    padding: "0 12px", marginBottom: 14,
-  },
-  inputBusqueda: {
-    flex: 1, border: "none", outline: "none", background: "transparent",
-    fontFamily: "inherit", fontSize: "0.92rem", color: color.texto,
-    padding: "11px 0", minWidth: 0,
-  },
-  limpiarBusqueda: {
-    background: "transparent", border: "none", cursor: "pointer",
-    color: color.textoDebil, display: "flex", padding: 2,
-  },
-  filtros: { display: "flex", gap: 7, marginBottom: 18, flexWrap: "wrap" },
   filtro: {
-    padding: "6px 14px", borderRadius: 999,
+    padding: "4px 11px", borderRadius: 999,
     // Separadas y no el atajo `border`: mezclarlo con el `borderColor` de
     // filtroActivo hace que al desactivarse quede el borde oscuro.
     borderWidth: 1, borderStyle: "solid", borderColor: color.borde,
-    background: color.tarjeta, color: color.textoSuave, fontSize: "0.83rem",
+    background: color.tarjeta, color: color.textoSuave, fontSize: "0.78rem",
     cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
   },
   filtroActivo: {
@@ -388,14 +480,19 @@ const estilos = {
     borderColor: color.primarioClaro,
   },
   filtroTipo: {
-    padding: "6px 14px", borderRadius: 999,
+    padding: "4px 11px", borderRadius: 999,
     borderWidth: 1, borderStyle: "solid", borderColor: color.borde,
-    background: color.tarjeta, color: color.textoSuave, fontSize: "0.83rem",
+    background: color.tarjeta, color: color.textoSuave, fontSize: "0.78rem",
     cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
   },
   filtroTipoActivo: {
     background: "#EFE9FA", color: "#5A3E9E", borderColor: "#EFE9FA",
   },
+  campoFecha: {
+    display: "flex", alignItems: "center", gap: 5,
+    fontSize: "0.78rem", color: color.textoSuave,
+  },
+  inputFecha: { ...cs.input, width: "auto", padding: "3px 8px", fontSize: "0.78rem" },
   fecha: {
     margin: "0 0 8px", fontSize: "0.72rem", color: color.textoDebil,
     textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600,

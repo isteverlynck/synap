@@ -3,13 +3,19 @@
 // La búsqueda y los filtros los resuelve el BACKEND, no el navegador: filtrar
 // una lista que ya está en pantalla solo alcanzaría si estuvieran todos los
 // equipos cargados. Con los datos reales del hospital (más de 6000 equipos)
-// eso tampoco entra de una: el backend manda de a 200 (limit/offset) y acá
-// se van agregando de a tanda con el botón "Cargar más", hasta llegar al
-// total real (que viene en el header X-Total-Count de cada respuesta).
+// eso tampoco entra de una: se muestra de a páginas de 50 equipos (limit/offset
+// al backend), con las flechas "Anterior / Siguiente" arriba de la lista. El
+// total real viene en el header X-Total-Count de cada respuesta.
+//
+// "Descargar CSV" baja la tabla con los mismos filtros que están puestos.
+//
+// El buscador + "Filtros" plegable y las flechas de página son componentes
+// compartidos con Órdenes y Accesorios (BarraFiltros y Paginador), para que
+// todas las listas se vean y se usen igual.
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, SlidersHorizontal, X, Plus, Download } from "lucide-react";
+import { Plus, Download } from "lucide-react";
 import { listarActivosConTotal, opcionesDeFiltro } from "../api/activos";
 import { listarSiglas, listarUbicaciones } from "../api/catalogos";
 import { rolActual } from "../api/auth";
@@ -17,6 +23,8 @@ import { descargarCSV } from "../api/exportar";
 import { toast } from "sonner";
 import Encabezado from "../componentes/Encabezado";
 import CodigoConGlosario from "../componentes/CodigoConGlosario";
+import BarraFiltros, { CampoFiltro } from "../componentes/BarraFiltros";
+import Paginador from "../componentes/Paginador";
 import { armarDiccionarioSiglas } from "../utiles/codigos";
 import { color, cs, boton, insignia, tonoEstadoActivo } from "../tema";
 
@@ -24,25 +32,47 @@ import { color, cs, boton, insignia, tonoEstadoActivo } from "../tema";
 // es solo consulta (reportan un problema desde la ficha, no cargan equipos).
 const PUEDE_CREAR = ["coordinacion", "tecnico", "junior", "jefatura"];
 
+// Quién puede bajar el CSV de equipos (el backend lo exige igual).
+const PUEDE_DESCARGAR = ["coordinacion", "tecnico", "junior", "jefatura"];
+
+// Cuántos equipos se muestran por página.
+const POR_PAGINA = 50;
+
 function Activos() {
   const navegar = useNavigate();
   const puedeCrear = PUEDE_CREAR.includes(rolActual());
-  const PUEDE_DESCARGAR = ["coordinacion", "tecnico", "jefatura"];
+  const puedeDescargar = PUEDE_DESCARGAR.includes(rolActual());
   const [activos, setActivos] = useState([]);
   const [total, setTotal] = useState(0);
   const [opciones, setOpciones] = useState({ tipos: [], sectores: [], grupos: [], estados: [] });
   const [siglas, setSiglas] = useState([]);
   const [ubicacionesCatalogo, setUbicacionesCatalogo] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [cargandoMas, setCargandoMas] = useState(false);
+  const [descargando, setDescargando] = useState(false);
   const [error, setError] = useState("");
-  const [verFiltros, setVerFiltros] = useState(false);
 
   // Lo que escribe la persona y lo que efectivamente se busca son dos cosas
   // distintas: sin eso, cada tecla dispararía una llamada al backend.
   const [textoEscrito, setTextoEscrito] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [filtros, setFiltros] = useState({ estado: "", tipoEquipoId: "", sectorId: "", grupoId: "" });
+
+  // Página actual (0 = la primera). Se guarda junto con la búsqueda/filtros a
+  // los que corresponde: si cambia cualquiera de ellos, la página vuelve sola
+  // a la primera, sin pedir dos veces al servidor.
+  const claveConsulta = JSON.stringify([busqueda, filtros]);
+  const [paginaGuardada, setPaginaGuardada] = useState({ clave: claveConsulta, pagina: 0 });
+  // Si cambió la búsqueda o algún filtro, la página guardada ya no corresponde:
+  // se vuelve a la primera (así, al limpiar los filtros, tampoco reaparece una
+  // página vieja).
+  if (paginaGuardada.clave !== claveConsulta) {
+    setPaginaGuardada({ clave: claveConsulta, pagina: 0 });
+  }
+  const pagina = paginaGuardada.clave === claveConsulta ? paginaGuardada.pagina : 0;
+
+  function irAPagina(n) {
+    setPaginaGuardada({ clave: claveConsulta, pagina: n });
+  }
 
   useEffect(() => {
     opcionesDeFiltro().then(setOpciones).catch(() => {});
@@ -69,35 +99,51 @@ function Activos() {
     return () => clearTimeout(t);
   }, [textoEscrito]);
 
-  // Cada vez que cambia la búsqueda o los filtros, se vuelve a pedir desde
-  // cero (offset 0): es una lista nueva, no una continuación de la anterior.
+  // Cada vez que cambia la búsqueda, los filtros o la página, se pide al
+  // backend esa página. Si la persona cambia de página o de filtro antes de
+  // que llegue la respuesta anterior, esa respuesta vieja se descarta.
   useEffect(() => {
+    let vigente = true;
     setCargando(true);
     setError("");
-    listarActivosConTotal({ buscar: busqueda, ...filtros })
+    listarActivosConTotal({ buscar: busqueda, ...filtros, limit: POR_PAGINA, offset: pagina * POR_PAGINA })
       .then(({ items, total: totalNuevo }) => {
+        if (!vigente) return;
         setActivos(items);
         setTotal(totalNuevo);
+        // Si la página pedida quedó vacía (ej.: se achicó el total), a la primera.
+        if (items.length === 0 && totalNuevo > 0 && pagina > 0) {
+          setPaginaGuardada({ clave: claveConsulta, pagina: 0 });
+        }
       })
-      .catch(() => setError("No se pudieron cargar los activos."))
-      .finally(() => setCargando(false));
-  }, [busqueda, filtros]);
-
-  // "Cargar más": pide la próxima tanda a partir de lo que ya hay en pantalla
-  // y la agrega al final, sin pisar lo que ya se cargó.
-  function cargarMas() {
-    setCargandoMas(true);
-    listarActivosConTotal({ buscar: busqueda, ...filtros, offset: activos.length })
-      .then(({ items, total: totalNuevo }) => {
-        setActivos((previos) => [...previos, ...items]);
-        setTotal(totalNuevo);
-      })
-      .catch(() => toast.error("No se pudo cargar más equipos. Probá de nuevo."))
-      .finally(() => setCargandoMas(false));
-  }
+      .catch(() => { if (vigente) setError("No se pudieron cargar los activos."); })
+      .finally(() => { if (vigente) setCargando(false); });
+    return () => { vigente = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busqueda, filtros, pagina]);
 
   const filtrosActivos = Object.values(filtros).filter(Boolean).length;
-  const quedanMas = !cargando && activos.length < total;
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+  const primerEquipo = pagina * POR_PAGINA + 1;
+
+  // Baja el CSV con la búsqueda y los filtros que están puestos ahora.
+  async function descargar() {
+    setDescargando(true);
+    try {
+      const params = new URLSearchParams();
+      if (busqueda) params.set("buscar", busqueda);
+      if (filtros.estado) params.set("estado", filtros.estado);
+      if (filtros.tipoEquipoId) params.set("tipo_equipo_id", filtros.tipoEquipoId);
+      if (filtros.sectorId) params.set("sector_id", filtros.sectorId);
+      if (filtros.grupoId) params.set("grupo_id", filtros.grupoId);
+      const consulta = params.toString();
+      await descargarCSV(`/exportar/activos${consulta ? `?${consulta}` : ""}`, "equipos");
+    } catch {
+      toast.error("No se pudo generar el CSV. Probá de nuevo.");
+    } finally {
+      setDescargando(false);
+    }
+  }
 
   function limpiarFiltros() {
     setFiltros({ estado: "", tipoEquipoId: "", sectorId: "", grupoId: "" });
@@ -107,7 +153,7 @@ function Activos() {
     <>
       <Encabezado
         titulo="Activos"
-        subtitulo={cargando ? "Buscando..." : textoDelSubtitulo(activos.length, total, busqueda, filtrosActivos)}
+        subtitulo={cargando ? "Buscando..." : textoDelSubtitulo(activos.length, total, busqueda, filtrosActivos, primerEquipo)}
       >
         {puedeCrear && (
           <button style={{ ...boton("primario"), gap: 7 }} onClick={() => navegar("/activos/nuevo")}>
@@ -118,73 +164,53 @@ function Activos() {
         <button style={boton("secundario")} onClick={() => navegar("/escanear")}>
           Escanear equipo (QR)
         </button>
+        {puedeDescargar && (
+          <button
+            style={{ ...boton("secundario"), gap: 7 }}
+            onClick={descargar}
+            disabled={descargando}
+            title="Descarga los equipos con la búsqueda y los filtros que tenés puestos"
+          >
+            <Download size={16} strokeWidth={1.9} aria-hidden="true" />
+            {descargando ? "Generando..." : "Descargar CSV"}
+          </button>
+        )}
       </Encabezado>
 
 
-      {/* ─── Buscador ─── */}
-      <div style={estilos.barraBusqueda}>
-        <div style={estilos.campoBusqueda}>
-          <Search size={17} strokeWidth={1.9} color={color.textoDebil} aria-hidden="true" />
-          <input
-            style={estilos.input}
-            placeholder="Buscar por código, nombre, marca o número de serie"
-            value={textoEscrito}
-            onChange={(e) => setTextoEscrito(e.target.value)}
-          />
-          {textoEscrito && (
-            <button style={estilos.limpiar} onClick={() => setTextoEscrito("")} title="Limpiar">
-              <X size={15} strokeWidth={2.2} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-
-        <button
-          style={{ ...boton(filtrosActivos > 0 ? "primario" : "secundario"), gap: 8 }}
-          onClick={() => setVerFiltros((v) => !v)}
-        >
-          <SlidersHorizontal size={16} strokeWidth={1.9} aria-hidden="true" />
-          Filtros{filtrosActivos > 0 ? ` (${filtrosActivos})` : ""}
-        </button>
-      </div>
-
-      {/* ─── Filtros, plegados por defecto ─── */}
-      {verFiltros && (
-        <div style={{ ...cs.tarjeta, padding: 18, marginBottom: 14 }}>
-          <div style={estilos.grillaFiltros}>
-            <Filtro
-              etiqueta="Estado"
-              valor={filtros.estado}
-              onChange={(v) => setFiltros({ ...filtros, estado: v })}
-              opciones={opciones.estados.map((e) => ({ id: e, nombre: e }))}
-            />
-            <Filtro
-              etiqueta="Tipo de equipo"
-              valor={filtros.tipoEquipoId}
-              onChange={(v) => setFiltros({ ...filtros, tipoEquipoId: v })}
-              opciones={opciones.tipos}
-            />
-            <Filtro
-              etiqueta="Servicio"
-              valor={filtros.sectorId}
-              onChange={(v) => setFiltros({ ...filtros, sectorId: v })}
-              opciones={opciones.sectores}
-            />
-            <Filtro
-              etiqueta="Grupo técnico"
-              valor={filtros.grupoId}
-              onChange={(v) => setFiltros({ ...filtros, grupoId: v })}
-              opciones={opciones.grupos}
-            />
-          </div>
-
-          {filtrosActivos > 0 && (
-            <button style={{ ...boton("fantasma"), marginTop: 12, gap: 6 }} onClick={limpiarFiltros}>
-              <X size={15} strokeWidth={2.2} aria-hidden="true" />
-              Limpiar filtros
-            </button>
-          )}
-        </div>
-      )}
+      {/* ─── Buscador + filtros plegables ─── */}
+      <BarraFiltros
+        placeholder="Buscar por código, nombre, marca o número de serie"
+        texto={textoEscrito}
+        onTexto={setTextoEscrito}
+        filtrosActivos={filtrosActivos}
+        onLimpiar={limpiarFiltros}
+      >
+        <CampoFiltro
+          etiqueta="Estado"
+          valor={filtros.estado}
+          onChange={(v) => setFiltros({ ...filtros, estado: v })}
+          opciones={opciones.estados.map((e) => ({ id: e, nombre: e }))}
+        />
+        <CampoFiltro
+          etiqueta="Tipo de equipo"
+          valor={filtros.tipoEquipoId}
+          onChange={(v) => setFiltros({ ...filtros, tipoEquipoId: v })}
+          opciones={opciones.tipos}
+        />
+        <CampoFiltro
+          etiqueta="Servicio"
+          valor={filtros.sectorId}
+          onChange={(v) => setFiltros({ ...filtros, sectorId: v })}
+          opciones={opciones.sectores}
+        />
+        <CampoFiltro
+          etiqueta="Grupo técnico"
+          valor={filtros.grupoId}
+          onChange={(v) => setFiltros({ ...filtros, grupoId: v })}
+          opciones={opciones.grupos}
+        />
+      </BarraFiltros>
 
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
@@ -194,6 +220,9 @@ function Activos() {
           parte del nombre del equipo.
         </p>
       )}
+
+      {/* ─── Páginas: flechas arriba de la lista ─── */}
+      <Paginador pagina={pagina} totalPaginas={totalPaginas} onCambiar={irAPagina} deshabilitado={cargando} />
 
       <div style={estilos.lista}>
         {activos.map((a) => (
@@ -231,70 +260,27 @@ function Activos() {
           </div>
         ))}
       </div>
-
-      {quedanMas && (
-        <button
-          style={{ ...boton("secundario"), marginTop: 16, alignSelf: "center" }}
-          onClick={cargarMas}
-          disabled={cargandoMas}
-        >
-          {cargandoMas ? "Cargando..." : `Cargar más (${activos.length} de ${total})`}
-        </button>
-      )}
     </>
   );
 }
 
-function Filtro({ etiqueta, valor, onChange, opciones }) {
-  return (
-    <div>
-      <label style={cs.label}>{etiqueta}</label>
-      <select style={cs.input} value={valor} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Todos</option>
-        {opciones.map((o) => (
-          <option key={o.id} value={o.id}>{o.nombre}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 // El subtítulo dice si estás viendo todo o un recorte, para que nadie crea que
-// el hospital tiene 12 equipos cuando en realidad hay un filtro puesto (o 200
-// cuando en realidad hay varios miles y todavía no se pidió el resto).
-function textoDelSubtitulo(cantidad, total, busqueda, filtrosActivos) {
+// el hospital tiene 50 equipos cuando en realidad hay varios miles y estás
+// en una página.
+function textoDelSubtitulo(cantidad, total, busqueda, filtrosActivos, primero) {
   const hayRecorte = total > cantidad;
+  const rango = `${primero}–${primero + cantidad - 1}`;
   if (busqueda || filtrosActivos > 0) {
     const palabra = total === 1 ? "resultado" : "resultados";
-    return hayRecorte ? `Mostrando ${cantidad} de ${total} ${palabra}` : `${cantidad} ${palabra}`;
+    return hayRecorte ? `Mostrando ${rango} de ${total} ${palabra}` : `${cantidad} ${palabra}`;
   }
   return hayRecorte
-    ? `Mostrando ${cantidad} de ${total} equipos registrados`
+    ? `Mostrando ${rango} de ${total} equipos registrados`
     : `${cantidad} equipos registrados`;
 }
 
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "20px 0", lineHeight: 1.6 },
-  barraBusqueda: { display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" },
-  campoBusqueda: {
-    ...cs.input,
-    display: "flex", alignItems: "center", gap: 9,
-    flex: 1, minWidth: 220, padding: "0 12px",
-  },
-  input: {
-    flex: 1, border: "none", outline: "none", background: "transparent",
-    fontFamily: "inherit", fontSize: "0.92rem", color: color.texto,
-    padding: "11px 0", minWidth: 0,
-  },
-  limpiar: {
-    background: "transparent", border: "none", cursor: "pointer",
-    color: color.textoDebil, display: "flex", padding: 2,
-  },
-  grillaFiltros: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-    gap: 14,
-  },
   lista: { display: "flex", flexDirection: "column", gap: 10 },
   tarjeta: {
     ...cs.tarjeta, padding: "14px 18px",

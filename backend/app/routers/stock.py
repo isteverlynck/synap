@@ -109,7 +109,7 @@ def ver_insumo(
     """Ver un insumo puntual por su id."""
     insumo = db.query(Insumo).filter(Insumo.id == insumo_id).first()
     if insumo is None:
-        raise HTTPException(status_code=404, detail="Insumo no encontrado")
+        raise HTTPException(status_code=404, detail="Accesorio no encontrado")
     return insumo
 
 
@@ -160,7 +160,7 @@ def eliminar_insumo(
     """
     insumo = db.query(Insumo).filter(Insumo.id == insumo_id).first()
     if insumo is None:
-        raise HTTPException(status_code=404, detail="Insumo no encontrado.")
+        raise HTTPException(status_code=404, detail="Accesorio no encontrado.")
 
     tiene_compras = db.query(Compra).filter(Compra.insumo_id == insumo_id).first() is not None
     tiene_consumos = db.query(ConsumoInsumo).filter(ConsumoInsumo.insumo_id == insumo_id).first() is not None
@@ -169,7 +169,7 @@ def eliminar_insumo(
         raise HTTPException(
             status_code=400,
             detail=(
-                "Este insumo ya tiene movimientos registrados (compra, consumo o "
+                "Este accesorio ya tiene movimientos registrados (compra, consumo o "
                 "ajuste) y no se puede eliminar, porque se perdería ese historial. "
                 "Si ya no se usa, lo podés dejar con stock en 0."
             ),
@@ -244,7 +244,7 @@ def registrar_pedido_compra(
 ):
     insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
     if insumo is None:
-        raise HTTPException(status_code=404, detail="Insumo no encontrado.")
+        raise HTTPException(status_code=404, detail="Accesorio no encontrado.")
     if payload.cantidad <= 0:
         raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0.")
 
@@ -278,7 +278,7 @@ def recibir_compra(
 
     insumo = db.query(Insumo).filter(Insumo.id == compra.insumo_id).first()
     if insumo is None:
-        raise HTTPException(status_code=404, detail="El insumo de la compra no existe.")
+        raise HTTPException(status_code=404, detail="El accesorio de la compra no existe.")
 
     compra.estado = "recibida"
     compra.fecha_recepcion = date.today()
@@ -301,7 +301,7 @@ def registrar_consumo(
     validar_a_cargo_de_preventiva(current_user, orden)
     insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
     if insumo is None:
-        raise HTTPException(status_code=404, detail="Insumo no encontrado.")
+        raise HTTPException(status_code=404, detail="Accesorio no encontrado.")
     if payload.cantidad <= 0:
         raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0.")
 
@@ -364,7 +364,7 @@ def registrar_ajuste(
 
     insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
     if insumo is None:
-        raise HTTPException(status_code=404, detail="Insumo no encontrado.")
+        raise HTTPException(status_code=404, detail="Accesorio no encontrado.")
 
     ajuste = AjusteInventario(
         insumo_id=payload.insumo_id,

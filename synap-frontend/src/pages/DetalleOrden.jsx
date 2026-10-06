@@ -143,7 +143,7 @@ function DetalleOrden() {
 
   function nombreInsumo(insumoId) {
     const i = insumos.find((x) => x.id === insumoId);
-    return i ? i.nombre : "Insumo";
+    return i ? i.nombre : "Accesorio";
   }
   async function arrancar() {
     try {
@@ -417,7 +417,7 @@ function DetalleOrden() {
           correctiva), no solo a las preventivas. */}
           {puedeTrabajar && (
             <button style={boton("secundario")} onClick={() => setAccion("consumo")}>
-              Registrar consumo de insumo
+              Registrar consumo de accesorio
             </button>
           )}
           {/* Tiempo real de parada: se aprieta al momento en que el equipo
@@ -526,7 +526,7 @@ function DetalleOrden() {
       {/* ─── Insumos consumidos en esta OT ─── */}
       {consumosOT.length > 0 && (
         <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
-          <p style={estilos.panelTitulo}>Insumos consumidos en esta OT</p>
+          <p style={estilos.panelTitulo}>Accesorios consumidos en esta OT</p>
           <div style={estilos.listaNotas}>
             {consumosOT.map((c) => (
               <div key={c.id} style={estilos.nota}>
@@ -1144,7 +1144,7 @@ function PanelConsumoInsumo({ ot, perfil, insumos, setConsumosOT, cerrar }) {
   const [error, setError] = useState("");
 
   async function confirmar() {
-    if (!insumoId) { setError("Elegí el insumo."); return; }
+    if (!insumoId) { setError("Elegí el accesorio."); return; }
     const cant = Number(cantidad);
     if (!cant || cant <= 0) { setError("Indicá una cantidad mayor a 0."); return; }
     setEnviando(true);
@@ -1168,8 +1168,8 @@ function PanelConsumoInsumo({ ot, perfil, insumos, setConsumosOT, cerrar }) {
 
   return (
     <div style={{ ...cs.tarjeta, padding: 18, marginTop: 14 }}>
-      <p style={estilos.panelTitulo}>Registrar consumo de insumo</p>
-      <label style={cs.label}>Insumo</label>
+      <p style={estilos.panelTitulo}>Registrar consumo de accesorio</p>
+      <label style={cs.label}>Accesorio</label>
       <select
         style={{ ...cs.input, marginBottom: 12 }}
         value={insumoId}

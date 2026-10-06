@@ -7,10 +7,14 @@ import cliente from "./cliente";
 // Las OT asignadas al usuario logueado (la pantalla del técnico).
 //   { estado }  → ABIERTA / EN_PROGRESO / CERRADA
 //   { tipo }    → CORRECTIVA / PREVENTIVA
-export async function misOrdenes({ estado, tipo } = {}) {
+//   { notificadaDesde, notificadaHasta } → rango de fecha de notificación,
+//                 como "AAAA-MM-DD" (los dos extremos incluidos)
+export async function misOrdenes({ estado, tipo, notificadaDesde, notificadaHasta } = {}) {
   const params = {};
   if (estado) params.estado = estado;
   if (tipo) params.tipo = tipo;
+  if (notificadaDesde) params.notificada_desde = notificadaDesde;
+  if (notificadaHasta) params.notificada_hasta = notificadaHasta;
   const res = await cliente.get("/ordenes-trabajo/mias", { params });
   return res.data;
 }
@@ -18,8 +22,11 @@ export async function misOrdenes({ estado, tipo } = {}) {
 // Listado general con filtros. Los que más se usan:
 //   { misGrupos: true }                → las de los grupos que coordino
 //   { misGrupos: true, sinAsignar: true } → las que esperan técnico
+//   { notificadaDesde, notificadaHasta } → rango de fecha de notificación,
+//                                          como "AAAA-MM-DD"
 export async function listarOrdenes({ estado, tipo, activoCodigo, grupoId,
-                                      sinAsignar, misGrupos, limite } = {}) {
+                                      sinAsignar, misGrupos, limite,
+                                      notificadaDesde, notificadaHasta } = {}) {
   const params = {};
   if (estado) params.estado = estado;
   if (tipo) params.tipo = tipo;
@@ -27,6 +34,8 @@ export async function listarOrdenes({ estado, tipo, activoCodigo, grupoId,
   if (grupoId) params.grupo_id = grupoId;
   if (sinAsignar !== undefined) params.sin_asignar = sinAsignar;
   if (misGrupos) params.mis_grupos = true;
+  if (notificadaDesde) params.notificada_desde = notificadaDesde;
+  if (notificadaHasta) params.notificada_hasta = notificadaHasta;
   if (limite) params.limit = limite;
   const res = await cliente.get("/ordenes-trabajo", { params });
   return res.data;

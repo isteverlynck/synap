@@ -13,10 +13,12 @@ Los archivos se arman para que Excel en español los abra bien de una:
 
 import csv
 import io
+import re
 from datetime import date
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -39,7 +41,7 @@ def respuesta_csv(nombre_base: str, encabezados: list[str], filas: list[list]) -
     bajan varias veces no se pisan entre sí.
     """
     salida = io.StringIO()
-    salida.write("﻿")  # BOM: para que Excel lea bien las tildes
+    salida.write("\ufeff")  # BOM: para que Excel lea bien las tildes
     escritor = csv.writer(salida, delimiter=";")
     escritor.writerow(encabezados)
     for fila in filas:
@@ -62,13 +64,48 @@ _NOMBRE_NIVEL_RIESGO = {"ALTO": "Alto", "MEDIO": "Medio", "BAJO": "Bajo"}
 
 @router.get("/activos")
 def exportar_activos(
+    buscar: str | None = None,
+    estado: str | None = None,
+    tipo_equipo_id: str | None = None,
+    sector_id: str | None = None,
+    grupo_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
-    """Todos los equipos, con los nombres de tipo y servicio ya resueltos."""
+    """Los equipos, con los nombres de tipo y servicio ya resueltos.
+
+    Sin parámetros baja TODOS. Con parámetros baja solo los que coinciden: son
+    los mismos filtros que la pantalla de Activos (buscar, estado, tipo de
+    equipo, servicio y grupo técnico), con la misma lógica que GET /activos,
+    así que lo que se descarga es lo que se ve con esos filtros puestos —
+    completo, no solo la página que está en pantalla.
+    """
     tipos = {t.id: t.nombre for t in db.query(TipoEquipo).all()}
     servicios = {s.id: s.nombre for s in db.query(Servicio).all()}
-    activos = db.query(Activo).order_by(Activo.codigo).all()
+
+    q = db.query(Activo)
+    if buscar:
+        texto = buscar.strip()
+        como_codigo = re.sub(r"[\s-]+", "-", texto.upper()).strip("-")
+        patron = f"%{texto}%"
+        q = q.filter(
+            or_(
+                Activo.codigo.ilike(f"%{como_codigo}%"),
+                Activo.descripcion.ilike(patron),
+                Activo.marca.ilike(patron),
+                Activo.modelo.ilike(patron),
+                Activo.numero_serie.ilike(patron),
+            )
+        )
+    if estado:
+        q = q.filter(Activo.estado.ilike(estado))
+    if tipo_equipo_id:
+        q = q.filter(Activo.tipo_equipo_id == tipo_equipo_id)
+    if sector_id:
+        q = q.filter(Activo.sector_id == sector_id)
+    if grupo_id:
+        q = q.filter(Activo.grupo_id == grupo_id)
+    activos = q.order_by(Activo.codigo).all()
 
     # Criticidad y nivel de riesgo, calculados con el PRIUX (ver
     # backend/app/criticidad.py) — la columna vieja (cargada a mano) se había
@@ -116,6 +153,7 @@ from sqlalchemy import or_, and_
 
 from ..models import OrdenTrabajo
 from ..security import requiere_rol, grupos_del_coordinador
+from .ordenes_trabajo import filtrar_por_fecha_notificacion
 
 
 def _fecha_hora(valor) -> str:
@@ -128,12 +166,15 @@ def exportar_ordenes(
     estado: str | None = None,
     tipo: str | None = None,
     sin_asignar: bool | None = None,
+    notificada_desde: date | None = None,
+    notificada_hasta: date | None = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Las OT que esta persona ve en su pantalla de Órdenes, respetando los
-    mismos filtros que ya tiene esa pantalla (estado, tipo, y "sin asignar"
-    para coordinación) si se los pasan por query string; si no se pasa
+    mismos filtros que ya tiene esa pantalla (estado, tipo, "sin asignar"
+    para coordinación, y el rango de fecha de notificación: notificada_desde /
+    notificada_hasta, AAAA-MM-DD) si se los pasan por query string; si no se pasa
     ninguno, descarga todo lo que ese rol puede ver:
       - Técnico: las asignadas a él, más las de su grupo sin técnico (mismo
         criterio que "Mis órdenes").
@@ -166,6 +207,7 @@ def exportar_ordenes(
         q = q.filter(OrdenTrabajo.tecnico_id.is_(None))
     elif sin_asignar is False:
         q = q.filter(OrdenTrabajo.tecnico_id.isnot(None))
+    q = filtrar_por_fecha_notificacion(q, notificada_desde, notificada_hasta)
 
     ordenes = q.order_by(OrdenTrabajo.numero_ot).all()
 

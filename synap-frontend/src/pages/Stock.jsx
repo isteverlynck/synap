@@ -1,4 +1,4 @@
-// Stock.jsx — insumos y repuestos: seguimiento de stock, alta de insumos,
+// Stock.jsx — accesorios (antes "insumos") y repuestos: seguimiento de stock, alta de insumos,
 // pedidos de compra y su recepción, ajustes manuales y el historial
 // unificado de movimientos.
 //
@@ -8,6 +8,9 @@
 // Registrar pedidos, marcar recibida una compra, consumir insumos y ajustar
 // stock a mano SÍ lo puede hacer cualquiera que llegue a esta pantalla
 // (técnico, junior, coordinación, jefatura) — es el trabajo del día a día.
+//
+// Formato de lista igual que Activos y Órdenes: buscador arriba con un botón
+// "Filtros" plegable (tipo de accesorio) y flechas de página (de a 50).
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -19,6 +22,8 @@ import {
 import { catalogosParaAlta } from "../api/activos";
 import { rolActual } from "../api/auth";
 import Encabezado from "../componentes/Encabezado";
+import BarraFiltros, { CampoFiltro } from "../componentes/BarraFiltros";
+import Paginador from "../componentes/Paginador";
 import { color, cs, boton, insignia } from "../tema";
 
 const PUEDE_CREAR_INSUMO = ["coordinacion", "jefatura"];
@@ -32,6 +37,14 @@ const ORIGEN_TEXTO = { compra: "Compra", consumo: "Consumo", ajuste: "Ajuste" };
 // específico (ej: guantes, alcohol en gel) — no es un id real del catálogo.
 const SIN_TIPO = "__sin_tipo__";
 
+// Cuántos accesorios se muestran por página.
+const POR_PAGINA = 50;
+
+// Para buscar sin importar mayúsculas ni tildes ("lapiz" encuentra "Lápiz").
+function normalizar(texto) {
+  return (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function Stock() {
   const puedeCrearInsumo = PUEDE_CREAR_INSUMO.includes(rolActual());
   const [insumos, setInsumos] = useState([]);
@@ -44,7 +57,20 @@ function Stock() {
   const [movimientos, setMovimientos] = useState([]);
   const [cargandoMovimientos, setCargandoMovimientos] = useState(true);
   const [tipoFiltro, setTipoFiltro] = useState("");
+  const [busqueda, setBusqueda] = useState("");
   const historialRef = useRef(null);
+
+  // Página actual (0 = la primera), guardada junto con la búsqueda y los
+  // filtros a los que corresponde: si cambia cualquiera de ellos, vuelve sola
+  // a la primera.
+  const clavePagina = JSON.stringify([busqueda, tipoFiltro, soloAlertas]);
+  const [paginaGuardada, setPaginaGuardada] = useState({ clave: clavePagina, pagina: 0 });
+  // Si cambió la búsqueda o algún filtro, la página guardada ya no corresponde:
+  // se vuelve a la primera (así, al limpiar los filtros, tampoco reaparece una
+  // página vieja).
+  if (paginaGuardada.clave !== clavePagina) {
+    setPaginaGuardada({ clave: clavePagina, pagina: 0 });
+  }
 
   function cargarInsumos() {
     setCargando(true);
@@ -89,10 +115,10 @@ function Stock() {
   async function eliminar(insumoId) {
     try {
       await eliminarInsumo(insumoId);
-      toast.success("Insumo eliminado.");
+      toast.success("Accesorio eliminado.");
       cargarInsumos();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "No pudimos eliminar el insumo.");
+      toast.error(e.response?.data?.detail || "No pudimos eliminar el accesorio.");
     }
   }
 
@@ -101,7 +127,7 @@ function Stock() {
       const pendientes = await listarCompras({ insumoId, estado: "pedida" });
       const compra = pendientes[0];
       if (!compra) {
-        toast.error("No encontramos el pedido pendiente de este insumo.");
+        toast.error("No encontramos el pedido pendiente de este accesorio.");
         return;
       }
       await recibirCompra(compra.id);
@@ -112,13 +138,24 @@ function Stock() {
     }
   }
 
-  // Filtro por tipo de equipo, en el navegador: la lista de insumos es chica
-  // (a diferencia de los activos), no hace falta pedírselo al backend.
+  // Búsqueda y filtro por tipo de equipo, en el navegador: la lista de
+  // insumos es chica (a diferencia de los activos), no hace falta pedírselo
+  // al backend.
+  const textoBuscado = normalizar(busqueda.trim());
   const insumosFiltrados = insumos.filter((i) => {
-    if (!tipoFiltro) return true;
-    if (tipoFiltro === SIN_TIPO) return !i.tipo_equipo_id;
-    return i.tipo_equipo_id === tipoFiltro;
+    if (tipoFiltro === SIN_TIPO) {
+      if (i.tipo_equipo_id) return false;
+    } else if (tipoFiltro && i.tipo_equipo_id !== tipoFiltro) {
+      return false;
+    }
+    if (!textoBuscado) return true;
+    return [i.nombre, i.codigo, i.descripcion].some((campo) => normalizar(campo).includes(textoBuscado));
   });
+
+  const totalPaginas = Math.max(1, Math.ceil(insumosFiltrados.length / POR_PAGINA));
+  const pagina = Math.min(paginaGuardada.clave === clavePagina ? paginaGuardada.pagina : 0, totalPaginas - 1);
+  const primero = pagina * POR_PAGINA;
+  const insumosPagina = insumosFiltrados.slice(primero, primero + POR_PAGINA);
 
   const tiposConInsumos = tipos.filter((t) => todosInsumos.some((i) => i.tipo_equipo_id === t.id));
   const hayInsumosSinTipo = todosInsumos.some((i) => !i.tipo_equipo_id);
@@ -129,7 +166,7 @@ function Stock() {
 
   function nombrePorId(id) {
     const ins = todosInsumos.find((x) => x.id === id);
-    return ins ? ins.nombre : "Insumo";
+    return ins ? ins.nombre : "Accesorio";
   }
 
   function unidadPorId(id) {
@@ -140,50 +177,71 @@ function Stock() {
   return (
     <>
       <Encabezado
-        titulo="Insumos"
-        subtitulo={cargando ? "Cargando..." : textoDelSubtitulo(insumosFiltrados.length, soloAlertas, !!tipoFiltro)}
+        titulo="Accesorios"
+        subtitulo={
+          cargando
+            ? "Cargando..."
+            : textoDelSubtitulo(insumosFiltrados.length, soloAlertas, !!tipoFiltro || !!textoBuscado)
+              + (totalPaginas > 1 ? ` · mostrando ${primero + 1}–${primero + insumosPagina.length}` : "")
+        }
       >
         <button style={boton(soloAlertas ? "primario" : "secundario")} onClick={() => setSoloAlertas((v) => !v)}>
           {soloAlertas ? "Viendo solo alertas" : "Ver todos"}
         </button>
-        {puedeCrearInsumo && (
-          <button style={{ ...boton("primario"), gap: 7 }} onClick={() => setModalNuevo(true)}>
-            <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
-            Nuevo insumo
-          </button>
-        )}
-      </Encabezado>
-
-      <div style={estilos.barraFiltroFila}>
-        <div style={estilos.barraFiltro}>
-          <Filtro
-            etiqueta="Tipo de insumo"
-            valor={tipoFiltro}
-            onChange={setTipoFiltro}
-            opciones={opcionesFiltroTipo}
-          />
-        </div>
         <button style={{ ...boton("secundario"), gap: 7 }} onClick={irAlHistorial}>
           <History size={16} strokeWidth={1.9} aria-hidden="true" />
           Ver historial
         </button>
-      </div>
+        {puedeCrearInsumo && (
+          <button style={{ ...boton("primario"), gap: 7 }} onClick={() => setModalNuevo(true)}>
+            <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
+            Nuevo accesorio
+          </button>
+        )}
+      </Encabezado>
+
+      {/* ─── Buscador + filtros plegables ─── */}
+      <BarraFiltros
+        placeholder="Buscar por nombre, código o descripción"
+        texto={busqueda}
+        onTexto={setBusqueda}
+        filtrosActivos={tipoFiltro ? 1 : 0}
+        onLimpiar={() => setTipoFiltro("")}
+      >
+        <CampoFiltro
+          etiqueta="Tipo de accesorio"
+          valor={tipoFiltro}
+          onChange={setTipoFiltro}
+          opciones={opcionesFiltroTipo}
+        />
+      </BarraFiltros>
 
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
-      {cargando && <p style={estilos.mensaje}>Cargando insumos...</p>}
+      {cargando && <p style={estilos.mensaje}>Cargando accesorios...</p>}
 
       {!cargando && !error && insumosFiltrados.length === 0 && (
         <p style={estilos.mensaje}>
-          {tipoFiltro
-            ? "Ningún insumo de ese tipo."
-            : soloAlertas ? "Ningún insumo necesita atención por ahora." : "Todavía no hay insumos cargados."}
+          {textoBuscado
+            ? "Ningún accesorio coincide con esa búsqueda."
+            : tipoFiltro
+            ? "Ningún accesorio de ese tipo."
+            : soloAlertas ? "Ningún accesorio necesita atención por ahora." : "Todavía no hay accesorios cargados."}
         </p>
+      )}
+
+      {/* ─── Páginas: flechas arriba de la lista ─── */}
+      {!cargando && (
+        <Paginador
+          pagina={pagina}
+          totalPaginas={totalPaginas}
+          onCambiar={(n) => setPaginaGuardada({ clave: clavePagina, pagina: n })}
+        />
       )}
 
       {!cargando && (
         <div style={estilos.lista}>
-          {insumosFiltrados.map((i) => (
+          {insumosPagina.map((i) => (
             <InsumoCard
               key={i.id}
               insumo={i}
@@ -481,20 +539,6 @@ function MovimientosHistorial({ innerRef, movimientos, cargando, nombrePorId, un
   );
 }
 
-function Filtro({ etiqueta, valor, onChange, opciones }) {
-  return (
-    <div>
-      <label style={cs.label}>{etiqueta}</label>
-      <select style={cs.input} value={valor} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Todos</option>
-        {opciones.map((o) => (
-          <option key={o.id} value={o.id}>{o.nombre}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 function ModalNuevoInsumo({ tipos, onCancelar, onCreado }) {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -508,7 +552,7 @@ function ModalNuevoInsumo({ tipos, onCancelar, onCreado }) {
 
   async function crear() {
     setError("");
-    if (!nombre.trim()) return setError("Indicá el nombre del insumo.");
+    if (!nombre.trim()) return setError("Indicá el nombre del accesorio.");
     const actual = Number(stockActual) || 0;
     const minimo = Number(stockMinimo) || 0;
     const reorden = Number(puntoReorden) || 0;
@@ -527,10 +571,10 @@ function ModalNuevoInsumo({ tipos, onCancelar, onCreado }) {
         punto_reorden: reorden,
         tipo_equipo_id: tipoEquipoId || null,
       });
-      toast.success(`Insumo creado: ${creado.nombre}`);
+      toast.success(`Accesorio creado: ${creado.nombre}`);
       onCreado();
     } catch (err) {
-      setError(err.response?.data?.detail || "No se pudo crear el insumo.");
+      setError(err.response?.data?.detail || "No se pudo crear el accesorio.");
     } finally {
       setEnviando(false);
     }
@@ -539,7 +583,7 @@ function ModalNuevoInsumo({ tipos, onCancelar, onCreado }) {
   return (
     <div style={estilos.overlay} onClick={onCancelar}>
       <div style={estilos.modal} onClick={(e) => e.stopPropagation()}>
-        <p style={estilos.modalTitulo}>Nuevo insumo</p>
+        <p style={estilos.modalTitulo}>Nuevo accesorio</p>
 
         <div style={estilos.modalCuerpo}>
           <p style={estilos.ayudaCodigo}>El código (INS-0001, INS-0002...) lo asigna el sistema solo.</p>
@@ -616,20 +660,15 @@ function textoDelSubtitulo(cantidad, soloAlertas, hayFiltro) {
     return `${cantidad} ${cantidad === 1 ? "resultado" : "resultados"}`;
   }
   if (soloAlertas) {
-    return `${cantidad} ${cantidad === 1 ? "insumo necesita" : "insumos necesitan"} atención`;
+    return `${cantidad} ${cantidad === 1 ? "accesorio necesita" : "accesorios necesitan"} atención`;
   }
-  return `${cantidad} ${cantidad === 1 ? "insumo cargado" : "insumos cargados"}`;
+  return `${cantidad} ${cantidad === 1 ? "accesorio cargado" : "accesorios cargados"}`;
 }
 
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "14px 0", lineHeight: 1.6 },
   error: { fontSize: "0.85rem", color: color.peligro, margin: "8px 0" },
   lista: { display: "flex", flexDirection: "column", gap: 10 },
-  barraFiltroFila: {
-    display: "flex", alignItems: "flex-end", justifyContent: "space-between",
-    gap: 12, marginBottom: 14, flexWrap: "wrap",
-  },
-  barraFiltro: { maxWidth: 240, flex: 1, minWidth: 180 },
   tarjeta: { ...cs.tarjeta, padding: "14px 18px" },
   filaPrincipal: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   nombre: { fontSize: "0.92rem", color: color.texto, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 },

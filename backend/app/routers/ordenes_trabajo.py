@@ -12,7 +12,8 @@ Flujo de fechas (según el uso real del hospital):
 Todos los endpoints están protegidos con login (get_current_user).
 """
 
-from datetime import datetime
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_, and_
@@ -38,6 +39,40 @@ from ..security import get_current_user, requiere_rol, grupos_del_coordinador, r
 from ..criticidad import agregar_criticidad_a_ordenes
 
 router = APIRouter(prefix="/ordenes-trabajo", tags=["ordenes_de_trabajo"])
+
+_TZ_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def filtrar_por_fecha_notificacion(q, desde: date | None, hasta: date | None):
+    """Recorta una consulta de OT a las notificadas entre dos días (inclusive).
+
+    Lo usan el listado, "Mis órdenes" y el CSV de órdenes, para que los tres
+    entiendan igual el filtro "Notificada desde / hasta".
+
+    - La fecha de notificación se guarda en UTC; los días que elige la persona
+      son días de Argentina. Por eso se convierte el límite de cada día a UTC:
+      una falla avisada a las 22 hs de Argentina ya es "mañana" en UTC, y sin
+      esta conversión caería en el día equivocado.
+    - Las OT que no tienen fecha de notificación (típicamente las preventivas,
+      que las genera el sistema solo) cuentan con su fecha de apertura, mismo
+      criterio que usa el dashboard.
+    - "hasta" es inclusive: pedir hasta el 10/10 trae también lo del 10/10.
+    """
+    if desde is None and hasta is None:
+        return q
+    if desde is not None and hasta is not None and desde > hasta:
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha \"desde\" no puede ser posterior a la fecha \"hasta\".",
+        )
+    fecha = func.coalesce(OrdenTrabajo.fecha_notificacion, OrdenTrabajo.fecha_apertura)
+    if desde is not None:
+        inicio = datetime.combine(desde, time.min, tzinfo=_TZ_ARGENTINA)
+        q = q.filter(fecha >= inicio.astimezone(timezone.utc).replace(tzinfo=None))
+    if hasta is not None:
+        fin = datetime.combine(hasta + timedelta(days=1), time.min, tzinfo=_TZ_ARGENTINA)
+        q = q.filter(fecha < fin.astimezone(timezone.utc).replace(tzinfo=None))
+    return q
 
 
 def _validar_permiso_sobre_ot(current_user: Usuario, db: Session, orden: OrdenTrabajo) -> None:
@@ -102,6 +137,8 @@ def listar_ordenes(
     grupo_id: str | None = None,
     sin_asignar: bool | None = None,
     mis_grupos: bool = False,
+    notificada_desde: date | None = None,
+    notificada_hasta: date | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
@@ -116,6 +153,9 @@ def listar_ordenes(
         de pendientes del coordinador después de aceptar solicitudes.
       - mis_grupos=true: las de los grupos que coordina el usuario logueado
         (jefatura las ve todas, no filtra).
+      - notificada_desde / notificada_hasta (AAAA-MM-DD): las notificadas en
+        ese rango de días, ambos extremos incluidos (ver
+        filtrar_por_fecha_notificacion).
     """
     q = db.query(OrdenTrabajo)
 
@@ -139,6 +179,8 @@ def listar_ordenes(
     if mis_grupos and current_user.rol != "jefatura":
         q = q.filter(OrdenTrabajo.grupo_id.in_(grupos_del_coordinador(db, current_user)))
 
+    q = filtrar_por_fecha_notificacion(q, notificada_desde, notificada_hasta)
+
     # Orden fijo: las más nuevas primero. Sin esto la lista puede cambiar de
     # orden entre recargas y confunde al usuario.
     return q.order_by(OrdenTrabajo.fecha_apertura.desc().nullslast()).limit(limit).all()
@@ -148,6 +190,8 @@ def listar_ordenes(
 def mis_ordenes(
     estado: str | None = None,
     tipo: str | None = None,
+    notificada_desde: date | None = None,
+    notificada_hasta: date | None = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
@@ -168,6 +212,8 @@ def mis_ordenes(
       - tipo: CORRECTIVA / PREVENTIVA (para separar las secciones del panel del
         técnico: "OT asignadas" vs "OT preventivas").
       - estado: ABIERTA / EN_PROGRESO / CERRADA.
+      - notificada_desde / notificada_hasta (AAAA-MM-DD): rango de días en que
+        se notificó la OT, ambos extremos incluidos.
     """
     q = db.query(OrdenTrabajo).filter(
         or_(
@@ -182,6 +228,7 @@ def mis_ordenes(
         q = q.filter(OrdenTrabajo.estado == estado)
     if tipo is not None:
         q = q.filter(OrdenTrabajo.tipo == tipo.upper())
+    q = filtrar_por_fecha_notificacion(q, notificada_desde, notificada_hasta)
     return q.order_by(OrdenTrabajo.fecha_apertura.desc()).all()
 
 
