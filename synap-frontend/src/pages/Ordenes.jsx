@@ -17,6 +17,9 @@
 // etiqueta violeta + un borde de color para que se distinga de un vistazo,
 // incluso mirando "Todas" mezcladas.
 //
+// Prioridad: un recorte más (baja / media / alta / crítica), pedido al backend
+// igual que el estado y el tipo, y que también respeta el CSV.
+//
 // Fecha de notificación: dos casilleros "Desde" y "Hasta" (días de Argentina,
 // los dos incluidos) que recortan la lista y también el CSV. Se piden al
 // backend, no se filtran acá, para que valgan sobre TODAS las órdenes y no
@@ -90,6 +93,15 @@ const FILTROS_TIPO = [
   { id: "CORRECTIVA", texto: "Correctivas" },
 ];
 
+// El recorte por prioridad. Los valores son los que guarda el backend.
+const FILTROS_PRIORIDAD = [
+  { id: "", texto: "Todas" },
+  { id: "CRITICA", texto: "Crítica" },
+  { id: "ALTA", texto: "Alta" },
+  { id: "MEDIA", texto: "Media" },
+  { id: "BAJA", texto: "Baja" },
+];
+
 // Cuántas órdenes se muestran por página.
 const POR_PAGINA = 50;
 
@@ -104,6 +116,7 @@ function Ordenes() {
   const [tecnicos, setTecnicos] = useState([]);
   const [filtro, setFiltro] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("");
+  const [prioridadFiltro, setPrioridadFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [notifDesde, setNotifDesde] = useState("");   // "AAAA-MM-DD" o ""
   const [notifHasta, setNotifHasta] = useState("");
@@ -114,7 +127,7 @@ function Ordenes() {
   // Página actual (0 = la primera), guardada junto con la búsqueda y los
   // filtros a los que corresponde: si cambia cualquiera de ellos, vuelve sola
   // a la primera.
-  const clavePagina = JSON.stringify([busqueda, filtro, tipoFiltro, notifDesde, notifHasta]);
+  const clavePagina = JSON.stringify([busqueda, filtro, tipoFiltro, prioridadFiltro, notifDesde, notifHasta]);
   const [paginaGuardada, setPaginaGuardada] = useState({ clave: clavePagina, pagina: 0 });
   // Si cambió la búsqueda o algún filtro, la página guardada ya no corresponde:
   // se vuelve a la primera (así, al limpiar los filtros, tampoco reaparece una
@@ -131,18 +144,19 @@ function Ordenes() {
   useEffect(() => {
     if (!perfil) return;
     cargar();
-  }, [perfil, filtro, tipoFiltro, notifDesde, notifHasta]);
+  }, [perfil, filtro, tipoFiltro, prioridadFiltro, notifDesde, notifHasta]);
 
   // "Desde" posterior a "Hasta": no tiene sentido, no se pide nada hasta que
   // se corrija (las fechas ISO se pueden comparar como texto).
   const rangoInvalido = !!notifDesde && !!notifHasta && notifDesde > notifHasta;
   const hayFiltroFecha = !!notifDesde || !!notifHasta;
   // Cuántos filtros hay puestos (las dos fechas cuentan como uno solo).
-  const filtrosActivos = (filtro ? 1 : 0) + (tipoFiltro ? 1 : 0) + (hayFiltroFecha ? 1 : 0);
+  const filtrosActivos = (filtro ? 1 : 0) + (tipoFiltro ? 1 : 0) + (prioridadFiltro ? 1 : 0) + (hayFiltroFecha ? 1 : 0);
 
   function limpiarFiltros() {
     setFiltro("");
     setTipoFiltro("");
+    setPrioridadFiltro("");
     setNotifDesde("");
     setNotifHasta("");
   }
@@ -160,7 +174,7 @@ function Ordenes() {
     }
     setCargando(true);
     setError("");
-    const fechas = { notificadaDesde: notifDesde || undefined, notificadaHasta: notifHasta || undefined };
+    const fechas = { prioridad: prioridadFiltro || undefined, notificadaDesde: notifDesde || undefined, notificadaHasta: notifHasta || undefined };
     try {
       // limite más alto que el default (50): el buscador y las páginas
       // trabajan sobre esta misma lista sin volver a pedirle nada al backend,
@@ -186,10 +200,9 @@ function Ordenes() {
   }
 
   // Descarga el CSV de OT respetando los mismos filtros que están puestos
-  // en esta pantalla (estado, tipo, fecha de notificación, y "sin asignar"
-  // para coordinación) — si
-  // no hay ningún filtro activo ("Todas"), descarga todo lo que este rol
-  // puede ver, igual que antes.
+  // en esta pantalla (estado, tipo, prioridad, fecha de notificación, y "sin
+  // asignar" para coordinación) — si no hay ningún filtro activo ("Todas"),
+  // descarga todo lo que este rol puede ver, igual que antes.
   async function descargarOrdenes() {
     if (descargando) return;
     if (rangoInvalido) {
@@ -206,6 +219,7 @@ function Ordenes() {
         if (filtro) params.set("estado", filtro);
         if (tipoFiltro) params.set("tipo", tipoFiltro);
       }
+      if (prioridadFiltro) params.set("prioridad", prioridadFiltro);
       if (notifDesde) params.set("notificada_desde", notifDesde);
       if (notifHasta) params.set("notificada_hasta", notifHasta);
       const query = params.toString();
@@ -301,6 +315,21 @@ function Ordenes() {
           ))}
         </GrupoFiltro>
 
+        <GrupoFiltro etiqueta="Prioridad">
+          {FILTROS_PRIORIDAD.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setPrioridadFiltro(f.id)}
+              style={{
+                ...estilos.filtro,
+                ...(prioridadFiltro === f.id ? estilos.filtroActivo : {}),
+              }}
+            >
+              {f.texto}
+            </button>
+          ))}
+        </GrupoFiltro>
+
         {/* Fecha de notificación: rango de días, los dos extremos incluidos. */}
         <GrupoFiltro etiqueta="Notificada">
           <label style={estilos.campoFecha}>
@@ -334,6 +363,8 @@ function Ordenes() {
             ? "No encontramos ninguna OT con esa búsqueda."
             : hayFiltroFecha
             ? "No hay órdenes notificadas en ese rango de fechas."
+            : prioridadFiltro
+            ? "No hay órdenes con esa prioridad en esta vista."
             : filtro === "SIN_ASIGNAR"
             ? "No hay órdenes esperando técnico."
             : "No hay órdenes en esta vista."}

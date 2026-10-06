@@ -1,3 +1,4 @@
+
 """Descarga de tablas en CSV (para abrir en Excel o Google Sheets).
 
 Cada descarga respeta lo mismo que el rol puede ver en pantalla: si una tabla
@@ -168,13 +169,14 @@ def exportar_ordenes(
     sin_asignar: bool | None = None,
     notificada_desde: date | None = None,
     notificada_hasta: date | None = None,
+    prioridad: str | None = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
 ):
     """Las OT que esta persona ve en su pantalla de Órdenes, respetando los
-    mismos filtros que ya tiene esa pantalla (estado, tipo, "sin asignar"
-    para coordinación, y el rango de fecha de notificación: notificada_desde /
-    notificada_hasta, AAAA-MM-DD) si se los pasan por query string; si no se pasa
+    mismos filtros que ya tiene esa pantalla (estado, tipo, prioridad, "sin
+    asignar" para coordinación, y el rango de fecha de notificación:
+    notificada_desde / notificada_hasta, AAAA-MM-DD) si se los pasan por query string; si no se pasa
     ninguno, descarga todo lo que ese rol puede ver:
       - Técnico: las asignadas a él, más las de su grupo sin técnico (mismo
         criterio que "Mis órdenes").
@@ -203,6 +205,8 @@ def exportar_ordenes(
         q = q.filter(OrdenTrabajo.estado == estado.upper())
     if tipo is not None:
         q = q.filter(OrdenTrabajo.tipo == tipo.upper())
+    if prioridad is not None:
+        q = q.filter(OrdenTrabajo.prioridad == prioridad.upper())
     if sin_asignar is True:
         q = q.filter(OrdenTrabajo.tecnico_id.is_(None))
     elif sin_asignar is False:

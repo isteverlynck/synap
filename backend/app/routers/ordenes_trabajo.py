@@ -139,6 +139,7 @@ def listar_ordenes(
     mis_grupos: bool = False,
     notificada_desde: date | None = None,
     notificada_hasta: date | None = None,
+    prioridad: str | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
@@ -156,6 +157,7 @@ def listar_ordenes(
       - notificada_desde / notificada_hasta (AAAA-MM-DD): las notificadas en
         ese rango de días, ambos extremos incluidos (ver
         filtrar_por_fecha_notificacion).
+      - prioridad: BAJA / MEDIA / ALTA / CRITICA.
     """
     q = db.query(OrdenTrabajo)
 
@@ -169,6 +171,8 @@ def listar_ordenes(
         q = q.filter(OrdenTrabajo.activo_codigo == activo_codigo)
     if grupo_id is not None:
         q = q.filter(OrdenTrabajo.grupo_id == grupo_id)
+    if prioridad is not None:
+        q = q.filter(OrdenTrabajo.prioridad == prioridad.upper())
 
     # sin_asignar=true → sin técnico; false → solo las ya asignadas.
     if sin_asignar is True:
@@ -192,6 +196,7 @@ def mis_ordenes(
     tipo: str | None = None,
     notificada_desde: date | None = None,
     notificada_hasta: date | None = None,
+    prioridad: str | None = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
@@ -214,6 +219,7 @@ def mis_ordenes(
       - estado: ABIERTA / EN_PROGRESO / CERRADA.
       - notificada_desde / notificada_hasta (AAAA-MM-DD): rango de días en que
         se notificó la OT, ambos extremos incluidos.
+      - prioridad: BAJA / MEDIA / ALTA / CRITICA.
     """
     q = db.query(OrdenTrabajo).filter(
         or_(
@@ -228,6 +234,8 @@ def mis_ordenes(
         q = q.filter(OrdenTrabajo.estado == estado)
     if tipo is not None:
         q = q.filter(OrdenTrabajo.tipo == tipo.upper())
+    if prioridad is not None:
+        q = q.filter(OrdenTrabajo.prioridad == prioridad.upper())
     q = filtrar_por_fecha_notificacion(q, notificada_desde, notificada_hasta)
     return q.order_by(OrdenTrabajo.fecha_apertura.desc()).all()
 

@@ -1,3 +1,4 @@
+
 // ordenes.js — órdenes de trabajo. Las usan los cuatro roles, cada uno de una
 // forma distinta: el técnico ve las suyas, coordinación las de su grupo,
 // jefatura todas, y cualquiera puede abrir el detalle de una OT puntual.
@@ -7,12 +8,14 @@ import cliente from "./cliente";
 // Las OT asignadas al usuario logueado (la pantalla del técnico).
 //   { estado }  → ABIERTA / EN_PROGRESO / CERRADA
 //   { tipo }    → CORRECTIVA / PREVENTIVA
+//   { prioridad } → BAJA / MEDIA / ALTA / CRITICA
 //   { notificadaDesde, notificadaHasta } → rango de fecha de notificación,
 //                 como "AAAA-MM-DD" (los dos extremos incluidos)
-export async function misOrdenes({ estado, tipo, notificadaDesde, notificadaHasta } = {}) {
+export async function misOrdenes({ estado, tipo, prioridad, notificadaDesde, notificadaHasta } = {}) {
   const params = {};
   if (estado) params.estado = estado;
   if (tipo) params.tipo = tipo;
+  if (prioridad) params.prioridad = prioridad;
   if (notificadaDesde) params.notificada_desde = notificadaDesde;
   if (notificadaHasta) params.notificada_hasta = notificadaHasta;
   const res = await cliente.get("/ordenes-trabajo/mias", { params });
@@ -22,14 +25,16 @@ export async function misOrdenes({ estado, tipo, notificadaDesde, notificadaHast
 // Listado general con filtros. Los que más se usan:
 //   { misGrupos: true }                → las de los grupos que coordino
 //   { misGrupos: true, sinAsignar: true } → las que esperan técnico
+//   { prioridad }                      → BAJA / MEDIA / ALTA / CRITICA
 //   { notificadaDesde, notificadaHasta } → rango de fecha de notificación,
 //                                          como "AAAA-MM-DD"
-export async function listarOrdenes({ estado, tipo, activoCodigo, grupoId,
+export async function listarOrdenes({ estado, tipo, prioridad, activoCodigo, grupoId,
                                       sinAsignar, misGrupos, limite,
                                       notificadaDesde, notificadaHasta } = {}) {
   const params = {};
   if (estado) params.estado = estado;
   if (tipo) params.tipo = tipo;
+  if (prioridad) params.prioridad = prioridad;
   if (activoCodigo) params.activo_codigo = activoCodigo;
   if (grupoId) params.grupo_id = grupoId;
   if (sinAsignar !== undefined) params.sin_asignar = sinAsignar;
