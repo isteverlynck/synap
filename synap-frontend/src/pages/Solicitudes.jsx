@@ -6,17 +6,27 @@
 //   3. Aceptadas: las que ya se convirtieron en OT, con su estado de avance
 //      (sin asignar / en progreso / finalizada).
 //   4. Rechazadas: las que el coordinador rechazó, con el motivo.
+//
+// Las tres listas (enviadas, aceptadas y rechazadas) tienen el mismo formato
+// que Equipos, Órdenes y Accesorios: el buscador arriba (por N° de solicitud
+// o por equipo), un botón "Filtros" que despliega y esconde el filtro de
+// fechas ("Desde" y "Hasta": el día en que se hizo la solicitud, en hora de
+// Argentina, los dos incluidos) y las flechas de página ("Anterior /
+// Siguiente") arriba de la lista, de a 50. Todo eso lo resuelve ListaFiltrable.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import cliente from "../api/cliente";
 import { logout } from "../api/auth";
 import { crearSolicitud, misSolicitudes, verOrdenTrabajo, subirAdjuntos } from "../api/solicitudes";
 import { verActivo } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
+import BarraFiltros, { GrupoFiltro } from "../componentes/BarraFiltros";
+import Paginador from "../componentes/Paginador";
 import { color, cs, boton, insignia } from "../tema";
 import { formatearFecha, agruparPorFecha } from "../utiles/fechas";
 import { normalizarCodigo } from "../utiles/codigos";
+import { coincideSolicitud, enRangoDeFechas, masRecientesPrimero } from "../utiles/solicitudes";
 
 
 const SOLAPAS = [
@@ -441,6 +451,128 @@ function CrearSolicitud({ onCreada, activoInicial }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Lista con buscador, filtro de fechas y páginas (la usan las 3 listas)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Cuántas solicitudes se muestran por página.
+const POR_PAGINA = 50;
+
+// Recibe la lista ya cargada ("items") y se encarga del resto: buscar,
+// filtrar por fecha, ordenar (la más reciente primero), partir en páginas y
+// agrupar por día. Cada lista le dice dos cosas: cómo sacarle la solicitud a
+// cada ítem (en "Aceptadas" el ítem es { solicitud, ot }, no la solicitud
+// sola) y cómo dibujar cada tarjeta.
+function ListaFiltrable({ items, obtenerSolicitud, renderItem }) {
+  const [busqueda, setBusqueda] = useState("");
+  const [desde, setDesde] = useState("");   // "AAAA-MM-DD" o ""
+  const [hasta, setHasta] = useState("");
+
+  // Página actual (0 = la primera), guardada junto con la búsqueda y las
+  // fechas a las que corresponde: si cambia cualquiera de ellas, vuelve sola
+  // a la primera.
+  const clavePagina = JSON.stringify([busqueda, desde, hasta]);
+  const [paginaGuardada, setPaginaGuardada] = useState({ clave: clavePagina, pagina: 0 });
+  // Si cambió la búsqueda o alguna fecha, la página guardada ya no
+  // corresponde: se vuelve a la primera (así, al limpiar los filtros, tampoco
+  // reaparece una página vieja).
+  if (paginaGuardada.clave !== clavePagina) {
+    setPaginaGuardada({ clave: clavePagina, pagina: 0 });
+  }
+
+  // "Desde" posterior a "Hasta": no tiene sentido, no se muestra nada hasta
+  // que se corrija (las fechas ISO se pueden comparar como texto).
+  const rangoInvalido = !!desde && !!hasta && desde > hasta;
+  const hayFiltroFecha = !!desde || !!hasta;
+  const filtrosActivos = hayFiltroFecha ? 1 : 0;   // las dos fechas cuentan como uno solo
+
+  function limpiarFiltros() {
+    setDesde("");
+    setHasta("");
+  }
+
+  // Primero se filtra y se ordena, y recién después se parte en páginas.
+  const fechaDe = (item) => obtenerSolicitud(item).created_at;
+  const filtrados = rangoInvalido
+    ? []
+    : masRecientesPrimero(
+        items.filter(
+          (item) =>
+            coincideSolicitud(obtenerSolicitud(item), busqueda) &&
+            enRangoDeFechas(fechaDe(item), desde, hasta)
+        ),
+        fechaDe
+      );
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  const pagina = Math.min(paginaGuardada.clave === clavePagina ? paginaGuardada.pagina : 0, totalPaginas - 1);
+  const primera = pagina * POR_PAGINA;
+  const grupos = agruparPorFecha(filtrados.slice(primera, primera + POR_PAGINA), fechaDe);
+
+  return (
+    <div>
+      <BarraFiltros
+        placeholder="Buscar por N° de solicitud (ej: #12) o por equipo"
+        texto={busqueda}
+        onTexto={setBusqueda}
+        filtrosActivos={filtrosActivos}
+        onLimpiar={limpiarFiltros}
+      >
+        {/* Fecha en que se hizo la solicitud: rango de días, los dos
+        extremos incluidos. */}
+        <GrupoFiltro etiqueta="Fecha de la solicitud">
+          <label style={estilos.campoFecha}>
+            Desde
+            <input
+              type="date"
+              style={estilos.inputFecha}
+              value={desde}
+              max={hasta || undefined}
+              onChange={(e) => setDesde(e.target.value)}
+            />
+          </label>
+          <label style={estilos.campoFecha}>
+            Hasta
+            <input
+              type="date"
+              style={estilos.inputFecha}
+              value={hasta}
+              min={desde || undefined}
+              onChange={(e) => setHasta(e.target.value)}
+            />
+          </label>
+        </GrupoFiltro>
+      </BarraFiltros>
+
+      {filtrados.length === 0 && (
+        <p style={estilos.mensaje}>
+          {rangoInvalido
+            ? "La fecha \"Desde\" no puede ser posterior a la fecha \"Hasta\"."
+            : busqueda.trim()
+              ? "No encontramos ninguna solicitud con esa búsqueda."
+              : "No hay solicitudes en ese rango de fechas."}
+        </p>
+      )}
+
+      {/* ─── Páginas: flechas arriba de la lista ─── */}
+      <Paginador
+        pagina={pagina}
+        totalPaginas={totalPaginas}
+        onCambiar={(n) => setPaginaGuardada({ clave: clavePagina, pagina: n })}
+      />
+
+      {grupos.map((grupo) => (
+        <div key={grupo.fecha}>
+          <h3 style={estilos.fechaTitulo}>{grupo.fecha}</h3>
+          {grupo.items.map((item) => (
+            <Fragment key={obtenerSolicitud(item).id}>{renderItem(item)}</Fragment>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SOLAPA 2 y 4 — Lista simple de solicitudes por estado (enviadas / rechazadas)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -448,7 +580,6 @@ function ListaSolicitudes({ estado, vacio }) {
   const [solicitudes, setSolicitudes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [filtroNumero, setFiltroNumero] = useState("");
 
   useEffect(() => {
     misSolicitudes(estado)
@@ -461,39 +592,18 @@ function ListaSolicitudes({ estado, vacio }) {
   if (error) return <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>;
   if (solicitudes.length === 0) return <p style={estilos.mensaje}>{vacio}</p>;
 
-  // Filtra por número de solicitud (acepta que escriban "#12" o solo "12").
-  const textoFiltro = filtroNumero.trim().replace(/^#/, "");
-  const solicitudesFiltradas = textoFiltro
-    ? solicitudes.filter((s) => String(s.numero_solicitud).includes(textoFiltro))
-    : solicitudes;
-  const grupos = agruparPorFecha(solicitudesFiltradas, (s) => s.created_at);
-
   return (
-    <div>
-      <input
-        style={estilos.filtro}
-        placeholder="Buscar por N° de solicitud…"
-        value={filtroNumero}
-        onChange={(e) => setFiltroNumero(e.target.value)}
-      />
-
-      {grupos.length === 0 && (
-        <p style={estilos.mensaje}>No encontramos ninguna solicitud con ese número.</p>
+    <ListaFiltrable
+      items={solicitudes}
+      obtenerSolicitud={(s) => s}
+      renderItem={(s) => (
+        <TarjetaSolicitud s={s}>
+          {s.estado === "RECHAZADA" && s.motivo_rechazo && (
+            <p style={estilos.motivoRechazo}>Motivo: {s.motivo_rechazo}</p>
+          )}
+        </TarjetaSolicitud>
       )}
-
-      {grupos.map((grupo) => (
-        <div key={grupo.fecha}>
-          <h3 style={estilos.fechaTitulo}>{grupo.fecha}</h3>
-          {grupo.items.map((s) => (
-            <TarjetaSolicitud key={s.id} s={s}>
-              {s.estado === "RECHAZADA" && s.motivo_rechazo && (
-                <p style={estilos.motivoRechazo}>Motivo: {s.motivo_rechazo}</p>
-              )}
-            </TarjetaSolicitud>
-          ))}
-        </div>
-      ))}
-    </div>
+    />
   );
 }
 
@@ -511,7 +621,6 @@ function ListaAceptadas() {
   const [items, setItems] = useState([]); // [{ solicitud, ot }]
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [filtroNumero, setFiltroNumero] = useState("");
 
   const cargar = useCallback(async () => {
     setError("");
@@ -545,39 +654,19 @@ function ListaAceptadas() {
   if (error) return <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>;
   if (items.length === 0) return <p style={estilos.mensaje}>No tenés solicitudes aceptadas todavía.</p>;
 
-  const textoFiltro = filtroNumero.trim().replace(/^#/, "");
-  const itemsFiltrados = textoFiltro
-    ? items.filter((it) => String(it.solicitud.numero_solicitud).includes(textoFiltro))
-    : items;
-  const grupos = agruparPorFecha(itemsFiltrados, (it) => it.solicitud.created_at);
-
   return (
-    <div>
-      <input
-        style={estilos.filtro}
-        placeholder="Buscar por N° de solicitud…"
-        value={filtroNumero}
-        onChange={(e) => setFiltroNumero(e.target.value)}
-      />
-
-      {grupos.length === 0 && (
-        <p style={estilos.mensaje}>No encontramos ninguna solicitud con ese número.</p>
-      )}
-
-      {grupos.map((grupo) => (
-        <div key={grupo.fecha}>
-          <h3 style={estilos.fechaTitulo}>{grupo.fecha}</h3>
-          {grupo.items.map(({ solicitud: s, ot }) => {
-            const estado = estadoOt(s);
-            return (
-              <TarjetaSolicitud key={s.id} s={s}>
-                <span style={insignia(estado.tono)}>{estado.texto}</span>
-              </TarjetaSolicitud>
-            );
-          })}
-        </div>
-      ))}
-    </div>
+    <ListaFiltrable
+      items={items}
+      obtenerSolicitud={(it) => it.solicitud}
+      renderItem={({ solicitud: s }) => {
+        const estado = estadoOt(s);
+        return (
+          <TarjetaSolicitud s={s}>
+            <span style={insignia(estado.tono)}>{estado.texto}</span>
+          </TarjetaSolicitud>
+        );
+      }}
+    />
   );
 }
 
@@ -675,10 +764,11 @@ const estilos = {
   error: { color: color.peligro, fontSize: "0.85rem", margin: "0 0 12px" },
   exito: { color: color.exito, fontSize: "0.85rem", margin: "0 0 12px" },
   mensaje: { color: color.textoSuave, padding: "20px 0" },
-  filtro: {
-    ...cs.input,
-    width: "100%", maxWidth: 280, marginBottom: 20,
+  campoFecha: {
+    display: "flex", alignItems: "center", gap: 5,
+    fontSize: "0.78rem", color: color.textoSuave,
   },
+  inputFecha: { ...cs.input, width: "auto", padding: "3px 8px", fontSize: "0.78rem" },
   fechaTitulo: { fontSize: "0.8rem", color: color.textoDebil, fontWeight: 700, letterSpacing: "0.02em", margin: "22px 0 10px", textTransform: "uppercase" },
   numeroSolicitud: { fontSize: "0.74rem", color: color.primario, fontWeight: 700, marginBottom: 4 },
   tituloSolicitud: { color: color.texto, fontSize: "0.98rem" },

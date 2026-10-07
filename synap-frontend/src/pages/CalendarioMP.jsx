@@ -25,6 +25,11 @@
 //   - Grupo técnico: las opciones salen de los propios ítems del mes (no de
 //     un catálogo aparte), así nunca ofrece un grupo que ese mes no tiene
 //     nada.
+//
+// Formato: igual que Equipos, Órdenes y Accesorios — el buscador arriba con un
+// botón "Filtros" que despliega (y esconde) los filtros de estado y de grupo,
+// y las flechas de página ("Anterior / Siguiente") arriba de la lista, de a
+// 50. Al cambiar de mes, de búsqueda o de filtro vuelve a la primera página.
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -37,6 +42,8 @@ import { calendarioPreventivas, generarPreventivas, resumenCalendario } from "..
 import { obtenerPerfil } from "../api/auth";
 import { opcionesDeFiltro, listarActivos } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
+import BarraFiltros, { GrupoFiltro } from "../componentes/BarraFiltros";
+import Paginador from "../componentes/Paginador";
 import { color, cs, boton, insignia, sombra } from "../tema";
 import { diasHasta, parsearFecha } from "../utiles/fechas";
 
@@ -47,6 +54,9 @@ const MESES = [
 const MESES_ABREV = MESES.map((m) => m.slice(0, 3));
 
 const PUEDE_GENERAR = ["coordinacion", "jefatura"];
+
+// Cuántos equipos se muestran por página.
+const POR_PAGINA = 50;
 
 // "YYYY-MM" a partir de un Date — lo que espera el input type="month" y el
 // endpoint /preventivas/calendario/resumen.
@@ -112,6 +122,18 @@ function CalendarioMP() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroGrupo, setFiltroGrupo] = useState("");
+
+  // Página actual (0 = la primera), guardada junto con el mes, la búsqueda y
+  // los filtros a los que corresponde: si cambia cualquiera de ellos, vuelve
+  // sola a la primera.
+  const clavePagina = JSON.stringify([anio, mes, busqueda, filtroEstado, filtroGrupo]);
+  const [paginaGuardada, setPaginaGuardada] = useState({ clave: clavePagina, pagina: 0 });
+  // Si cambió el mes, la búsqueda o algún filtro, la página guardada ya no
+  // corresponde: se vuelve a la primera (así, al limpiar los filtros, tampoco
+  // reaparece una página vieja).
+  if (paginaGuardada.clave !== clavePagina) {
+    setPaginaGuardada({ clave: clavePagina, pagina: 0 });
+  }
 
   // ─── Gráfico "carga de mantenimientos por mes" ───
   // Por default arranca en el mes actual y muestra los 6 siguientes: es una
@@ -261,21 +283,38 @@ function CalendarioMP() {
     ? items.filter((item) => coincideFiltros(item, { busqueda, estado: filtroEstado, grupo: filtroGrupo }))
     : items;
 
-  function limpiarFiltros() {
-    setBusqueda("");
+  // Cuántos filtros del panel hay puestos (la búsqueda no cuenta: ya se ve
+  // en su propio campo).
+  const filtrosActivos = (filtroEstado ? 1 : 0) + (filtroGrupo ? 1 : 0);
+
+  // "Limpiar filtros" del panel saca el estado y el grupo; el de abajo, el del
+  // cartel de "ningún equipo coincide", saca también la búsqueda.
+  function limpiarFiltrosPanel() {
     setFiltroEstado("");
     setFiltroGrupo("");
   }
+
+  function limpiarFiltros() {
+    setBusqueda("");
+    limpiarFiltrosPanel();
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(itemsFiltrados.length / POR_PAGINA));
+  const pagina = Math.min(paginaGuardada.clave === clavePagina ? paginaGuardada.pagina : 0, totalPaginas - 1);
+  const primera = pagina * POR_PAGINA;
+  const itemsPagina = itemsFiltrados.slice(primera, primera + POR_PAGINA);
+
+  const subtitulo = totalPaginas > 1
+    ? `Mostrando ${primera + 1}–${primera + itemsPagina.length} de ${itemsFiltrados.length}`
+    : hayFiltrosActivos
+      ? `${itemsFiltrados.length} de ${items.length} en esta vista`
+      : "Preventivos generados y programados, mes a mes";
 
   return (
     <>
       <Encabezado
         titulo="Calendario de mantenimientos"
-        subtitulo={
-          hayFiltrosActivos
-            ? `${itemsFiltrados.length} de ${items.length} en esta vista`
-            : "Preventivos generados y programados, mes a mes"
-        }
+        subtitulo={subtitulo}
       />
 
       {/* ─── Buscador: próximo mantenimiento de un equipo puntual ───
@@ -443,59 +482,52 @@ function CalendarioMP() {
         )}
       </div>
 
-      {/* ─── Buscador: por código o nombre del equipo ─── */}
-      <div style={estilos.campoBusqueda}>
-        <Search size={17} strokeWidth={1.9} color={color.textoDebil} aria-hidden="true" />
-        <input
-          style={estilos.inputBusqueda}
-          placeholder="Buscar por código o nombre del equipo"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-        {busqueda && (
-          <button style={estilos.limpiarBusqueda} onClick={() => setBusqueda("")} title="Limpiar">
-            <X size={15} strokeWidth={2.2} aria-hidden="true" />
-          </button>
-        )}
-      </div>
-
-      {/* ─── Filtro por estado ─── */}
-      <div style={estilos.filtros}>
-        {FILTROS_ESTADO.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFiltroEstado(f.id)}
-            style={{
-              ...estilos.filtro,
-              ...(filtroEstado === f.id ? estilos.filtroActivo : {}),
-            }}
-          >
-            {f.texto}
-          </button>
-        ))}
-      </div>
-
-      {/* ─── Filtro por grupo técnico: solo si hay más de uno este mes,
-      elegir entre uno solo no aporta nada. ─── */}
-      {grupos.length > 1 && (
-        <div style={estilos.filtros}>
-          <button
-            onClick={() => setFiltroGrupo("")}
-            style={{ ...estilos.filtro, ...(filtroGrupo === "" ? estilos.filtroActivo : {}) }}
-          >
-            Todos los grupos
-          </button>
-          {grupos.map((g) => (
+      {/* ─── Buscador (por código o nombre del equipo) + filtros plegables ─── */}
+      <BarraFiltros
+        placeholder="Buscar por código o nombre del equipo"
+        texto={busqueda}
+        onTexto={setBusqueda}
+        filtrosActivos={filtrosActivos}
+        onLimpiar={limpiarFiltrosPanel}
+      >
+        <GrupoFiltro etiqueta="Estado">
+          {FILTROS_ESTADO.map((f) => (
             <button
-              key={g}
-              onClick={() => setFiltroGrupo(g)}
-              style={{ ...estilos.filtro, ...(filtroGrupo === g ? estilos.filtroActivo : {}) }}
+              key={f.id}
+              onClick={() => setFiltroEstado(f.id)}
+              style={{
+                ...estilos.chip,
+                ...(filtroEstado === f.id ? estilos.chipActivo : {}),
+              }}
             >
-              {g}
+              {f.texto}
             </button>
           ))}
-        </div>
-      )}
+        </GrupoFiltro>
+
+        {/* Grupo técnico: solo si hay más de uno este mes, elegir entre uno
+        solo no aporta nada (salvo que ya haya uno elegido de otro mes: así
+        se lo puede sacar desde acá). */}
+        {(grupos.length > 1 || filtroGrupo) && (
+          <GrupoFiltro etiqueta="Grupo técnico">
+            <button
+              onClick={() => setFiltroGrupo("")}
+              style={{ ...estilos.chip, ...(filtroGrupo === "" ? estilos.chipActivo : {}) }}
+            >
+              Todos los grupos
+            </button>
+            {grupos.map((g) => (
+              <button
+                key={g}
+                onClick={() => setFiltroGrupo(g)}
+                style={{ ...estilos.chip, ...(filtroGrupo === g ? estilos.chipActivo : {}) }}
+              >
+                {g}
+              </button>
+            ))}
+          </GrupoFiltro>
+        )}
+      </BarraFiltros>
 
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
@@ -512,8 +544,16 @@ function CalendarioMP() {
         </p>
       )}
 
+      {/* ─── Páginas: flechas arriba de la lista ─── */}
+      <Paginador
+        pagina={pagina}
+        totalPaginas={totalPaginas}
+        onCambiar={(n) => setPaginaGuardada({ clave: clavePagina, pagina: n })}
+        deshabilitado={cargando}
+      />
+
       <div style={estilos.lista}>
-        {itemsFiltrados.map((item) => (
+        {itemsPagina.map((item) => (
           <div
             key={item.activo_codigo}
             style={estilos.tarjeta}
@@ -753,6 +793,18 @@ const estilos = {
     cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
   },
   filtroActivo: {
+    background: color.primarioClaro, color: color.primarioOscuro,
+    borderColor: color.primarioClaro,
+  },
+  // Los botoncitos de los filtros plegables: más chicos que los del gráfico de
+  // arriba (mismo tamaño que en Órdenes).
+  chip: {
+    padding: "4px 11px", borderRadius: 999,
+    borderWidth: 1, borderStyle: "solid", borderColor: color.borde,
+    background: color.tarjeta, color: color.textoSuave, fontSize: "0.78rem",
+    cursor: "pointer", fontFamily: "inherit", fontWeight: 600,
+  },
+  chipActivo: {
     background: color.primarioClaro, color: color.primarioOscuro,
     borderColor: color.primarioClaro,
   },

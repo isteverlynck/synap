@@ -4,13 +4,24 @@
 // La idea central es que resuelva sin salir de la lista. Cada tarjeta se abre
 // en el lugar para aceptar, rechazar o corregir. Es lo contrario de Máximo,
 // donde hay que navegar varias pantallas para hacer algo simple.
+//
+// Formato: igual que Equipos, Órdenes y Accesorios — el buscador arriba (por
+// N° de solicitud, por código de equipo, o por lo que es si no es un equipo
+// médico), un botón "Filtros" que despliega y esconde el filtro de fechas
+// ("Desde" y "Hasta": el día en que se hizo la solicitud, en hora de
+// Argentina, los dos incluidos) y las flechas de página ("Anterior /
+// Siguiente") arriba de la lista, de a 50. Se filtra acá, sobre lo que ya se
+// trajo del backend.
 
 import { useEffect, useState } from "react";
 import { solicitudesPendientes, tecnicosDisponibles, listarGrupos, aceptarSolicitud,
          rechazarSolicitud, modificarSolicitud } from "../api/coordinacion";
 import { verCriticidad } from "../api/activos";
 import { agruparPorFecha } from "../utiles/fechas";
+import { coincideSolicitud, enRangoDeFechas, masRecientesPrimero } from "../utiles/solicitudes";
 import Encabezado from "../componentes/Encabezado";
+import BarraFiltros, { GrupoFiltro } from "../componentes/BarraFiltros";
+import Paginador from "../componentes/Paginador";
 import { color, cs, boton, insignia } from "../tema";
 import { toast } from "sonner";
 import { HeartPulse, Wrench } from "lucide-react";
@@ -21,6 +32,9 @@ import { HeartPulse, Wrench } from "lucide-react";
 const PRIORIDAD_SEGUN_NIVEL = { ALTO: "ALTA", MEDIO: "MEDIA", BAJO: "BAJA" };
 const NOMBRE_NIVEL = { ALTO: "alto", MEDIO: "medio", BAJO: "bajo" };
 
+// Cuántas solicitudes se muestran por página.
+const POR_PAGINA = 50;
+
 function Pendientes() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
@@ -29,6 +43,21 @@ function Pendientes() {
   const [error, setError] = useState("");
   // Qué tarjeta está abierta y en qué modo: { id, modo: 'aceptar'|'rechazar'|'modificar' }
   const [abierta, setAbierta] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [desde, setDesde] = useState("");   // "AAAA-MM-DD" o ""
+  const [hasta, setHasta] = useState("");
+
+  // Página actual (0 = la primera), guardada junto con la búsqueda y las
+  // fechas a las que corresponde: si cambia cualquiera de ellas, vuelve sola
+  // a la primera.
+  const clavePagina = JSON.stringify([busqueda, desde, hasta]);
+  const [paginaGuardada, setPaginaGuardada] = useState({ clave: clavePagina, pagina: 0 });
+  // Si cambió la búsqueda o alguna fecha, la página guardada ya no
+  // corresponde: se vuelve a la primera (así, al limpiar los filtros, tampoco
+  // reaparece una página vieja).
+  if (paginaGuardada.clave !== clavePagina) {
+    setPaginaGuardada({ clave: clavePagina, pagina: 0 });
+  }
 
   useEffect(() => { cargar(); }, []);
 
@@ -61,28 +90,111 @@ function Pendientes() {
     setAbierta(null);
   }
 
-  if (cargando) {
-    return <p style={estilos.mensaje}>Cargando solicitudes...</p>;
+  // "Desde" posterior a "Hasta": no tiene sentido, no se muestra nada hasta
+  // que se corrija (las fechas ISO se pueden comparar como texto).
+  const rangoInvalido = !!desde && !!hasta && desde > hasta;
+  const hayFiltroFecha = !!desde || !!hasta;
+  const filtrosActivos = hayFiltroFecha ? 1 : 0;   // las dos fechas cuentan como uno solo
+
+  function limpiarFiltros() {
+    setDesde("");
+    setHasta("");
   }
 
-  const grupos = agruparPorFecha(solicitudes, (s) => s.created_at);
+  // Primero se filtra y se ordena (la más reciente primero), y recién después
+  // se parte en páginas.
+  const solicitudesFiltradas = rangoInvalido
+    ? []
+    : masRecientesPrimero(
+        solicitudes.filter(
+          (s) => coincideSolicitud(s, busqueda) && enRangoDeFechas(s.created_at, desde, hasta)
+        ),
+        (s) => s.created_at
+      );
+  const hayRecorte = busqueda.trim() !== "" || hayFiltroFecha;
+
+  const totalPaginas = Math.max(1, Math.ceil(solicitudesFiltradas.length / POR_PAGINA));
+  const pagina = Math.min(paginaGuardada.clave === clavePagina ? paginaGuardada.pagina : 0, totalPaginas - 1);
+  const primera = pagina * POR_PAGINA;
+  const solicitudesPagina = solicitudesFiltradas.slice(primera, primera + POR_PAGINA);
+  const grupos = agruparPorFecha(solicitudesPagina, (s) => s.created_at);
+
+  const subtitulo = cargando
+    ? "Cargando..."
+    : totalPaginas > 1
+      ? `Mostrando ${primera + 1}–${primera + solicitudesPagina.length} de ${solicitudesFiltradas.length}`
+      : hayRecorte
+        ? `${solicitudesFiltradas.length} de ${solicitudes.length} esperando respuesta`
+        : `${solicitudes.length} esperando respuesta`;
 
   return (
     <>
-      <Encabezado
-        titulo="Solicitudes pendientes"
-        subtitulo={`${solicitudes.length} esperando respuesta`}
-      >
+      <Encabezado titulo="Solicitudes pendientes" subtitulo={subtitulo}>
         <button style={boton("secundario")} onClick={cargar}>Actualizar</button>
       </Encabezado>
 
+      {/* ─── Buscador (por N° de solicitud o equipo) + filtro de fechas plegable ─── */}
+      <BarraFiltros
+        placeholder="Buscar por N° de solicitud (ej: #12) o por equipo"
+        texto={busqueda}
+        onTexto={setBusqueda}
+        filtrosActivos={filtrosActivos}
+        onLimpiar={limpiarFiltros}
+      >
+        {/* Fecha en que se hizo la solicitud: rango de días, los dos
+        extremos incluidos. */}
+        <GrupoFiltro etiqueta="Fecha de la solicitud">
+          <label style={estilos.campoFecha}>
+            Desde
+            <input
+              type="date"
+              style={estilos.inputFecha}
+              value={desde}
+              max={hasta || undefined}
+              onChange={(e) => setDesde(e.target.value)}
+            />
+          </label>
+          <label style={estilos.campoFecha}>
+            Hasta
+            <input
+              type="date"
+              style={estilos.inputFecha}
+              value={hasta}
+              min={desde || undefined}
+              onChange={(e) => setHasta(e.target.value)}
+            />
+          </label>
+        </GrupoFiltro>
+      </BarraFiltros>
+
+      {cargando && <p style={estilos.mensaje}>Cargando solicitudes...</p>}
+
       {error && <p style={{ ...estilos.mensaje, color: color.peligro }}>{error}</p>}
 
-      {solicitudes.length === 0 && !error && (
+      {!cargando && !error && solicitudes.length === 0 && (
         <p style={estilos.mensaje}>No hay solicitudes esperando. Todo al día.</p>
       )}
 
-      {grupos.map((grupo) => (
+      {!cargando && !error && solicitudes.length > 0 && solicitudesFiltradas.length === 0 && (
+        <p style={estilos.mensaje}>
+          {rangoInvalido
+            ? "La fecha \"Desde\" no puede ser posterior a la fecha \"Hasta\"."
+            : busqueda.trim()
+              ? "No encontramos ninguna solicitud con esa búsqueda."
+              : "No hay solicitudes en ese rango de fechas."}
+        </p>
+      )}
+
+      {/* ─── Páginas: flechas arriba de la lista ─── */}
+      {!cargando && (
+        <Paginador
+          pagina={pagina}
+          totalPaginas={totalPaginas}
+          onCambiar={(n) => setPaginaGuardada({ clave: clavePagina, pagina: n })}
+        />
+      )}
+
+      {!cargando && grupos.map((grupo) => (
         <div key={grupo.fecha} style={{ marginBottom: 22 }}>
           <p style={estilos.fecha}>{grupo.fecha}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -426,6 +538,11 @@ function PanelModificar({ s, cerrar, alModificar }) {
 
 const estilos = {
   mensaje: { color: color.textoSuave, padding: "18px 0" },
+  campoFecha: {
+    display: "flex", alignItems: "center", gap: 5,
+    fontSize: "0.78rem", color: color.textoSuave,
+  },
+  inputFecha: { ...cs.input, width: "auto", padding: "3px 8px", fontSize: "0.78rem" },
   fecha: { margin: "0 0 8px", fontSize: "0.72rem", color: color.textoDebil, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 600 },
   tarjeta: { ...cs.tarjeta, padding: "14px 16px" },
   cabecera: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
