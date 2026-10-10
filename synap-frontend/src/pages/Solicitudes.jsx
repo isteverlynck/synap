@@ -3,8 +3,8 @@
 // Tiene 4 solapas:
 //   1. Crear solicitud: el formulario (¿es equipo médico o no? + datos).
 //   2. Enviadas: las que mandé y todavía están PENDIENTE (esperando al coordinador).
-//   3. Aceptadas: las que ya se convirtieron en OT, con su estado de avance
-//      (sin asignar / en progreso / finalizada).
+//   3. Aceptadas: las que ya se convirtieron en OT, con una marca que dice si
+//      ya tienen técnico a cargo (Asignada) o todavía no (Sin asignar).
 //   4. Rechazadas: las que el coordinador rechazó, con el motivo.
 //
 // Las tres listas (enviadas, aceptadas y rechazadas) tienen el mismo formato
@@ -16,10 +16,9 @@
 
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import cliente from "../api/cliente";
 import { logout } from "../api/auth";
 import { crearSolicitud, misSolicitudes, verOrdenTrabajo, subirAdjuntos } from "../api/solicitudes";
-import { verActivo } from "../api/activos";
+import { verActivo, listarActivos } from "../api/activos";
 import Encabezado from "../componentes/Encabezado";
 import BarraFiltros, { GrupoFiltro } from "../componentes/BarraFiltros";
 import Paginador from "../componentes/Paginador";
@@ -127,7 +126,7 @@ function CrearSolicitud({ onCreada, activoInicial }) {
   // código exacto (por ejemplo, leyéndolo del cartelito QR pegado en el equipo).
   useEffect(() => {
     if (esEquipoMedico === true && activos.length === 0) {
-      cliente.get("/activos").then((res) => setActivos(res.data)).catch(() => {});
+      listarActivos().then(setActivos).catch(() => {});
     }
   }, [esEquipoMedico, activos.length]);
 
@@ -608,7 +607,7 @@ function ListaSolicitudes({ estado, vacio }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SOLAPA 3 — Aceptadas, con su sub-estado (sin asignar / en progreso / finalizada)
+// SOLAPA 3 — Aceptadas, con una marca de si ya tienen técnico (Asignada / Sin asignar)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function estadoOt(s) {

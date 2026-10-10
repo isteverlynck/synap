@@ -12,19 +12,25 @@
 // Argentina, los dos incluidos) y las flechas de página ("Anterior /
 // Siguiente") arriba de la lista, de a 50. Se filtra acá, sobre lo que ya se
 // trajo del backend.
+//
+// En cada tarjeta se puede mirar los archivos adjuntos (fotos o PDF) antes de
+// decidir, y "Modificar" corrige el texto, el equipo o el tipo (equipo médico
+// u otra cosa) cuando enfermería lo cargó mal, para no tener que rechazarla.
 
 import { useEffect, useState } from "react";
 import { solicitudesPendientes, tecnicosDisponibles, listarGrupos, aceptarSolicitud,
-         rechazarSolicitud, modificarSolicitud } from "../api/coordinacion";
-import { verCriticidad } from "../api/activos";
+         rechazarSolicitud, modificarSolicitud, resumenAdjuntosPendientes,
+         listarAdjuntosDeSolicitud, abrirAdjuntoDeSolicitud } from "../api/coordinacion";
+import { verCriticidad, verActivo } from "../api/activos";
 import { agruparPorFecha } from "../utiles/fechas";
+import { normalizarCodigo } from "../utiles/codigos";
 import { coincideSolicitud, enRangoDeFechas, masRecientesPrimero } from "../utiles/solicitudes";
 import Encabezado from "../componentes/Encabezado";
 import BarraFiltros, { GrupoFiltro } from "../componentes/BarraFiltros";
 import Paginador from "../componentes/Paginador";
 import { color, cs, boton, insignia } from "../tema";
 import { toast } from "sonner";
-import { HeartPulse, Wrench } from "lucide-react";
+import { HeartPulse, Wrench, Paperclip } from "lucide-react";
 
 // Sugerencia de prioridad según el nivel de riesgo PRIUX del equipo (ver
 // backend/app/criticidad.py::nivel_riesgo). Es un punto de partida nomás:
@@ -39,6 +45,8 @@ function Pendientes() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
   const [gruposTecnicos, setGruposTecnicos] = useState([]);
+  // Cuántos archivos adjuntos tiene cada solicitud: { id: cantidad }.
+  const [cantidadAdjuntos, setCantidadAdjuntos] = useState({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   // Qué tarjeta está abierta y en qué modo: { id, modo: 'aceptar'|'rechazar'|'modificar' }
@@ -65,17 +73,21 @@ function Pendientes() {
     setCargando(true);
     setError("");
     try {
-      // Las tres cosas en paralelo: la lista, los técnicos y los grupos (estos
+      // Las cuatro cosas en paralelo: la lista, los técnicos, los grupos (estos
       // últimos hacen falta para aceptar una solicitud que no es de un
-      // equipo, donde el grupo no se puede deducir y hay que elegirlo).
-      const [lista, gente, listaGrupos] = await Promise.all([
+      // equipo, donde el grupo no se puede deducir y hay que elegirlo) y
+      // cuántos archivos adjuntos tiene cada solicitud. Esto último es un
+      // extra: si falla, la bandeja funciona igual, solo que sin mostrarlos.
+      const [lista, gente, listaGrupos, adjuntos] = await Promise.all([
         solicitudesPendientes(),
         tecnicosDisponibles(),
         listarGrupos(),
+        resumenAdjuntosPendientes().catch(() => ({})),
       ]);
       setSolicitudes(lista);
       setTecnicos(gente);
       setGruposTecnicos(listaGrupos);
+      setCantidadAdjuntos(adjuntos);
     } catch {
       setError("No pudimos cargar las solicitudes pendientes.");
     } finally {
@@ -88,6 +100,33 @@ function Pendientes() {
   function quitarDeLaLista(id) {
     setSolicitudes((antes) => antes.filter((s) => s.id !== id));
     setAbierta(null);
+  }
+
+  // Después de corregir una solicitud se vuelve a pedir la lista, sin el
+  // cartel de "Cargando". Hace falta porque si se cambió el equipo, puede
+  // pertenecer a otro grupo: cambia el grupo que se muestra al aceptarla y,
+  // si ese grupo es de otra persona, ya no tiene que estar en esta bandeja.
+  async function alModificar(actualizada) {
+    // Primero se refleja el cambio en el lugar (respuesta al toque; el grupo
+    // se conserva porque la respuesta del backend no lo trae).
+    setSolicitudes((antes) =>
+      antes.map((x) => (x.id === actualizada.id ? { ...x, ...actualizada, grupo_id: x.grupo_id } : x))
+    );
+    try {
+      const [lista, adjuntos] = await Promise.all([
+        solicitudesPendientes(),
+        resumenAdjuntosPendientes().catch(() => ({})),
+      ]);
+      setSolicitudes(lista);
+      setCantidadAdjuntos(adjuntos);
+      if (!lista.some((x) => x.id === actualizada.id)) {
+        toast.info(`La solicitud #${actualizada.numero_solicitud} pasó a otro grupo`, {
+          description: "Ya no está en tu bandeja: ahora la ve quien coordina ese grupo.",
+        });
+      }
+    } catch {
+      // Si no se pudo actualizar, queda lo que ya se mostró.
+    }
   }
 
   // "Desde" posterior a "Hasta": no tiene sentido, no se muestra nada hasta
@@ -206,12 +245,9 @@ function Pendientes() {
                 grupos={gruposTecnicos}
                 abierta={abierta}
                 setAbierta={setAbierta}
+                cantidadAdjuntos={cantidadAdjuntos[s.id] || 0}
                 alResolver={quitarDeLaLista}
-                alModificar={(actualizada) =>
-                  setSolicitudes((antes) =>
-                    antes.map((x) => (x.id === actualizada.id ? actualizada : x))
-                  )
-                }
+                alModificar={alModificar}
               />
             ))}
           </div>
@@ -225,7 +261,7 @@ function Pendientes() {
 // Una solicitud
 // ─────────────────────────────────────────────────────────────────────────
 
-function Tarjeta({ solicitud: s, tecnicos, grupos, abierta, setAbierta, alResolver, alModificar }) {
+function Tarjeta({ solicitud: s, tecnicos, grupos, abierta, setAbierta, cantidadAdjuntos, alResolver, alModificar }) {
   const modo = abierta?.id === s.id ? abierta.modo : null;
 
   return (
@@ -253,6 +289,12 @@ function Tarjeta({ solicitud: s, tecnicos, grupos, abierta, setAbierta, alResolv
         <p style={estilos.descripcion}>{s.descripcion_problema}</p>
       )}
 
+      {/* Las fotos o PDF que adjuntó quien la pidió, para mirarlos antes de
+      decidir. Solo aparece si tiene alguno. */}
+      {cantidadAdjuntos > 0 && (
+        <AdjuntosDeLaSolicitud solicitudId={s.id} cantidad={cantidadAdjuntos} />
+      )}
+
       {/* Los botones desaparecen cuando hay un panel abierto: así queda claro
       que estás en el medio de una acción y no se dispara otra sin querer. */}
       {!modo && (
@@ -271,6 +313,56 @@ function Tarjeta({ solicitud: s, tecnicos, grupos, abierta, setAbierta, alResolv
       )}
       {modo === "modificar" && (
         <PanelModificar s={s} cerrar={() => setAbierta(null)} alModificar={alModificar} />
+      )}
+    </div>
+  );
+}
+
+// ─── Archivos adjuntos ───
+
+// El botón "Ver archivos adjuntos (n)" despliega la lista de nombres; al tocar
+// un nombre se abre el archivo. La lista se pide la primera vez que se abre,
+// no al cargar la bandeja (serían muchos pedidos para algo que casi nunca se
+// mira).
+function AdjuntosDeLaSolicitud({ solicitudId, cantidad }) {
+  const [abierto, setAbierto] = useState(false);
+  const [archivos, setArchivos] = useState(null);   // null = todavía no se pidió
+  const [error, setError] = useState("");
+
+  function alternar() {
+    const abrir = !abierto;
+    setAbierto(abrir);
+    if (abrir && archivos === null) {
+      setError("");
+      listarAdjuntosDeSolicitud(solicitudId)
+        .then(setArchivos)
+        .catch(() => setError("No pudimos cargar los archivos."));
+    }
+  }
+
+  return (
+    <div style={estilos.adjuntos}>
+      <button type="button" style={estilos.botonAdjuntos} onClick={alternar}>
+        <Paperclip size={14} strokeWidth={1.8} aria-hidden="true" />
+        {abierto ? "Ocultar archivos adjuntos" : `Ver archivos adjuntos (${cantidad})`}
+      </button>
+      {abierto && (
+        <div style={{ marginTop: 6 }}>
+          {error && <p style={estilos.error}>{error}</p>}
+          {!error && archivos === null && <p style={estilos.lineaTenue}>Cargando…</p>}
+          {archivos && archivos.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              style={estilos.archivo}
+              onClick={() =>
+                abrirAdjuntoDeSolicitud(solicitudId, a).catch(() => toast.error("No se pudo abrir el archivo."))
+              }
+            >
+              {a.nombre_archivo}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -482,21 +574,122 @@ function PanelRechazar({ s, cerrar, alResolver }) {
 
 // ─── Modificar ───
 
+// El título que arma el sistema cuando nadie lo escribe a mano (ver
+// crear_solicitud en el backend). Se usa para saber si el título de una
+// solicitud es el automático y, si es así, ponerle el equipo nuevo cuando se
+// corrige el equipo.
+const tituloAutomatico = (identificador) => `Solicitud de servicio — ${identificador}`;
+
 function PanelModificar({ s, cerrar, alModificar }) {
+  const eraEquipo = !!s.activo_codigo;
   const [titulo, setTitulo] = useState(s.titulo || "");
   const [descripcion, setDescripcion] = useState(s.descripcion_problema || "");
   const [ubicacion, setUbicacion] = useState(s.ubicacion || "");
+  // Tipo: equipo médico (se identifica por su ID) u otra cosa (se describe).
+  const [esEquipo, setEsEquipo] = useState(eraEquipo);
+  const [codigo, setCodigo] = useState(s.activo_codigo || "");
+  const [cosa, setCosa] = useState(s.descripcion_cosa || "");
+  // El equipo nuevo, ya confirmado contra el backend (para mostrar qué es).
+  const [equipoValidado, setEquipoValidado] = useState(null);
+  const [validando, setValidando] = useState(false);
+  const [errorCodigo, setErrorCodigo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
 
+  // El ID que hay escrito, en la forma que usa la base. Si es el mismo que ya
+  // tenía la solicitud (aunque sea con otras mayúsculas o espacios) se deja
+  // tal cual estaba, para no tratar como "cambio" lo que no cambió.
+  const codigoEscrito =
+    eraEquipo && codigo.trim().toUpperCase() === s.activo_codigo.toUpperCase()
+      ? s.activo_codigo
+      : normalizarCodigo(codigo);
+
+  // Lo que identifica a la solicitud antes y después de la corrección.
+  const identificadorViejo = s.activo_codigo || s.descripcion_cosa || "";
+  const identificadorNuevo = esEquipo ? codigoEscrito : cosa.trim();
+  // Si el título es el que armó el sistema y nadie lo tocó, acompaña al cambio
+  // de equipo; si alguien lo escribió a mano (o lo está editando acá), se respeta.
+  const seActualizaElTitulo =
+    !!identificadorViejo &&
+    s.titulo === tituloAutomatico(identificadorViejo) &&
+    titulo === s.titulo &&
+    !!identificadorNuevo &&
+    identificadorNuevo !== identificadorViejo;
+
+  // Confirma contra el backend que el ID escrito es un equipo que existe.
+  // Devuelve el equipo, o null si no existe o no se pudo verificar.
+  async function validarEquipo(limpio) {
+    setValidando(true);
+    setErrorCodigo("");
+    try {
+      const activo = await verActivo(limpio);
+      setEquipoValidado(activo);
+      setCodigo(activo.codigo);
+      return activo;
+    } catch (e) {
+      setEquipoValidado(null);
+      // Un 404 es "ese código no existe". Cualquier otra cosa (sin conexión,
+      // error del servidor) no es culpa de lo que se escribió.
+      if (e?.response?.status === 404) {
+        setErrorCodigo(`No encontramos ningún equipo con el ID "${limpio}". Revisalo e intentá de nuevo.`);
+      } else {
+        setErrorCodigo("No pudimos verificar el código en este momento. Probá de nuevo en unos segundos.");
+      }
+      return null;
+    } finally {
+      setValidando(false);
+    }
+  }
+
+  // Al salir del campo (o apretar Enter): si el código cambió, se verifica.
+  function comprobarEquipo() {
+    if (!codigoEscrito || codigoEscrito === s.activo_codigo || equipoValidado?.codigo === codigoEscrito) return;
+    validarEquipo(codigoEscrito);
+  }
+
   async function guardar() {
-    setEnviando(true);
     setError("");
+
+    // 1) Lo que tiene que estar completo y bien según el tipo elegido.
+    if (esEquipo) {
+      if (!identificadorNuevo) {
+        setError("Ingresá el ID del equipo.");
+        return;
+      }
+      const hayQueVerificar =
+        identificadorNuevo !== s.activo_codigo && equipoValidado?.codigo !== identificadorNuevo;
+      if (hayQueVerificar) {
+        setEnviando(true);
+        const activo = await validarEquipo(identificadorNuevo);
+        if (!activo) {
+          setEnviando(false);
+          return;   // el error ya quedó mostrado debajo del campo
+        }
+      }
+    } else if (!identificadorNuevo) {
+      setError("Describí qué es (ej: pinza de oftalmología).");
+      return;
+    }
+
+    // 2) Solo se mandan los campos que cambiaron.
+    setEnviando(true);
     try {
       const cambios = {};
-      if (titulo !== s.titulo) cambios.titulo = titulo;
+      if (seActualizaElTitulo) cambios.titulo = tituloAutomatico(identificadorNuevo);
+      else if (titulo !== s.titulo) cambios.titulo = titulo;
       if (descripcion !== s.descripcion_problema) cambios.descripcion_problema = descripcion;
       if (ubicacion !== s.ubicacion) cambios.ubicacion = ubicacion;
+
+      if (esEquipo !== eraEquipo) {
+        // Cambió el tipo: se manda el tipo nuevo junto con su dato.
+        cambios.es_equipo_medico = esEquipo;
+        if (esEquipo) cambios.activo_codigo = identificadorNuevo;
+        else cambios.descripcion_cosa = identificadorNuevo;
+      } else if (esEquipo) {
+        if (identificadorNuevo !== s.activo_codigo) cambios.activo_codigo = identificadorNuevo;
+      } else if (identificadorNuevo !== (s.descripcion_cosa || "")) {
+        cambios.descripcion_cosa = identificadorNuevo;
+      }
 
       if (Object.keys(cambios).length === 0) { cerrar(); return; }
 
@@ -513,6 +706,57 @@ function PanelModificar({ s, cerrar, alModificar }) {
   return (
     <div style={estilos.panel}>
       <p style={estilos.panelTitulo}>Corregir la solicitud</p>
+
+      <label style={cs.label}>¿Es un equipo médico?</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button type="button" style={esEquipo ? estilos.opcionActiva : estilos.opcion}
+                onClick={() => setEsEquipo(true)}>
+          Sí, es un equipo médico
+        </button>
+        <button type="button" style={!esEquipo ? estilos.opcionActiva : estilos.opcion}
+                onClick={() => setEsEquipo(false)}>
+          No (ej: instrumental)
+        </button>
+      </div>
+
+      {esEquipo ? (
+        <>
+          <label style={cs.label}>ID del equipo</label>
+          <input
+            style={{ ...cs.input, marginBottom: 6 }}
+            placeholder="Ej: B-CIRU-MAAN-056"
+            value={codigo}
+            onChange={(e) => {
+              setCodigo(e.target.value);
+              setEquipoValidado(null);
+              setErrorCodigo("");
+            }}
+            onBlur={comprobarEquipo}
+            onKeyDown={(e) => e.key === "Enter" && comprobarEquipo()}
+          />
+          {validando && <p style={estilos.sugerencia}>Verificando…</p>}
+          {errorCodigo && <p style={estilos.error}>{errorCodigo}</p>}
+          {equipoValidado && !errorCodigo && (
+            <p style={estilos.confirmacion}>{equipoValidado.codigo} — {equipoValidado.descripcion}</p>
+          )}
+        </>
+      ) : (
+        <>
+          <label style={cs.label}>¿Qué es?</label>
+          <input
+            style={{ ...cs.input, marginBottom: 6 }}
+            placeholder="Ej: pinza de oftalmología"
+            value={cosa}
+            onChange={(e) => setCosa(e.target.value)}
+          />
+        </>
+      )}
+      {seActualizaElTitulo && (
+        <p style={estilos.sugerencia}>
+          El título pasará a ser “{tituloAutomatico(identificadorNuevo)}”.
+        </p>
+      )}
+      <div style={{ marginBottom: 10 }} />
 
       <label style={cs.label}>Título</label>
       <input style={{ ...cs.input, marginBottom: 10 }} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
@@ -555,6 +799,27 @@ const estilos = {
   panelTitulo: { margin: "0 0 12px", fontSize: "0.9rem", fontWeight: 700, color: color.texto },
   sugerencia: { margin: "4px 0 6px", fontSize: "0.78rem", color: color.textoDebil },
   error: { color: color.peligro, fontSize: "0.84rem", margin: "0 0 10px" },
+  confirmacion: { color: color.exito, fontSize: "0.84rem", margin: "0 0 6px" },
+  opcion: {
+    flex: 1, padding: "9px 10px", borderRadius: 10, border: `1.5px solid ${color.borde}`,
+    background: color.tarjeta, cursor: "pointer", fontFamily: "inherit", fontSize: "0.84rem", color: color.texto,
+  },
+  opcionActiva: {
+    flex: 1, padding: "9px 10px", borderRadius: 10, border: `1.5px solid ${color.primario}`,
+    background: color.primarioClaro, cursor: "pointer", fontWeight: 600,
+    fontFamily: "inherit", fontSize: "0.84rem", color: color.primarioOscuro,
+  },
+  adjuntos: { marginTop: 10 },
+  botonAdjuntos: {
+    display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none",
+    padding: 0, cursor: "pointer", color: color.primario, fontSize: "0.85rem",
+    fontWeight: 600, fontFamily: "inherit",
+  },
+  archivo: {
+    display: "block", background: "none", border: "none", padding: "4px 0", cursor: "pointer",
+    color: color.primario, fontSize: "0.88rem", textAlign: "left", fontFamily: "inherit",
+    wordBreak: "break-all",
+  },
 };
 
 export default Pendientes;

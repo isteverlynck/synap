@@ -1,7 +1,7 @@
 // Cascaron.jsx — el marco que rodea a todas las pantallas de adentro.
 //
 // Contiene lo que es igual para todos: la barra de arriba (saludo,
-// notificaciones, ajustes) y el menú de navegación. Lo único que cambia según
+// descargas, acceso a Mi cuenta) y el menú de navegación. Lo único que cambia según
 // el rol es QUÉ ítems tiene ese menú.
 //
 // En compu el menú es una barra lateral oscura; en celular pasa abajo, como
@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { color } from "../tema";
 import {
   QrCode, Inbox, ClipboardList, HeartPulse, Package,
-  CalendarClock, CalendarDays, BarChart3, Bell, Boxes, Download,
+  CalendarClock, CalendarDays, BarChart3, Boxes, Download,
 } from "lucide-react";
 
 // ─── Qué ve cada rol ──────────────────────────────────────────────────────
@@ -213,9 +213,6 @@ function Cascaron() {
                 )}
               </div>
             )}
-            <button style={estilos.iconoBoton} title="Notificaciones">
-              <Icono nombre="campana" color={color.textoSuave} />
-            </button>
             {/* El avatar lleva a Mi cuenta, donde vive el cerrar sesión. Antes
             cerraba la sesión de una: un click sin querer te sacaba. */}
             <div
@@ -301,7 +298,6 @@ const ICONOS = {
   calendario: CalendarClock,
   "calendario-dias": CalendarDays,
   grafico: BarChart3,
-  campana: Bell,
   catalogos: Boxes,
   descargar: Download,
 };

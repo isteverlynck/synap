@@ -1,5 +1,6 @@
 // coordinacion.js — lo que hace el coordinador con las solicitudes que le
-// llegan: verlas, corregirlas, aceptarlas (con o sin técnico) o rechazarlas.
+// llegan: verlas (con sus archivos adjuntos), corregirlas, aceptarlas (con o
+// sin técnico) o rechazarlas.
 
 import cliente from "./cliente";
 
@@ -55,4 +56,54 @@ export async function rechazarSolicitud(id, motivo) {
 export async function modificarSolicitud(id, cambios) {
   const res = await cliente.patch(`/solicitudes/${id}/modificar`, cambios);
   return res.data;
+}
+
+// ─── Archivos adjuntos de una solicitud pendiente ───
+// Las fotos o PDF que subió quien hizo la solicitud. Una vez aceptada se ven
+// desde la orden de trabajo (api/ordenes.js); estas tres sirven para mirarlos
+// ANTES de decidir.
+
+// Cuántos archivos tiene cada solicitud pendiente de la bandeja:
+// { "id de la solicitud": cantidad }. Las que no tienen ninguno no figuran.
+export async function resumenAdjuntosPendientes() {
+  const res = await cliente.get("/solicitudes/pendientes/adjuntos-resumen");
+  return res.data;
+}
+
+// Solo los nombres, para la lista. El archivo en sí se pide al tocarlo.
+export async function listarAdjuntosDeSolicitud(solicitudId) {
+  const res = await cliente.get(`/solicitudes/${solicitudId}/adjuntos`);
+  return res.data;
+}
+
+// Abre un adjunto. No alcanza con un link común porque el backend pide el
+// token de sesión: lo pedimos con axios (que ya lo agrega), lo recibimos como
+// "blob" (el archivo en crudo) y armamos una dirección temporal para abrirlo.
+//
+// Las fotos JPG/PNG y los PDF se abren en una pestaña nueva. Las HEIC se
+// descargan con su nombre, porque la mayoría de los navegadores no las muestran.
+export async function abrirAdjuntoDeSolicitud(solicitudId, adjunto) {
+  const esHeic = adjunto.tipo_mime === "image/heic" || adjunto.tipo_mime === "image/heif";
+  // La pestaña se abre ANTES de pedir el archivo: si se abre después de
+  // esperar la respuesta, algunos navegadores (Safari) la bloquean.
+  const pestana = esHeic ? null : window.open("", "_blank");
+  try {
+    const res = await cliente.get(`/solicitudes/${solicitudId}/adjuntos/${adjunto.id}`, {
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(res.data);
+    if (pestana) {
+      pestana.location.href = url;
+    } else {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = adjunto.nombre_archivo;
+      link.click();
+    }
+    // La dirección temporal se libera al rato, cuando ya se abrió.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    if (pestana) pestana.close();
+    throw err;
+  }
 }

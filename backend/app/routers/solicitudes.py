@@ -202,6 +202,30 @@ def _grupo_de_activo(db, activo_codigo):
     return rel.grupo_id if rel else None
 
 
+def _es_de_mis_grupos(db, sol, mis_grupos):
+    """¿La solicitud le corresponde a un coordinador que atiende estos grupos?
+
+    Es el mismo criterio con el que se arma la bandeja de pendientes: las de un
+    equipo son del grupo que atiende ese equipo, y las de 'cosa' (sin equipo)
+    las ven todos los coordinadores.
+    """
+    if not sol.activo_codigo:
+        return True
+    return _grupo_de_activo(db, sol.activo_codigo) in mis_grupos
+
+
+def _validar_grupo_de_la_solicitud(db, sol, current_user):
+    """Corta con 403 si la solicitud es de un equipo de un grupo que esta
+    persona no coordina. Lo usan rechazar, modificar y los adjuntos, igual que
+    ya lo hacía aceptar: así nadie toca una solicitud que no ve en su bandeja,
+    aunque conozca su id."""
+    if not _es_de_mis_grupos(db, sol, grupos_del_coordinador(db, current_user)):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo podés gestionar solicitudes de los grupos que coordinás.",
+        )
+
+
 @router.patch("/{solicitud_id}/aceptar", response_model=SolicitudOut)
 def aceptar_solicitud(
     solicitud_id: str,
@@ -338,6 +362,7 @@ def rechazar_solicitud(
     ).first()
     if sol is None:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    _validar_grupo_de_la_solicitud(db, sol, current_user)
     if sol.estado != "PENDIENTE":
         raise HTTPException(status_code=400, detail=f"La solicitud ya está {sol.estado}.")
 
@@ -362,6 +387,10 @@ def modificar_solicitud(
     ).first()
     if sol is None:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    # Se controla contra el equipo que tenía ANTES de la corrección: si se
+    # cambia por un equipo de otro grupo, la solicitud pasa a la bandeja de ese
+    # grupo (es una forma válida de corregir un equipo mal cargado).
+    _validar_grupo_de_la_solicitud(db, sol, current_user)
     if sol.estado != "PENDIENTE":
         raise HTTPException(status_code=400, detail="Solo se modifican solicitudes pendientes.")
 
@@ -425,6 +454,12 @@ def modificar_solicitud(
 # ═══════════════════════════════════════════════════════════════════════════
 
 import os
+import uuid
+from urllib.parse import quote
+
+from fastapi.responses import Response
+from sqlalchemy.orm import defer
+
 from ..models import AdjuntoSolicitud
 from ..schemas import AdjuntoOut
 
@@ -501,3 +536,117 @@ def subir_adjuntos(
     for adjunto in nuevos:
         db.refresh(adjunto)
     return nuevos
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ADJUNTOS (GET) — lo que ve coordinación ANTES de aceptar la solicitud
+# ═══════════════════════════════════════════════════════════════════════════
+# Una vez aceptada, los archivos se ven desde la orden de trabajo (ver
+# ordenes_trabajo.py). Estos endpoints sirven para la bandeja de pendientes:
+# coordinación puede mirar las fotos antes de decidir. Solo las ve quien
+# coordina el grupo de la solicitud (mismo control que aceptar).
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _a_uuid(valor):
+    """Convierte el texto de la dirección en un UUID; None si no lo es (así un
+    id mal escrito da 404 y no un error del servidor)."""
+    try:
+        return uuid.UUID(str(valor))
+    except ValueError:
+        return None
+
+
+@router.get("/pendientes/adjuntos-resumen")
+def resumen_adjuntos_pendientes(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+) -> dict[str, int]:
+    """Cuántos archivos adjuntos tiene cada solicitud pendiente que esta
+    persona ve en su bandeja: {id de la solicitud: cantidad}. Las que no tienen
+    ninguno no aparecen. Lo usa la pantalla para mostrar "Adjuntos (2)" sin
+    pedir la lista de archivos de cada tarjeta."""
+    cuentas = (
+        db.query(AdjuntoSolicitud.solicitud_id, func.count(AdjuntoSolicitud.id))
+        .join(SolicitudServicio, SolicitudServicio.id == AdjuntoSolicitud.solicitud_id)
+        .filter(SolicitudServicio.estado == "PENDIENTE")
+        .group_by(AdjuntoSolicitud.solicitud_id)
+        .all()
+    )
+    if not cuentas:
+        return {}
+
+    ids = [solicitud_id for solicitud_id, _ in cuentas]
+    solicitudes = {
+        s.id: s
+        for s in db.query(SolicitudServicio).filter(SolicitudServicio.id.in_(ids)).all()
+    }
+    mis_grupos = grupos_del_coordinador(db, current_user)
+    return {
+        str(solicitud_id): cantidad
+        for solicitud_id, cantidad in cuentas
+        if solicitud_id in solicitudes
+        and _es_de_mis_grupos(db, solicitudes[solicitud_id], mis_grupos)
+    }
+
+
+@router.get("/{solicitud_id}/adjuntos", response_model=list[AdjuntoOut])
+def listar_adjuntos_de_solicitud(
+    solicitud_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Nombres de los archivos adjuntos de una solicitud (sin el archivo en sí)."""
+    id_solicitud = _a_uuid(solicitud_id)
+    sol = (
+        db.query(SolicitudServicio).filter(SolicitudServicio.id == id_solicitud).first()
+        if id_solicitud else None
+    )
+    if sol is None:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    _validar_grupo_de_la_solicitud(db, sol, current_user)
+
+    return (
+        db.query(AdjuntoSolicitud)
+        # defer: no traer el archivo en sí, que puede pesar varios MB y para
+        # la lista solo hace falta el nombre.
+        .options(defer(AdjuntoSolicitud.contenido))
+        .filter(AdjuntoSolicitud.solicitud_id == sol.id)
+        .order_by(AdjuntoSolicitud.created_at)
+        .all()
+    )
+
+
+@router.get("/{solicitud_id}/adjuntos/{adjunto_id}")
+def ver_adjunto_de_solicitud(
+    solicitud_id: str,
+    adjunto_id: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(requiere_rol("coordinacion")),
+):
+    """Devuelve el archivo en sí, para abrirlo o descargarlo."""
+    id_solicitud = _a_uuid(solicitud_id)
+    sol = (
+        db.query(SolicitudServicio).filter(SolicitudServicio.id == id_solicitud).first()
+        if id_solicitud else None
+    )
+    if sol is None:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    _validar_grupo_de_la_solicitud(db, sol, current_user)
+
+    # El archivo tiene que ser de ESTA solicitud (no de cualquier otra).
+    id_adjunto = _a_uuid(adjunto_id)
+    adjunto = (
+        db.query(AdjuntoSolicitud)
+        .filter(AdjuntoSolicitud.id == id_adjunto, AdjuntoSolicitud.solicitud_id == sol.id)
+        .first()
+        if id_adjunto else None
+    )
+    if adjunto is None:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    return Response(
+        content=adjunto.contenido,
+        media_type=adjunto.tipo_mime,
+        # inline: que el navegador lo abra (foto o PDF) en vez de forzar la descarga.
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(adjunto.nombre_archivo)}"},
+    )
