@@ -48,6 +48,16 @@ const COLOR_ESTADO_OT = {
   CERRADA: "#667085",
 };
 
+// Urgencia (prioridad) de las fallas. El backend manda la prioridad tal cual
+// está guardada en la OT, o SIN_PRIORIDAD si coordinación no le puso ninguna.
+const NOMBRE_URGENCIA = {
+  BAJA: "Baja",
+  MEDIA: "Media",
+  ALTA: "Alta",
+  CRITICA: "Crítica",
+  SIN_PRIORIDAD: "Sin prioridad",
+};
+
 // Vida útil de los equipos, según antigüedad (criterio del Hospital Alemán,
 // ver dashboard.py::_estado_vida_util). Colores en degradé de "está bien" a
 // "ya no" — mismo criterio de colores reservados que el resto del dashboard.
@@ -189,8 +199,8 @@ function Dashboard() {
           icono={UserX}
           etiqueta="OT sin asignar"
           valor={kpis.ot_sin_asignar}
-          notaOk="Todas las órdenes abiertas tienen técnico asignado."
-          notaAlerta="Órdenes abiertas (correctivas o preventivas) sin técnico asignado todavía."
+          notaOk="Todas las órdenes correctivas abiertas tienen técnico asignado."
+          notaAlerta="Órdenes correctivas abiertas sin técnico asignado todavía."
         />
         <TarjetaAlerta
           icono={CalendarX}
@@ -225,7 +235,7 @@ function Dashboard() {
           etiqueta="Cumplimiento de preventivos"
           valor={kpis.cumplimiento_mp_pct !== null ? `${kpis.cumplimiento_mp_pct}%` : null}
           nota={kpis.mp_totales > 0
-            ? `${kpis.mp_realizados} de ${kpis.mp_totales} realizados${mesMP ? " ese mes" : ""}`
+            ? `${kpis.mp_realizados} de ${kpis.mp_totales} realizados${mesMP ? " ese mes" : ""}. El % cuenta solo los hechos dentro de su mes programado.`
             : (mesMP ? "Sin preventivos programados ese mes" : "No hay preventivos cargados")}
           progreso={kpis.cumplimiento_mp_pct !== null ? { valor: kpis.cumplimiento_mp_pct, total: 100 } : null}
           extra={
@@ -276,7 +286,7 @@ function Dashboard() {
           etiqueta="Fallas registradas"
           valor={kpis.fallas_totales}
           nota={kpis.fallas_por_tipo.length > 0
-            ? `${kpis.fallas_por_tipo.length} tipos distintos`
+            ? `${kpis.fallas_por_tipo.length} ${kpis.fallas_por_tipo.length === 1 ? "nivel" : "niveles"} de urgencia`
             : "Sin fallas registradas"}
         />
       </div>
@@ -338,16 +348,16 @@ function Dashboard() {
       </Seccion>
 
       <Seccion
-        titulo="Tipos de falla más frecuentes"
-        ayuda="Sirve para detectar si el problema es del equipo o del uso que se le da."
+        titulo="Fallas por urgencia"
+        ayuda="Muestra cuántas fallas hubo de cada nivel de urgencia (Baja, Media, Alta, Crítica). Sirve para ver si los problemas son graves o menores."
       >
         {kpis.fallas_por_tipo.length === 0 && (
-          <p style={estilos.vacio}>Todavía no hay fallas clasificadas.</p>
+          <p style={estilos.vacio}>Todavía no hay fallas registradas.</p>
         )}
         {kpis.fallas_por_tipo.map((f) => (
           <Barra
             key={f.tipo_falla}
-            etiqueta={f.tipo_falla === "SIN_TIPO" ? "Sin clasificar" : f.tipo_falla}
+            etiqueta={NOMBRE_URGENCIA[f.tipo_falla] || f.tipo_falla}
             valor={f.cantidad}
             maximo={kpis.fallas_por_tipo[0].cantidad}
             sufijo={f.cantidad === 1 ? "vez" : "veces"}

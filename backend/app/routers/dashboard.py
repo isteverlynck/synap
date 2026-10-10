@@ -18,8 +18,9 @@ Sobre "fallas" (KPI 3 y 5): el reporte de fallas del anteproyecto lo cubre el
 flujo de solicitudes de servicio (una solicitud aceptada por coordinación se
 convierte en OT correctiva) — la tabla `Falla` quedó sin usar, nada la
 escribe. Por eso estos dos KPI leen de OT tipo CORRECTIVA, no de `Falla`:
-"por tipo" agrupa por `prioridad` (baja/media/alta/urgente), que es la
-clasificación que sí existe en el sistema. Para el MTBF, la fecha del evento
+"por tipo" agrupa por `prioridad` (baja/media/alta/crítica), que es la
+clasificación que sí existe en el sistema (en pantalla se muestra como "Fallas
+por urgencia"). Para el MTBF, la fecha del evento
 es la de la SOLICITUD que originó la correctiva (cuándo se avisó del
 problema) — no la de la OT — y cuenta apenas esa solicitud fue ACEPTADA, sin
 importar si la OT sigue abierta o ya se cerró (una rechazada no cuenta: nunca
@@ -27,7 +28,14 @@ llega a tener OT asociada). Si la correctiva no vino de una solicitud (ej:
 salió de un ítem de checklist en una preventiva), se usa la fecha de
 notificación/apertura de la OT como fallback.
 
-Protegido con login. (Pendiente: restringir a rol jefatura con permisos por rol.)
+Solo jefatura (requiere_rol("jefatura")).
+
+Órdenes sin equipo: las solicitudes de "no es un equipo médico" (instrumental,
+por ejemplo) generan una OT correctiva con activo_codigo vacío. Esas OT NO
+entran en los KPIs que miden la confiabilidad de los equipos (inactividad,
+fallas, MTTR y MTBF: no hay equipo al que atribuirlas, y un código vacío
+rompería la respuesta). Sí cuentan en los de carga de trabajo, que miden
+trabajo del grupo.
 
 Fallas técnicas vs. de usuario: al aceptar una solicitud, coordinación
 clasifica la falla (OrdenTrabajo.origen_falla = TECNICA / USUARIO). Los KPIs
@@ -35,9 +43,10 @@ que miden FALLAS del equipo (tiempo de inactividad, fallas, MTTR y MTBF: los
 KPIs 2 a 5) solo cuentan las técnicas — una falla por mal uso no habla de la confiabilidad del
 equipo. Las OT sin clasificar (migradas de Máximo, nacidas de un checklist, o
 anteriores a esta clasificación) cuentan como técnicas, para no dejar sin datos
-al historial. Los KPIs de CARGA de trabajo (OT por estado, carga por grupo, OT
-sin asignar, totales) siguen contando TODAS las OT: una falla de usuario igual
-da trabajo al equipo.
+al historial. Los KPIs de CARGA de trabajo (OT por estado, carga por grupo, totales)
+siguen contando TODAS las OT: una falla de usuario igual da trabajo al equipo.
+"OT sin asignar" cuenta solo las correctivas (las preventivas son del grupo y
+no se asignan a una persona).
 
 Filtros (grupo_id / tipo_equipo_id): opcionales, se pueden combinar. Cuando se
 pasan, TODOS los KPIs se recalculan solo sobre los activos que matchean ese
@@ -194,9 +203,13 @@ def obtener_kpis(
     # ─── KPI 2: tiempo de inactividad (correctivas) ───
     # Solo las fallas TÉCNICAS: son las que miden la confiabilidad del equipo
     # (ver el docstring del módulo). Esta lista alimenta los KPIs 2, 3, 4 y 5.
+    # Solo las que tienen equipo: una OT de "no es un equipo médico" no se
+    # puede atribuir a ningún equipo (ver el docstring del módulo).
     correctivas = [
         o for o in filtrar(
-            db.query(OrdenTrabajo).filter(OrdenTrabajo.tipo == "CORRECTIVA").all(),
+            db.query(OrdenTrabajo)
+            .filter(OrdenTrabajo.tipo == "CORRECTIVA", OrdenTrabajo.activo_codigo.isnot(None))
+            .all(),
             lambda o: o.activo_codigo,
         )
         if _es_falla_tecnica(o)
@@ -323,8 +336,10 @@ def obtener_kpis(
     ot_abiertas = sum(1 for o in todas_ot if o.estado != "CERRADA")
     activos = list(tipo_de_activo.keys())
     activos_totales = len(activos)
+    # La app guarda "DE_BAJA"; los datos cargados a mano pueden decir "BAJA".
+    # Se cuentan las dos formas (mismo criterio que preventivas.py).
     activos_en_baja = sum(
-        1 for a in activos_filtrados if str(a.estado).upper() == "BAJA"
+        1 for a in activos_filtrados if "BAJA" in str(a.estado).upper()
     )
 
     # ─── KPI 6: OT por estado (torta del dashboard) ───
@@ -364,16 +379,19 @@ def obtener_kpis(
     ]
 
     # ─── KPI 8b: alertas — sin asignar / preventivos vencidos ───
-    # "Sin asignar": cualquier OT ABIERTA (no cerrada, correctiva o
-    # preventiva) sin técnico asignado — usa tecnico_id, que es el campo de
-    # asignación a una PERSONA (grupo_id es el equipo dueño, no quién la
-    # tiene tomada). "Vencido" SOLO aplica a preventivos (definición
-    # acordada con Cami): el mes de fecha_programada ya pasó y todavía no
-    # tiene fecha_realizada — sin importar si generó o no una OT. Usa
+    # "Sin asignar": cualquier OT CORRECTIVA no cerrada y sin técnico
+    # asignado — usa tecnico_id, que es el campo de asignación a una PERSONA
+    # (grupo_id es el equipo dueño, no quién la tiene tomada). Las
+    # preventivas no cuentan: son del grupo y nunca se asignan a una persona
+    # (es el mismo criterio que la solapa "Sin asignar" de Órdenes).
+    # "Vencido" SOLO aplica a preventivos (definición acordada con Cami): el
+    # mes de fecha_programada ya pasó y todavía no tiene fecha_realizada —
+    # sin importar si generó o no una OT. Usa
     # mps_todos (no el filtro anio/mes de KPI 1: acá siempre se mira el
     # estado actual completo, no un mes puntual).
     ot_sin_asignar = sum(
-        1 for o in todas_ot if o.estado != "CERRADA" and o.tecnico_id is None
+        1 for o in todas_ot
+        if o.tipo == "CORRECTIVA" and o.estado != "CERRADA" and o.tecnico_id is None
     )
     preventivos_vencidos = sum(
         1 for m in mps_todos

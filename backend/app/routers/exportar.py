@@ -1,4 +1,3 @@
-
 """Descarga de tablas en CSV (para abrir en Excel o Google Sheets).
 
 Cada descarga respeta lo mismo que el rol puede ver en pantalla: si una tabla
@@ -57,7 +56,7 @@ def respuesta_csv(nombre_base: str, encabezados: list[str], filas: list[list]) -
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# EQUIPOS — técnicos, coordinación y jefatura (los que tienen la pantalla)
+# EQUIPOS — técnicos (y junior), coordinación y jefatura (los que tienen la pantalla)
 # ═══════════════════════════════════════════════════════════════════════════
 
 _NOMBRE_NIVEL_RIESGO = {"ALTO": "Alto", "MEDIO": "Medio", "BAJO": "Bajo"}
@@ -71,7 +70,7 @@ def exportar_activos(
     sector_id: str | None = None,
     grupo_id: str | None = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Los equipos, con los nombres de tipo y servicio ya resueltos.
 
@@ -142,13 +141,12 @@ def exportar_activos(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ÓRDENES DE TRABAJO — técnicos, coordinación y (desde 03/10) jefatura
+# ÓRDENES DE TRABAJO — técnicos (y junior), coordinación y (desde 03/10) jefatura
 # ═══════════════════════════════════════════════════════════════════════════
-# Jefatura no tiene la pantalla de Órdenes (no ve el detalle operativo de
-# cada OT, solo los indicadores del dashboard), pero sí puede bajar este CSV
-# con el historial completo — mismo criterio que ya tenía el CSV de
-# mantenimientos. A diferencia de técnico/coordinación, jefatura ve TODAS las
-# OT, sin recorte por grupo ni por asignación.
+# Jefatura ve la pantalla de Órdenes en modo solo lectura (no opera ninguna
+# OT) y puede bajar este CSV con el historial completo — mismo criterio que el
+# CSV de mantenimientos. A diferencia de técnico/coordinación, jefatura ve
+# TODAS las OT, sin recorte por grupo ni por asignación.
 
 from sqlalchemy import or_, and_
 
@@ -171,15 +169,15 @@ def exportar_ordenes(
     notificada_hasta: date | None = None,
     prioridad: str | None = None,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Las OT que esta persona ve en su pantalla de Órdenes, respetando los
     mismos filtros que ya tiene esa pantalla (estado, tipo, prioridad, "sin
     asignar" para coordinación, y el rango de fecha de notificación:
     notificada_desde / notificada_hasta, AAAA-MM-DD) si se los pasan por query string; si no se pasa
     ninguno, descarga todo lo que ese rol puede ver:
-      - Técnico: las asignadas a él, más las de su grupo sin técnico (mismo
-        criterio que "Mis órdenes").
+      - Técnico (y junior): las asignadas a él, más las de su grupo sin
+        técnico (mismo criterio que "Mis órdenes").
       - Coordinación: todas las de los grupos que coordina.
       - Jefatura: todas, sin recorte (requiere_rol la deja pasar siempre).
     """
@@ -251,7 +249,7 @@ def exportar_ordenes(
     ]
     return respuesta_csv("ordenes", encabezados, filas)
 # ═══════════════════════════════════════════════════════════════════════════
-# INSUMOS — técnicos, coordinación y jefatura (los que tienen la pantalla)
+# INSUMOS — técnicos (y junior), coordinación y jefatura (los que tienen la pantalla)
 # ═══════════════════════════════════════════════════════════════════════════
 
 from ..models import Insumo, Compra
@@ -261,7 +259,7 @@ from .stock import calcular_nivel
 @router.get("/insumos")
 def exportar_insumos(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Estado actual del stock: cada insumo con sus cantidades, su nivel
     (OK / Reponer / Crítico, la misma regla que usa la pantalla) y si ya
@@ -306,12 +304,12 @@ from ..security import grupos_del_coordinador
 @router.get("/mantenimientos")
 def exportar_mantenimientos(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     # De qué grupos puede bajar esta persona (None = todos, para jefatura).
     if current_user.rol == "coordinacion":
         grupos = set(grupos_del_coordinador(db, current_user))
-    elif current_user.rol == "tecnico":
+    elif current_user.rol in ("tecnico", "junior"):
         grupos = {current_user.grupo}
     else:
         grupos = None
