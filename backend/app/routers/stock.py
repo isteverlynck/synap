@@ -10,10 +10,17 @@ Reglas de negocio (definidas con el equipo, reflejan el flujo real del hospital)
     Motivo: no contar como disponible algo que todavía no llegó, y que se vea
     que un insumo ya está encargado (para no pedirlo dos veces).
 
-  CONSUMO SIEMPRE PERMITIDO
-    - POST /stock/consumos descuenta stock y NUNCA se rechaza. Si el stock queda
-      por debajo del mínimo, se registra igual y se AVISA (situación crítica).
+  CONSUMO SIEMPRE PERMITIDO (en cuanto al stock)
+    - POST /stock/consumos descuenta stock y NUNCA se rechaza por falta de
+      stock. Si el stock queda por debajo del mínimo (o en negativo), se
+      registra igual y se AVISA (situación crítica).
     Motivo: la necesidad clínica es real y no puede quedar bloqueada por un umbral.
+    - Lo que sí se controla es QUIÉN y SOBRE QUÉ: solo el personal del grupo de
+      la orden (técnico, junior o la coordinación de ese grupo; jefatura no
+      opera), y la orden no puede estar cerrada.
+  AVISO POR MAIL DE STOCK CRÍTICO
+    - Se manda una sola vez, cuando el accesorio PASA a crítico — no en cada
+      movimiento mientras siga crítico (para no llenar la casilla).
 
   DOS UMBRALES / TRES NIVELES DE ALERTA
     - punto_reorden: nivel preventivo (conviene encargar antes de tocar el mínimo).
@@ -48,7 +55,8 @@ from ..schemas import (
     AjusteOut,
     MovimientoOut,
 )
-from ..security import get_current_user, requiere_rol, validar_a_cargo_de_preventiva
+from ..security import get_current_user, requiere_rol, requiere_rol_estricto, validar_a_cargo_de_preventiva
+from .ordenes_trabajo import _validar_permiso_sobre_ot
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 
@@ -92,7 +100,7 @@ def _siguiente_codigo_insumo(db: Session) -> str:
 
 @router.get("/insumos", response_model=list[InsumoOut])
 def listar_insumos(
-    limit: int = 100,
+    limit: int = 1000,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
@@ -293,11 +301,17 @@ def recibir_compra(
 def registrar_consumo(
     payload: ConsumoCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
+    # Estricto: jefatura ve las órdenes pero no opera ninguna (mismo criterio
+    # que el resto de las acciones sobre una OT).
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == payload.ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="La orden de trabajo no existe.")
+    if orden.estado == "CERRADA":
+        raise HTTPException(status_code=400, detail="La orden ya está cerrada: no se pueden registrar consumos.")
+    # Técnico/junior: solo órdenes de su grupo. Coordinación: de los grupos que coordina.
+    _validar_permiso_sobre_ot(current_user, db, orden)
     validar_a_cargo_de_preventiva(current_user, orden)
     insumo = db.query(Insumo).filter(Insumo.id == payload.insumo_id).first()
     if insumo is None:
@@ -309,10 +323,13 @@ def registrar_consumo(
         ot_id=payload.ot_id,
         insumo_id=payload.insumo_id,
         cantidad=payload.cantidad,
-        tecnico_id=payload.tecnico_id,
+        # Quién consumió sale de la sesión, no del pedido: así no se puede
+        # registrar un consumo a nombre de otra persona.
+        tecnico_id=current_user.id,
         fecha=datetime.utcnow(),
     )
     db.add(consumo)
+    nivel_antes = calcular_nivel(insumo.stock_actual, insumo.stock_minimo, insumo.punto_reorden)
     insumo.stock_actual = (insumo.stock_actual or 0) - payload.cantidad
     db.commit()
     db.refresh(consumo)
@@ -330,7 +347,9 @@ def registrar_consumo(
             f"punto de reorden {insumo.punto_reorden}."
         )
 
-    if nivel == "critico":
+    # El mail sale una sola vez, cuando pasa a crítico (el aviso en pantalla,
+    # en cambio, se muestra siempre).
+    if nivel == "critico" and nivel_antes != "critico":
         notificar_bioingenieria(
             "Stock crítico",
             (
@@ -374,6 +393,7 @@ def registrar_ajuste(
         registrado_por=payload.registrado_por,
     )
     db.add(ajuste)
+    nivel_antes = calcular_nivel(insumo.stock_actual, insumo.stock_minimo, insumo.punto_reorden)
     if payload.tipo == "entrada":
         insumo.stock_actual = (insumo.stock_actual or 0) + payload.cantidad
     else:
@@ -383,7 +403,8 @@ def registrar_ajuste(
 
     if payload.tipo == "salida":
         nivel = calcular_nivel(insumo.stock_actual, insumo.stock_minimo, insumo.punto_reorden)
-        if nivel == "critico":
+        # Mail solo cuando el accesorio PASA a crítico (no en cada ajuste).
+        if nivel == "critico" and nivel_antes != "critico":
             notificar_bioingenieria(
                 "Stock crítico",
                 (

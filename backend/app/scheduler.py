@@ -22,9 +22,12 @@ que están por vencer.
      crítico" — que los dispara una acción puntual del usuario — este hay
      que ir a buscarlo: todos los días revisa si ya entramos en la ÚLTIMA
      SEMANA del mes (últimos 7 días) y, si es así, avisa los MP programados
-     para ESE mes que todavía no se hicieron (estado != REALIZADO). Cada MP
-     se marca con aviso_vencimiento_enviado=True apenas se avisa una vez,
-     para no mandar el mismo mail todos los días de esa semana.
+     para ESE mes que todavía no se hicieron (estado != REALIZADO). Todos
+     los que hay en ese momento van en UN solo mail con la lista (no uno por
+     mantenimiento, para no llenar la casilla). Cada MP se marca con
+     aviso_vencimiento_enviado=True apenas se avisa una vez, para no mandar
+     el mismo mail todos los días de esa semana; si más tarde aparece uno
+     nuevo, sale en otro mail aparte.
 
 Nota para producción real: esto alcanza porque el backend queda corriendo
 todo el tiempo en un servidor. El propio código de preventivas.py ya lo
@@ -115,20 +118,34 @@ def _job_avisar_mp_por_vencer() -> None:
             if (mp.fecha_programada.year, mp.fecha_programada.month) == (hoy.year, hoy.month)
         ]
 
-        for mp in pendientes:
-            activo = db.query(Activo).filter(Activo.codigo == mp.activo_codigo).first()
-            descripcion = activo.descripcion if activo else mp.activo_codigo
+        # UN solo correo con la lista completa (en vez de uno por
+        # mantenimiento): a fin de mes pueden ser decenas y llenarían la casilla.
+        if pendientes:
+            renglones = []
+            for mp in sorted(pendientes, key=lambda x: x.fecha_programada):
+                activo = db.query(Activo).filter(Activo.codigo == mp.activo_codigo).first()
+                descripcion = activo.descripcion if activo else mp.activo_codigo
+                renglones.append(
+                    f"  - {descripcion} ({mp.activo_codigo}) — programado para "
+                    f"{mp.fecha_programada.strftime('%d/%m/%Y')}"
+                )
+                mp.aviso_vencimiento_enviado = True
+
+            cantidad = len(pendientes)
             notificar_bioingenieria(
-                "MP próximo a vencer",
+                "MP próximos a vencer" if cantidad > 1 else "MP próximo a vencer",
                 (
-                    f"El mantenimiento preventivo de '{descripcion}' ({mp.activo_codigo}) "
-                    f"está programado para este mes ({mp.fecha_programada.strftime('%m/%Y')}) "
-                    "y todavía no se realizó.\n\n"
-                    "Queda poco para que termine el mes: conviene programarlo antes de "
-                    "que se pase.\n"
+                    (
+                        "Hay 1 mantenimiento preventivo programado para este mes "
+                        if cantidad == 1 else
+                        f"Hay {cantidad} mantenimientos preventivos programados para este mes "
+                    )
+                    + f"({hoy.strftime('%m/%Y')}) que todavía no se realizaron:\n\n"
+                    + "\n".join(renglones)
+                    + "\n\nQueda poco para que termine el mes: conviene programarlos "
+                    "antes de que se pasen.\n"
                 ),
             )
-            mp.aviso_vencimiento_enviado = True
 
         if pendientes:
             db.commit()

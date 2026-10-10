@@ -21,10 +21,10 @@ from email.mime.text import MIMEText
 
 from .config import settings
 
-# TODO: cuando el frontend tenga una URL pública de verdad (hoy corre en
-# localhost:5173 en la compu de cada una), mover esto a config.py como
-# variable de entorno igual que el resto de los datos sensibles.
-URL_FRONTEND = "http://localhost:5173"
+# Dirección del frontend para armar los links de los mails. Viene de la
+# variable URL_FRONTEND del .env (ver config.py); si no está, usa la de la
+# compu local. Se le saca la "/" del final para no duplicarla al armar el link.
+URL_FRONTEND = settings.url_frontend.rstrip("/")
 
 
 def enviar_mail(destinatario: str, asunto: str, cuerpo: str) -> None:

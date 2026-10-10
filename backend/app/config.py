@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     # ningún usuario en particular, es la casilla que revisa Bioingeniería.
     email_notificaciones: str = ""
 
+    # ─── Dirección del frontend ───
+    # Dirección pública desde la que se abre SYNAP en el navegador. La usan los
+    # links de los mails (ej. recuperar contraseña). Hoy corre en la compu de
+    # cada una; cuando se despliegue de verdad, poner acá la dirección real en
+    # el .env (URL_FRONTEND=https://...).
+    url_frontend: str = "http://localhost:5173"
+
     # ─── Debug ───
     # Habilita endpoints de demo/prueba. Poner en False en producción.
     debug: bool = True

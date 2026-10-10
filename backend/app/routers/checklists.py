@@ -26,6 +26,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..notificaciones import notificar_bioingenieria
 from ..models import (
     ChecklistItem,
     ChecklistRespuesta,
@@ -295,4 +296,21 @@ def generar_correctiva_desde_checklist(
     # 6. Un solo commit: la respuesta NO_PASA y la OT se guardan juntas.
     db.commit()
     db.refresh(orden)
+
+    # 7. Avisar a bioingeniería que se abrió una OT correctiva (igual que
+    #    cuando se genera a mano desde la OT preventiva). Si el mail falla, no
+    #    rompe la creación: enviar_mail ya loguea el error y sigue.
+    origen_txt = ""
+    if ot_origen_id is not None:
+        origen_txt = f" (OT #{origen.numero_ot})"
+    notificar_bioingenieria(
+        "OT correctiva creada",
+        (
+            f"Se abrió la OT correctiva #{orden.numero_ot}, generada desde el "
+            f"checklist del mantenimiento preventivo{origen_txt}.\n\n"
+            f"Equipo: {orden.activo_codigo}\n"
+            f"Descripción: {orden.descripcion}\n\n"
+            f"Grupo asignado: {orden.grupo_id or 'sin grupo'}\n"
+        ),
+    )
     return orden
