@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1791752877.88462 "test.tex" "test.pdf" "test" 1791752881.73096 0
+["pdflatex"] 1791753994.60783 "test.tex" "test.pdf" "test" 1791753998.77455 0
   "/Users/ine/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1200.600pk" 1791669687.91413 14040 5186423ed202ba2af9d31a0c76682fab ""
   "/Users/ine/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/tcti1200.600pk" 1791669688.6469 17148 7f34f406783111506b2d4f6e79da3f86 ""
   "/usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/tcrm1200.tfm" 1136768653 1536 74b7293ec3713bb7fdca8dd1bd1f469c ""
@@ -147,12 +147,12 @@
   "fotos/etiquetas.png" 1791751328.34119 703183 658781fc1c883b7fca5c6644a588800f ""
   "fotos/figura_ciclo_de_vida_PMA.png" 1791669745.2477 740131 df900070bbbee96867a10ed4461e6349 ""
   "fotos/logo_itba.png" 1719092301.24811 39124 c52f44604bcc25bc77b7f56ee5aba10d ""
-  "test.aux" 1791752881.61153 19342 e11b16245a0072140e8a5feef727eb00 "pdflatex"
-  "test.lof" 1791752881.61452 2217 c4654d1bdcd32a2c5e4a7436bb1854a8 "pdflatex"
-  "test.lot" 1791752881.61454 521 f750bb96e153ed8280314bee9672ccb1 "pdflatex"
-  "test.out" 1791752881.61427 11330 25f521e4fd1be604bad4259f5505bf96 "pdflatex"
-  "test.tex" 1791752864.42577 160314 ac4a6db9ec1bf4c64dd4711a354fbf4f ""
-  "test.toc" 1791752881.61449 5901 612738c7e6fee5f503139b7a1316a5aa "pdflatex"
+  "test.aux" 1791753998.64094 19368 236ac7dea65c63e9998732f23c73deab "pdflatex"
+  "test.lof" 1791753998.64562 2217 c4654d1bdcd32a2c5e4a7436bb1854a8 "pdflatex"
+  "test.lot" 1791753998.64564 521 f750bb96e153ed8280314bee9672ccb1 "pdflatex"
+  "test.out" 1791753998.64521 11399 49766b7ce95336f7de5f34b5bd59e166 "pdflatex"
+  "test.tex" 1791753853.2424 160329 1f92c069e1c4f28491614a6c4ba85174 ""
+  "test.toc" 1791753998.64559 5914 3669cdf2e37b9fe3cc8e278ad70d7674 "pdflatex"
   (generated)
   "test.aux"
   "test.lof"
