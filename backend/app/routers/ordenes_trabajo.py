@@ -360,24 +360,22 @@ def asignar_tecnico(
 ):
     """Asignar (o reasignar) el técnico de una OT.
 
-    Lo puede hacer el coordinador (sobre cualquiera de sus OT), o cualquier
-    técnico del MISMO grupo de la orden — así el grupo se reparte el trabajo
-    entre ellos sin depender de que el coordinador haga cada pase a mano. El
-    destino siempre tiene que ser alguien de ese mismo grupo (eso ya se
-    validaba); ahora también se valida quién puede iniciar el pase.
+    Lo puede hacer el coordinador (sobre las OT de los grupos que coordina), o
+    cualquier técnico/junior del MISMO grupo de la orden — así el grupo se
+    reparte el trabajo sin depender de que el coordinador haga cada pase a
+    mano: un técnico puede TOMAR una orden sin asignar (asignándosela a sí
+    mismo) o PASARLA a un compañero. El destino siempre tiene que ser alguien
+    de ese mismo grupo.
     """
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+    if orden.estado == "CERRADA":
+        raise HTTPException(status_code=400, detail="La orden ya está cerrada: no se puede reasignar.")
 
-    # Un técnico (o junior) solo puede reasignar OT de su propio grupo, nunca
-    # las de otro. El coordinador puede sobre cualquiera (no restringimos acá
-    # a "sus" grupos, igual que ya era el comportamiento de este endpoint).
-    if current_user.rol in ("tecnico", "junior") and current_user.grupo != orden.grupo_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Solo podés reasignar órdenes de tu propio grupo.",
-        )
+    # Técnico/junior: solo OT de su propio grupo. Coordinación: solo las de
+    # los grupos que coordina (antes podía sobre cualquiera).
+    _validar_permiso_sobre_ot(current_user, db, orden)
 
     tecnico = db.query(Usuario).filter(Usuario.id == payload.tecnico_id).first()
     if tecnico is None:
@@ -398,6 +396,8 @@ def asignar_tecnico(
 # SEGUIMIENTO (PATCH) — cambiar el estado de una OT
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Los 4 estados que usa el sistema (de referencia: cada cambio de estado tiene
+# su propio endpoint, con sus controles; ver cambiar_estado más abajo).
 ESTADOS_VALIDOS = {"ABIERTA", "EN_PROGRESO", "PENDIENTE_CIERRE", "CERRADA"}
 
 
@@ -406,31 +406,54 @@ def cambiar_estado(
     ot_id: str,
     payload: OrdenTrabajoCambioEstado,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
-    """Cambiar el estado de una OT (parte del 'seguimiento').
+    """"Empezar a trabajar": pasa una OT de ABIERTA a EN_PROGRESO y registra
+    quién la inició.
 
-    Ej: pasar de ABIERTA a EN_PROGRESO cuando el técnico empieza a trabajar.
-    Para CERRAR conviene usar /cerrar (que además pone la fecha de cierre).
+    Es lo ÚNICO que hace este endpoint. Los demás cambios de estado tienen su
+    propio camino, con sus controles: /cerrar (correctivas), /completar,
+    /autorizar-cierre y /devolver (preventivas). Antes este endpoint aceptaba
+    cualquier estado, y por fuera de la pantalla permitía saltear ese
+    circuito (por ejemplo, cerrar una preventiva sin que coordinación la
+    autorice).
+
+    Quién puede: alguien del grupo de la orden (técnico/junior de ese grupo o
+    su coordinación). En una correctiva, un técnico solo puede empezar la que
+    tiene asignada (primero la toma); en una preventiva ya iniciada, solo
+    quien la inició.
     """
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
     if orden is None:
         raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
 
     nuevo = payload.estado.upper()
-    if nuevo not in ESTADOS_VALIDOS:
+    if nuevo != "EN_PROGRESO":
         raise HTTPException(
             status_code=400,
-            detail=f"Estado inválido. Valores: {', '.join(sorted(ESTADOS_VALIDOS))}.",
+            detail=(
+                "Por acá solo se puede empezar a trabajar una orden (EN_PROGRESO). "
+                "Para cerrarla o completarla usá las opciones de cierre."
+            ),
+        )
+    if orden.estado != "ABIERTA":
+        raise HTTPException(status_code=400, detail="Esta orden ya no está abierta: no se puede empezar.")
+
+    _validar_permiso_sobre_ot(current_user, db, orden)
+    validar_a_cargo_de_preventiva(current_user, orden)
+    if (
+        orden.tipo == "CORRECTIVA"
+        and current_user.rol in ("tecnico", "junior")
+        and orden.tecnico_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Primero tomá la orden: solo puede empezarla el técnico asignado.",
         )
 
-    orden.estado = nuevo
-    if nuevo == "EN_PROGRESO" and orden.iniciada_por is None:
+    orden.estado = "EN_PROGRESO"
+    if orden.iniciada_por is None:
         orden.iniciada_por = current_user.id
-    # Si se cierra por esta vía, igual completamos la fecha de cierre.
-    if nuevo == "CERRADA" and orden.fecha_cierre is None:
-        orden.fecha_cierre = datetime.utcnow()
-        _cerrar_parada_si_quedo_abierta(orden, orden.fecha_cierre)
 
     db.commit()
     db.refresh(orden)
@@ -457,7 +480,7 @@ def cerrar_orden(
     ot_id: str,
     payload: OrdenTrabajoCierre,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """Cerrar una OT CORRECTIVA: la marca como CERRADA y le pone la fecha de
     cierre (ahora). Con esto quedan completas las 3 fechas (notificacion ->
@@ -486,10 +509,12 @@ def cerrar_orden(
     # Nadie cierra OT de otro grupo (mismo chequeo que ya usan las paradas).
     _validar_permiso_sobre_ot(current_user, db, orden)
 
-    # Correctiva: un técnico solo cierra las que tiene asignadas.
+    # Correctiva: un técnico (o junior) solo cierra las que tiene asignadas.
+    # Coordinación puede cerrar cualquier correctiva de los grupos que
+    # coordina (eso ya lo validó _validar_permiso_sobre_ot).
     if (
         orden.tipo == "CORRECTIVA"
-        and current_user.rol == "tecnico"
+        and current_user.rol in ("tecnico", "junior")
         and orden.tecnico_id != current_user.id
     ):
         raise HTTPException(
@@ -530,7 +555,7 @@ def completar_orden(
     ot_id: str,
     payload: OrdenTrabajoCierre,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol_estricto("tecnico", "junior", "coordinacion")),
 ):
     """El técnico termina de trabajar una preventiva: registra qué se hizo y
     la deja PENDIENTE_CIERRE, a la espera de que coordinación la autorice.
@@ -933,7 +958,7 @@ from ..schemas import AdjuntoOut
 def listar_adjuntos(
     ot_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Nombres de los archivos adjuntos (sin el archivo en sí)."""
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()
@@ -958,7 +983,7 @@ def ver_adjunto(
     ot_id: str,
     adjunto_id: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(requiere_rol("tecnico", "coordinacion")),
+    current_user: Usuario = Depends(requiere_rol("tecnico", "junior", "coordinacion")),
 ):
     """Devuelve el archivo en sí, para abrirlo o descargarlo."""
     orden = db.query(OrdenTrabajo).filter(OrdenTrabajo.id == ot_id).first()

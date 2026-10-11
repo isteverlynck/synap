@@ -10,8 +10,11 @@ que están por vencer.
           ACTUAL — así, si el backend estuvo apagado justo el día 1 (algo
           común en desarrollo, donde no queda corriendo todo el tiempo), se
           pone al día apenas se prende, sin esperar al próximo día 1.
-       b. Todos los días a la madrugada revisa si es día 1 del mes y, si lo
-          es, genera las preventivas de ese mes.
+       b. Todos los días a la madrugada (00:05) vuelve a correr la misma
+          generación del mes en curso. No comprueba si es día 1: como no
+          duplica nada, el día 1 genera las del mes nuevo y el resto de los
+          días solo agrega lo que haya aparecido (un equipo recién cargado o
+          reprogramado para este mes).
      generar_preventivas_core (ver routers/preventivas.py) es idempotente: si
      la OT de un equipo para ese mes ya existe, no la duplica. Por eso no hay
      problema en llamarla de más — ni al arrancar, ni un día que no es el 1.
@@ -175,7 +178,8 @@ def iniciar_scheduler() -> BackgroundScheduler:
     # semana del mes, no esperamos a la corrida de mañana para avisar.
     _job_avisar_mp_por_vencer()
 
-    # Todos los días a las 00:05, por si hoy es día 1 del mes.
+    # Todos los días a las 00:05: el día 1 genera las del mes nuevo, y el resto
+    # de los días agrega lo que falte (no duplica nada).
     _scheduler.add_job(
         _job_generar_mes_actual,
         CronTrigger(hour=0, minute=5),
