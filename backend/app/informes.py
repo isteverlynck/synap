@@ -12,8 +12,9 @@ Se arma con reportlab (agregado a requirements.txt) porque es puro Python
 diferencia de otras opciones como weasyprint que piden Cairo/Pango.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
+from zoneinfo import ZoneInfo
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -63,11 +64,19 @@ def _dato(etiqueta: str, valor) -> str:
     return f"{negrita_abre}{etiqueta}:{negrita_cierra} {valor if valor not in (None, '') else '—'}"
 
 
+_TZ_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
 def _fecha(valor: datetime | None) -> str:
+    """Fecha para el PDF. Si trae hora, se pasa de UTC (como está guardada
+    en la base) a la hora de Argentina antes de imprimirla. Si es solo un
+    día (ej. fecha de instalación), va tal cual."""
     if valor is None:
         return "—"
-    return valor.strftime("%d/%m/%Y %H:%M") if isinstance(valor, datetime) else valor.strftime("%d/%m/%Y")
-
+    if isinstance(valor, datetime):
+        local = valor.replace(tzinfo=timezone.utc).astimezone(_TZ_ARGENTINA)
+        return local.strftime("%d/%m/%Y %H:%M")
+    return valor.strftime("%d/%m/%Y")
 
 def generar_informe_preventiva_pdf(
     *,
@@ -160,7 +169,7 @@ def generar_informe_preventiva_pdf(
 
     cuerpo.append(Spacer(1, 18))
     cuerpo.append(Paragraph(
-        f"Generado automáticamente por SYNAP el {datetime.utcnow().strftime('%d/%m/%Y %H:%M')} UTC.",
+        f"Generado automáticamente por SYNAP el {datetime.now(_TZ_ARGENTINA).strftime('%d/%m/%Y %H:%M')} (hora de Argentina).",
         ParagraphStyle("Pie", parent=_ESTILOS["Normal"], fontSize=7.5, textColor=colors.HexColor("#888888")),
     ))
 
@@ -286,7 +295,7 @@ def generar_informe_activo_pdf(
 
     cuerpo.append(Spacer(1, 18))
     cuerpo.append(Paragraph(
-        f"Generado automáticamente por SYNAP el {datetime.utcnow().strftime('%d/%m/%Y %H:%M')} UTC.",
+        f"Generado automáticamente por SYNAP el {datetime.now(_TZ_ARGENTINA).strftime('%d/%m/%Y %H:%M')} (hora de Argentina).",
         ParagraphStyle("PieActivo", parent=_ESTILOS["Normal"], fontSize=7.5, textColor=colors.HexColor("#888888")),
     ))
 

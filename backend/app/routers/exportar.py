@@ -155,9 +155,24 @@ from ..security import requiere_rol, grupos_del_coordinador
 from .ordenes_trabajo import filtrar_por_fecha_notificacion
 
 
+from datetime import timezone
+from zoneinfo import ZoneInfo
+
+_TZ_ARGENTINA = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
 def _fecha_hora(valor) -> str:
-    """Fecha y hora como dd/mm/aaaa hh:mm (vacío si no hay)."""
-    return valor.strftime("%d/%m/%Y %H:%M") if valor else ""
+    """Fecha y hora como dd/mm/aaaa hh:mm, en hora de Argentina (vacío si no hay).
+
+    En la base las horas se guardan en UTC y sin zona (datetime.utcnow()).
+    Si se imprimieran tal cual, el CSV mostraría todo 3 horas adelantado.
+    Por eso primero le decimos que esa hora es UTC y después la pasamos
+    a la hora de Argentina.
+    """
+    if not valor:
+        return ""
+    local = valor.replace(tzinfo=timezone.utc).astimezone(_TZ_ARGENTINA)
+    return local.strftime("%d/%m/%Y %H:%M")
 
 
 @router.get("/ordenes")

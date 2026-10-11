@@ -119,16 +119,33 @@ function CrearSolicitud({ onCreada, activoInicial }) {
   const [exito, setExito] = useState("");
   const [archivos, setArchivos] = useState([]);
 
-  // Traemos una lista de activos para mostrar sugerencias mientras escribe.
-  // No hace falta que esté completa: el ID que finalmente se manda siempre
-  // se valida contra el backend (ver validarCodigo), así que aunque el
-  // equipo no aparezca en esta lista corta igual funciona si se escribe el
-  // código exacto (por ejemplo, leyéndolo del cartelito QR pegado en el equipo).
+  // Sugerencias mientras escribe: le pedimos al backend los equipos que
+  // coinciden con lo tipeado (código, descripción, marca, modelo o serie),
+  // en vez de traer una lista fija al principio. Antes se traían solo los
+  // primeros 200 equipos, y con los más de 6000 del hospital la mayoría
+  // nunca aparecía como sugerencia.
+  // Esperamos 350 ms sin que teclee antes de buscar (igual que en Activos),
+  // para no mandar un pedido por cada letra. Con menos de 2 letras no se
+  // busca, porque devolvería casi todo el inventario.
   useEffect(() => {
-    if (esEquipoMedico === true && activos.length === 0) {
-      listarActivos().then(setActivos).catch(() => {});
+    const texto = codigoTexto.trim();
+    if (esEquipoMedico !== true || activoValidado || texto.length < 2) {
+      setActivos([]);
+      return;
     }
-  }, [esEquipoMedico, activos.length]);
+    // "vigente" evita que una respuesta vieja (de cuando había escrito
+    // menos letras) llegue tarde y pise la lista nueva.
+    let vigente = true;
+    const t = setTimeout(() => {
+      listarActivos({ buscar: texto, limit: 20 })
+        .then((lista) => vigente && setActivos(lista))
+        .catch(() => {});
+    }, 350);
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
+  }, [esEquipoMedico, activoValidado, codigoTexto]);
 
   // Confirma contra el backend que el ID escrito corresponde a un equipo
   // real. Se usa al elegir una sugerencia, al salir del campo (onBlur), al
@@ -167,18 +184,12 @@ function CrearSolicitud({ onCreada, activoInicial }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activoInicial]);
 
-  // Filtra la lista de activos a medida que la persona escribe (por código o
-  // por descripción), para no tener que buscar a mano en una lista larga.
+  // El backend ya devuelve solo los equipos que coinciden (hasta 20), así
+  // que acá no hace falta volver a filtrar. Si se filtrara de nuevo, se
+  // perderían los que coinciden por marca o modelo, o los códigos escritos
+  // con espacios como en la etiqueta.
   const textoBusqueda = codigoTexto.trim().toLowerCase();
-  const activosFiltrados = !activoValidado && textoBusqueda
-    ? activos
-        .filter(
-          (a) =>
-            a.codigo.toLowerCase().includes(textoBusqueda) ||
-            (a.descripcion || "").toLowerCase().includes(textoBusqueda)
-        )
-        .slice(0, 20)
-    : [];
+  const activosFiltrados = !activoValidado && textoBusqueda ? activos : [];
 
   function elegirTipo(valor) {
     setEsEquipoMedico(valor);
