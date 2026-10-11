@@ -1,6 +1,7 @@
 ﻿// DetalleOrden.jsx — una OT abierta en detalle. Es la pantalla donde el trabajo
-// efectivamente avanza: el técnico la arranca y la cierra, coordinación la
-// asigna o reasigna.
+// efectivamente avanza: el técnico toma una correctiva sin asignar (o se la
+// pasa a un compañero), la arranca y la cierra; coordinación la asigna o
+// reasigna, y también puede cerrar una correctiva de sus grupos.
 //
 // Igual que en la ficha del equipo, la parte de arriba es idéntica para todos
 // y lo único que cambia son las acciones de abajo.
@@ -105,6 +106,14 @@ function DetalleOrden() {
   const puedeTrabajar = ot?.tipo === "PREVENTIVA"
     ? (esDeMiGrupo || esCoordinacion) && (!ot?.iniciada_por || ot.iniciada_por === perfil?.id)
     : esMiOrden;
+  // Tomar: un técnico del grupo se asigna una correctiva que todavía no
+  // tiene técnico (después ya es "suya" y la puede empezar).
+  const puedeTomar = esDeMiGrupo && ot?.tipo === "CORRECTIVA" && !ot?.tecnico_id;
+  // Cerrar una correctiva: su técnico asignado, o coordinación. Si
+  // coordinación llegó a ver esta OT es porque es de un grupo que coordina
+  // (el backend no le muestra las de otros grupos, y lo vuelve a validar al
+  // cerrar).
+  const puedeCerrarCorrectiva = ot?.tipo === "CORRECTIVA" && (esMiOrden || esCoordinacion);
   const avisoPreventivo = textoPreventivo(ot?.activo_proxima_fecha_mp);
   // Para decidir si vale la pena dibujar la caja de "Acciones": si ninguna
   // de estas es cierta (el caso de jefatura, que entra en modo lectura), no
@@ -151,6 +160,18 @@ function DetalleOrden() {
       toast.success("Orden en progreso");
     } catch (e) {
       setError(e.response?.data?.detail || "No pudimos cambiar el estado.");
+    }
+  }
+
+  // "Tomar esta orden" = asignármela a mí. Es el mismo pedido que usa
+  // coordinación para asignar, con mi propio id.
+  async function tomar() {
+    setError("");
+    try {
+      setOt(await asignarTecnico(id, perfil.id));
+      toast.success("Tomaste la orden", { description: "Ya figura a tu nombre: podés empezar a trabajarla." });
+    } catch (e) {
+      setError(e.response?.data?.detail || "No pudimos tomar la orden.");
     }
   }
     async function iniciarParadaClick() {
@@ -378,10 +399,14 @@ function DetalleOrden() {
           {puedeTrabajar && ot.estado === "ABIERTA" && (
             <button style={boton("primario")} onClick={arrancar}>Empezar a trabajar</button>
           )}
-          {/* Cerrar directo por acá: solo correctivas. Las preventivas se
-          completan desde el checklist ("Revisar y completar la orden") y
-          después coordinación autoriza o devuelve (ver más abajo). */}
-          {puedeTrabajar && ot.estado === "EN_PROGRESO" && ot.tipo === "CORRECTIVA" && (
+          {puedeTomar && (
+            <button style={boton("primario")} onClick={tomar}>Tomar esta orden</button>
+          )}
+          {/* Cerrar directo por acá: solo correctivas, y lo puede hacer su
+          técnico asignado o coordinación. Las preventivas se completan desde
+          el checklist ("Revisar y completar la orden") y después
+          coordinación autoriza o devuelve (ver más abajo). */}
+          {puedeCerrarCorrectiva && ot.estado === "EN_PROGRESO" && (
             <button style={boton("primario")} onClick={() => setAccion("cerrar")}>Cerrar la orden</button>
           )}
           {/* Coordinación revisa una preventiva ya completada por el
@@ -394,8 +419,10 @@ function DetalleOrden() {
             </>
           )}
           {/* Las preventivas son del grupo entero: no se asignan a una
-          persona. Solo las correctivas tienen dueño. */}
-          {esCoordinacion && ot.tipo !== "PREVENTIVA" && (
+          persona. Solo las correctivas tienen dueño. Asigna o reasigna
+          coordinación, y también un técnico del grupo: así se pasan una orden
+          entre compañeros sin depender del coordinador. */}
+          {puedeAsignar && ot.tipo !== "PREVENTIVA" && (
             <button style={boton("secundario")} onClick={() => setAccion("asignar")}>
               {ot.tecnico_id ? "Reasignar técnico" : "Asignar técnico"}
             </button>
