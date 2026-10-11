@@ -98,14 +98,14 @@ en el Hospital Alemán} \\[0.2cm] }
 \vspace{0.5cm}
 
 % Integrantes
-\textsc{Autoras:}\  Inés María  Steverlynck (63667), \ Camila Barbagelata (6.....)\\[0.2cm]
+\textsc{Autoras:}\  Inés María  Steverlynck (63667), \ Camila Barbagelata (63047)\\[0.2cm]
 
 \vspace{0.5cm}
 
 % Author and supervisor
-\textsc{Tutor:}\  Siomara Figuereo\\[0.2cm]
+\textsc{Tutora:}\  Siomara Figueredo\\[0.2cm]
 
-\textsc{Co-tutor:}\  Carlos Lazzarino\\[0.5cm]
+\textsc{Co-tutor:}\  Carlos Lazzarini\\[0.5cm]
 
 \large \textsc{Octubre 2026}\\[0.1cm]
 
@@ -131,19 +131,21 @@ en el Hospital Alemán} \\[0.2cm] }
 \prefsectionnotitle{Prefacio}
 
 \prefsubsection{Agradecimientos}
+A nuestra tutora, Siomara Figueredo, jefa del servicio de Bioingeniería del Hospital Alemán, por su guía constante, por el tiempo que nos dedicó y por la confianza que depositó en nosotras. Su conocimiento del servicio fue fundamental para que SYNAP respondiera a la forma real de trabajar de Bioingeniería.
+
+Al Hospital Alemán, por abrirnos las puertas de su servicio de Bioingeniería y facilitarnos la información necesaria para desarrollar este proyecto.
+
+A los coordinadores, bioingenieros y técnicos del servicio, que nos explicaron cómo trabajan, respondieron la encuesta y, al conocer el sistema, compartieron su opinión con generosidad. Sus aportes dieron forma a gran parte de lo que hoy hace SYNAP.
+
+A nuestro co-tutor, Carlos Lazzarini, por su acompañamiento y sus aportes durante el desarrollo del trabajo.
+
 A la cátedra de Proyecto Final de Carrera, por acompañarnos a lo largo de todo el proyecto.
 
-A nuestro tutor, Nicolás Barrera, por todas las herramientas y asesoramiento que nos brindó para poder desarrollarlo.
+Al Instituto Tecnológico de Buenos Aires, nuestra casa de estudios durante toda la carrera, por la formación que nos dio y que nos permite comenzar esta nueva etapa como profesionales.
 
-A Pablo y Eugenia Murad, que nos presentaron esta problemática y nos permitieron trabajar en conjunto con el Centro Médico Roca.
+A nuestras familias, por acompañarnos sin condiciones durante la carrera y este proyecto, y por recordarnos siempre lo orgullosos que estaban de nosotras.
 
-Al Instituto Tecnológico de Buenos Aires, que fue nuestra casa de estudios por los últimos 6 años y nos formó para convertirnos en las profesionales que seremos en esta próxima etapa.
-
-A nuestras familias, que nos acompañaron incondicionalmente en este proceso y a lo largo de toda la carrera. Siempre estuvieron para apoyarnos, ya sea con unas palabras motivadoras, un abrazo o un brindis por esos finales aprobados. Nunca les faltó recordarnos lo orgullosos que estaban de nosotras.
-
-A Juan Manuel Cerviño por su compañía y apoyo incondicional.
-
-A nuestros amigos, que caminaron con nosotras en este proceso y que celebraran con nosotras este triunfo. Siempre supieron dar el apoyo y la inspiración que necesitábamos en el momento correcto.
+A nuestros amigos, que caminaron a nuestro lado en este recorrido y celebran con nosotras este logro.
 
 %=======================================================================================================
 \newpage
@@ -186,7 +188,38 @@ El sistema se desarrolló de forma iterativa con FastAPI, PostgreSQL y React, co
 %=======================================================================================================
 \newpage
 \prefsubsection{Índice de abreviaturas}
-\textbf{CMMS:} \textit{Computerized Maintenance Management System} (Sistema Informatizado de Gestión del Mantenimiento)
+\begingroup
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}p{0.17\linewidth}@{\hspace{0.02\linewidth}}p{0.79\linewidth}@{}}
+\textbf{ANMAT} & Administración Nacional de Medicamentos, Alimentos y Tecnología Médica \\
+\textbf{API} & \textit{Application Programming Interface} (interfaz de programación de aplicaciones) \\
+\textbf{CMMS} & \textit{Computerized Maintenance Management System} (Sistema Computarizado para la Gestión del Mantenimiento) \\
+\textbf{CSV} & \textit{Comma-Separated Values} (valores separados por comas), formato de archivo para tablas \\
+\textbf{CU} & Caso de uso \\
+\textbf{DNI} & Documento Nacional de Identidad \\
+\textbf{FMS} & \textit{Facilities Management Services}, área hospitalaria de infraestructura y servicios técnicos \\
+\textbf{HTTP} & \textit{Hypertext Transfer Protocol} (Protocolo de Transferencia de Hipertexto) \\
+\textbf{HTTPS} & \textit{Hypertext Transfer Protocol Secure} (versión segura del protocolo HTTP) \\
+\textbf{IEC} & \textit{International Electrotechnical Commission} (Comisión Electrotécnica Internacional) \\
+\textbf{IRAM} & Instituto Argentino de Normalización y Certificación \\
+\textbf{JSON} & \textit{JavaScript Object Notation}, formato de texto para intercambiar datos \\
+\textbf{JWT} & \textit{JSON Web Token} (token web JSON) \\
+\textbf{MP} & Mantenimiento preventivo \\
+\textbf{MTBF} & \textit{Mean Time Between Failures} (tiempo medio entre fallas) \\
+\textbf{MTTR} & \textit{Mean Time To Repair} (tiempo medio de reparación) \\
+\textbf{OMS} & Organización Mundial de la Salud \\
+\textbf{OT} & Orden de trabajo \\
+\textbf{PDF} & \textit{Portable Document Format} (formato de documento portátil) \\
+\textbf{PMA} & Producto médico activo \\
+\textbf{PNGCAM} & Programa Nacional de Garantía de Calidad de la Atención Médica \\
+\textbf{PRIUX} & Tablas de riesgo propias del Hospital Alemán \\
+\textbf{QR} & \textit{Quick Response} (respuesta rápida), código bidimensional \\
+\textbf{RF} & Requerimiento funcional \\
+\textbf{RNF} & Requerimiento no funcional \\
+\textbf{SMTP} & \textit{Simple Mail Transfer Protocol} (protocolo simple de transferencia de correo) \\
+\textbf{SQL} & \textit{Structured Query Language} (lenguaje de consulta estructurado) \\
+\end{tabular}
+\endgroup
 
 
 %=======================================================================================================
@@ -208,6 +241,7 @@ Como se menciona en la tesis doctoral de Bertelli \cite{bertelli2023} sobre la g
 Para ordenar este trabajo en las instituciones existen los sistemas de gestión de mantenimiento, conocidos como CMMS por sus siglas en inglés (Computerized Maintenance Management System). Estos sistemas centralizan el inventario de equipos, la programación de las intervenciones y el registro de lo realizado sobre cada uno. Lo que suele ocurrir en el ámbito hospitalario es que se adopta un sistema que nunca fue concebido para un hospital, ya que lo incorpora el área de mantenimiento edilicio para administrar ascensores, calderas e instalaciones, y una vez implementado se lo extiende al equipamiento médico. De esta forma, aparecen desajustes por el simple hecho de ser un sistema que no tiene en cuenta que los equipos médicos se trasladan entre sectores, que las fallas deben ser reportadas por personal asistencial en medio de un turno, o que cualquier intervención tiene que organizarse de acuerdo a la disponibilidad clínica. Una de las coordinadoras del servicio de Bioingeniería del Hospital Alemán lo expresó en la encuesta realizada para este trabajo, al señalar que el sistema que utilizan tiene muchos campos que no les sirven por tratarse de un programa genérico pensado para la industria (sección~\ref{sec:encuesta}).
 
 \subsection{Propuesta y justificación}
+\label{sec:propuesta-justificacion}
 Frente a ese escenario, el presente documento detalla el diseño y desarrollo de SYNAP, un sistema web de gestión de equipamiento médico pensado específicamente para un servicio hospitalario de Bioingeniería, que reúne en una única plataforma la información de cada activo, las órdenes de trabajo preventivas y correctivas, el stock de insumos y repuestos y los indicadores de desempeño del área, entre otras funciones. El nombre remite a la sinapsis neuronal, ya que lo que el sistema busca aportar son justamente las conexiones que hoy faltan o funcionan de manera débil entre el equipo registrado, la falla que se le reporta, la orden de trabajo que esa falla genera y el repuesto que se consume para resolverla.
 
 El proyecto aquí presentado está basado en el Hospital Alemán, institución privada de la Ciudad Autónoma de Buenos Aires, que actualmente gestiona su equipamiento médico con IBM Máximo \cite{ibm_maximo}. Tanto el desarrollo como la validación de SYNAP se llevan adelante junto al equipo de Bioingeniería de la institución, que es fuente de los requerimientos que definen la estructura y, además, destinatario del. Esto permitió incorporar observaciones y necesidades reales a lo largo del proceso y no una vez que el sistema ya estaba cerrado. Se presenta como una herramienta que el equipo pueda adoptar de forma natural y que agregue valor al área desde el primer día de uso.
@@ -217,6 +251,7 @@ Durante el desarrollo se trabajó con datos ficticios que respetan la estructura
 Los objetivos que guiaron el desarrollo se presentan a continuación, separados entre aquellos que el sistema debe cumplir necesariamente y aquellos que amplían su alcance en caso de que el avance del trabajo lo permita.
 
 \subsection{Objetivos}
+\label{sec:objetivos}
 \subsubsection{Objetivo general}
 Desarrollar un prototipo funcional de sistema web para la gestión de equipos médicos en el Hospital
 Alemán, que centralice su información y funcione como herramienta de soporte para el servicio de
@@ -250,11 +285,12 @@ parque tecnológico.
 \end{itemize}
 
 \subsection{Estructura del documento}
-El informe continúa con el estado del arte y el marco teórico, que reúnen los antecedentes en sistemas de gestión de equipamiento médico y los conceptos que fundamentan las decisiones de diseño. El capítulo~\ref{sec:diseno-desarrollo} describe el diseño y desarrollo del sistema, desde el relevamiento realizado en el servicio de Bioingeniería y los requerimientos que surgieron de él hasta el modelo de datos, la arquitectura y las tecnologías, el desarrollo de cada módulo, la interfaz de cada perfil, la integración de los datos del hospital y la validación del sistema mediante pruebas funcionales y de usabilidad. Los resultados obtenidos se presentan en el capítulo~\ref{sec:resultados} y se discuten frente a los antecedentes en el capítulo~\ref{sec:discusion}. El trabajo finaliza con las perspectivas futuras y las conclusiones.
+El informe continúa con el estado del arte y el marco teórico, que reúnen los antecedentes en sistemas de gestión de equipamiento médico y los conceptos que fundamentan las decisiones de diseño. El capítulo~\ref{sec:diseno-desarrollo} describe el diseño y desarrollo del sistema, desde el relevamiento realizado en el servicio de Bioingeniería y los requerimientos que surgieron de él hasta el modelo de datos, la arquitectura y las tecnologías, el desarrollo de cada módulo, la interfaz de cada perfil y la integración de los datos del hospital. Los resultados obtenidos y sus limitaciones se presentan en el capítulo~\ref{sec:resultados}, que incluye la validación con el servicio. El capítulo~\ref{sec:discusion} los discute frente a los antecedentes y presenta las conclusiones, y el trabajo finaliza con las perspectivas futuras (capítulo~\ref{sec:futuro}).
 
 %=======================================================================================================
 \newpage
 \section{Estado del arte}
+\label{sec:estado-arte}
 Diversos trabajos académicos abordaron la gestión del equipamiento médico mediante el desarrollo de sistemas informáticos propios, desde plataformas de soporte a los procesos de gestión basadas en los lineamientos de la OMS \cite{miranda_takayama2017} hasta sistemas para organizar el mantenimiento preventivo y correctivo \cite{khider_hamza2023} o modelos para priorizar las solicitudes de mantenimiento \cite{hamdi2012}. Sin embargo, se trata de desarrollos pensados para contextos institucionales y normativos ajenos al argentino, por lo que este apartado se centra en las soluciones que efectivamente se utilizan en el país.
 
 El Hospital Alemán trabaja actualmente con IBM Maximo \cite{ibm_maximo}, una plataforma de gestión de activos concebida para la industria en general que los hospitales adaptan a la gestión de su equipamiento médico. Esa adaptación limita su ajuste a las necesidades del servicio, como señaló una de las coordinadoras de Bioingeniería en la encuesta realizada para este trabajo (véase la sección~\ref{sec:encuesta}).
@@ -467,6 +503,7 @@ Con estos registros no es posible calcular de manera confiable la mayoría de lo
 Estos hallazgos se tradujeron en requerimientos del sistema: códigos de equipo generados automáticamente, catálogos cerrados en lugar de texto libre, solicitudes que no requieren inventar un activo, clasificación explícita de cada orden, un conjunto reducido de estados, medición del tiempo de parada y una bitácora propia para cada orden.
 
 \subsubsection{Perfiles de usuario}
+\label{sec:perfiles-usuario}
 A partir del relevamiento se definieron cuatro perfiles de usuario. Cada persona que accede a SYNAP tiene asignado uno, y ese perfil determina qué pantallas ve y qué acciones puede realizar. El control se aplica en el backend, como se detalla en la sección~\ref{sec:backend-bd}. La definición de los perfiles retoma la distinción que establece el documento de procesos de la Resolución 2725/2023 entre quienes gestionan el cumplimiento del plan de mantenimiento y quienes lo ejecutan \cite{res_2725_2023}, y suma el personal asistencial, que detecta y reporta las fallas, y la jefatura del servicio, que necesita una visión global del área. Los perfiles se presentan en el orden en que intervienen a lo largo del recorrido de una falla, desde su detección hasta la evaluación del desempeño del servicio.
 
 \textbf {Enfermería.} Representa al personal asistencial de los servicios clínicos, enfermeros y médicos, que utiliza el equipamiento en la atención de los pacientes y suele ser el primero en detectar una falla. Reporta en medio de un turno o de un procedimiento y tiene poco conocimiento técnico de los equipos, por lo que su recorrido se redujo a lo indispensable: escanear el código QR del equipo o ingresar su identificador, indicar la falla y la ubicación, y seguir el estado de la solicitud enviada. Si el problema no corresponde a un equipo médico, puede describirlo sin asociarlo a un activo. No tiene acceso al inventario, a las órdenes de trabajo ni al stock, ya que no los necesita para su tarea.
@@ -478,6 +515,7 @@ A partir del relevamiento se definieron cuatro perfiles de usuario. Cada persona
 \textbf {Jefatura.} Corresponde a la jefatura del servicio, que necesita una visión global del área sin restricción por grupo. Su herramienta principal es el panel de indicadores, que le permite evaluar el desempeño del servicio y fundamentar decisiones sobre el parque, como el recambio de un equipo o la revisión de un plan de mantenimiento. Puede consultar toda la información del sistema, incluidas las órdenes de trabajo de todos los grupos, que ve en modo de solo lectura, ya que supervisa el trabajo pero no lo ejecuta.
 
 \subsubsection{Casos de uso}
+\label{sec:casos-uso}
 
 Los casos de uso describen las interacciones concretas que cada perfil realiza con el sistema para cumplir un objetivo. Se definieron a partir de los procesos relevados en la sección~\ref{sec:serv-bioing} y de las necesidades expresadas en la encuesta. Algunos pueden ser realizados por más de un perfil, y en ellos el alcance de cada uno no es el mismo. El caso más claro son las órdenes de trabajo: el técnico solo opera sobre las de su grupo y la coordinación sobre las de los grupos que coordina, mientras que la jefatura puede consultarlas todas, pero no modificarlas. 
 
@@ -495,7 +533,7 @@ Los casos comunes a todos los perfiles, como el inicio de sesión y el escaneo d
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\linewidth]{fotos/Figura_4_3_casos_de_uso_activos_y_mantenimiento.png}
-    \caption{Diagrama de casos de uso del módulo de activos y mantenimiento preventivo }
+    \caption{Diagrama de casos de uso del módulo de activos y mantenimiento preventivo.}
     \label{fig:caso-2}
 \end{figure}
 
@@ -511,9 +549,12 @@ Los casos de uso con una descripción detallada se presentan en el \ref{anexo:ca
 \subsubsection{Requerimientos funcionales}
 \label{sec:requerimientos-funcionales}
 
+Los requerimientos funcionales describen lo que el sistema debe hacer. Surgieron del relevamiento de los procesos del servicio (sección~\ref{sec:serv-bioing}), de la encuesta (sección~\ref{sec:encuesta}), del análisis de los datos de Maximo (sección~\ref{sec:analisis-maximo}) y del marco normativo y teórico, y suman 31. Abarcan el inventario y las fichas de los equipos, el reporte de fallas, las órdenes de trabajo, el mantenimiento preventivo, el stock de accesorios y los indicadores, además del control de acceso, las notificaciones y la descarga de datos. Cada uno se detalla en el \ref{anexo:requerimientos}, en la Tabla~\ref{tab:rf}, con su origen y los casos de uso que lo cubren, lo que permite seguir el camino desde la necesidad detectada hasta la funcionalidad construida.
 
 \subsubsection{Requerimientos no funcionales}
 \label{sec:requerimientos-no-funcionales}
+
+Los requerimientos no funcionales establecen cómo debe comportarse el sistema, más allá de lo que hace. Se definieron once, que abarcan la accesibilidad, la adaptabilidad, la usabilidad, la legibilidad visual, el rendimiento, la seguridad, la integridad de los datos, la trazabilidad, la consistencia temporal, la mantenibilidad y el costo. Seis surgieron de lo planteado en la encuesta, sobre todo de las dificultades con el sistema actual, como la lentitud, la cantidad de pasos y la falta de indicaciones visuales, uno proviene de la normativa y cuatro de criterios técnicos de diseño. Se detallan en el \ref{anexo:requerimientos}, en la Tabla~\ref{tab:rnf}.
 
 \subsection{Datos de partida y modelo de datos}
 El modelo de datos es la base sobre la que se apoya todo el sistema, y cualquier error en esta etapa se arrastra a cada módulo que se construye encima. Por eso, como se mencionó en la sección~\ref{sec:enfoque-trabajo}, no se diseñó desde cero. Se partió de la estructura con la que el Hospital Alemán registra hoy su información, se corrigieron los problemas detectados en el histórico de órdenes y en la base de activos (sección~\ref{sec:analisis-maximo}) y se incorporaron los datos que el servicio necesita empezar a registrar para que los requerimientos definidos puedan cumplirse. 
@@ -590,6 +631,7 @@ Al implementar las tablas se invirtieron las preguntas sobre soporte, proveedor 
 Aparte del cálculo de riesgo, el sistema clasifica cada equipo según su vida útil, con el criterio del hospital, que depende solo de la antigüedad: moderno (menos de 5 años), aceptable (de 5 a menos de 10), medianamente aceptable (de 10 a menos de 15) y obsoleto (15 años o más). Esta clasificación se aplica a cualquier equipo que tenga fecha de instalación, sea médico o no, y se muestra en su ficha y en el panel de indicadores. Es independiente del límite de vida útil del cálculo de riesgo: la clasificación describe el estado general del parque, mientras que el límite agrava el puntaje de cada equipo que lo supera.
 
 \subsection{Arquitectura y tecnologías}
+\label{sec:arquitectura-tecnologias}
 SYNAP es una aplicación web: se usa desde el navegador y no requiere instalar nada en las computadoras ni en los celulares del hospital. La decisión responde a que el sistema debe estar disponible tanto para un técnico frente a su escritorio como para una enfermera que encuentra un equipo con problemas en medio de un turno, y pedirle que instale una aplicación sería una barrera más entre la falla y su registro. Las tecnologías se eligieron con tres criterios: que fueran de uso libre y sin costos de licencia, que contaran con documentación y comunidad amplias para resolver problemas durante el desarrollo, y que resultaran razonables de mantener por alguien que retome el proyecto en el futuro. 
 
 \subsubsection{Arquitectura general}
@@ -600,7 +642,7 @@ La comunicación sigue siempre el mismo recorrido: el navegador envía un pedido
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\linewidth]{fotos/Figura_4_7_arquitectura.png}
-    \caption{blabla}
+    \caption{Arquitectura de SYNAP. El navegador se comunica solo con el backend, que accede a la base de datos y envía los avisos por correo.}
     \label{fig:arq}
 \end{figure}
 
@@ -709,56 +751,99 @@ SYNAP se pensó desde el principio para usarse tanto en una computadora como en 
 (figra comparativa celular vs telefono)
 
 \subsection{Desarrollo de los módulos}
+\label{sec:desarrollo-modulos}
 En esta sección se describe cada módulo del sistema. El orden acompaña el recorrido de la información dentro del servicio, desde el ingreso al sistema y la consulta de un equipo hasta el reporte de una falla, su resolución en una orden de trabajo, el mantenimiento preventivo, el consumo de accesorios y los indicadores de gestión. De cada módulo se explica qué problema resuelve, qué reglas lo gobiernan y cómo quedó implementado en la interfaz.
 
 Como complemento, el \ref{anexo:manual} reúne un manual de uso con los pasos de las tareas más frecuentes de cada perfil, desde el primer ingreso al sistema hasta el reporte de una falla, la resolución de una orden y la consulta de los indicadores.
 
 \subsubsection{Autenticación y control de accesos}
-Para ingresar, la persona completa en la pantalla de inicio de sesión su número de identificación y su contraseña. El número tiene la forma u + DNI (por ejemplo, u12345678) y se eligió como nombre de usuario porque es el que el Hospital Alemán ya utiliza para identificar a su personal. Durante el desarrollo y las pruebas funcionales se trabajó con usuarios ficticios, ya que los nombres, correos y documentos del personal real son información confidencial; los datos generados respetan la estructura y los formatos del hospital. Los usuarios reales se incorporaron después, en una base separada (sección~\ref{sec:integracion-datos}).
+Para ingresar, la persona completa en la pantalla de inicio de sesión (Figura~\ref{fig:inicio-sesion}) su número de identificación y su contraseña. El número tiene la forma u + DNI (por ejemplo, u12345678) y se eligió como nombre de usuario porque es el que el Hospital Alemán ya utiliza para identificar a su personal. Durante el desarrollo y las pruebas funcionales se trabajó con usuarios ficticios, ya que los nombres, correos y documentos del personal real son información confidencial; los datos generados respetan la estructura y los formatos del hospital. Los usuarios reales se incorporaron después, en una base separada (sección~\ref{sec:integracion-datos}).
 
 Como las cuentas se cargan sin contraseña, la primera vez que alguien usa el sistema debe activar su usuario desde el botón “¿Primera vez? Activar mi usuario”. La activación tiene dos pasos. Primero se ingresa el número de identificación y el sistema verifica que exista y que todavía no haya sido activado; si no es así, le indica a la persona cómo continuar. Después se elige la contraseña, escribiéndola dos veces para evitar errores de tipeo, con un mínimo de 8 caracteres y sin otras restricciones. De este modo no hace falta distribuir contraseñas iniciales entre el personal, algo poco práctico y menos seguro, y cada persona elige la suya en su primer acceso. 
 
 En el inicio de sesión, si el número no está registrado, la cuenta todavía no fue activada o la contraseña es incorrecta, se muestra el mismo mensaje, “Número o contraseña incorrectos”, y no se permite el acceso. 
 
-(Foto Iniciar sesión)
+\begin{figure}[!htbp]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{fotos/Figura_4_9a_iniciar_sesion.png}}
+    \caption{Pantalla de inicio de sesión.}
+    \label{fig:inicio-sesion}
+\end{figure}
 
-En el caso de que el usuario olvide su contraseña, puede recuperarla desde la misma página de inicio de sesión seleccionando el botón ``Olvidé mi contraseña''. Si en cambio desea cambiarla, puede hacerlo desde la pestaña ``Mi cuenta'', a la que se accede en cualquier momento, una vez iniciada la sesión, desde el ícono ubicado en el extremo superior derecho, identificado con las iniciales de su nombre.
+En el caso de que el usuario olvide su contraseña, puede recuperarla desde la misma página de inicio de sesión seleccionando el botón ``Olvidé mi contraseña''. Si en cambio desea cambiarla, puede hacerlo desde la pestaña ``Mi cuenta'' (Figura~\ref{fig:mi-cuenta}), a la que se accede en cualquier momento, una vez iniciada la sesión, desde el ícono ubicado en el extremo superior derecho, identificado con las iniciales de su nombre.
 
-(Foto Coordinacion - Mi cuenta)
+\begin{figure}[!htbp]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=0.8\linewidth,height=0.40\textheight,keepaspectratio]{fotos/Figura_4_9b_mi_cuenta.png}}
+    \caption{Pestaña “Mi cuenta” del perfil de coordinación.}
+    \label{fig:mi-cuenta}
+\end{figure}
 
 \subsubsection{Activos y acceso por QR}
 \label{sec:activos-qr}
 El hospital ya tiene colocada en cada equipo una etiqueta con un código QR, un código de barras y el código de activo (sección~\ref{sec:serv-bioing}). Como el QR hoy no cumple ninguna función, el sistema lo aprovecha: contiene únicamente el código del equipo, con el que la aplicación recupera su información. Así no hizo falta generar ni imprimir etiquetas nuevas, una tarea costosa sobre un parque de varios miles de equipos, y el sistema se incorpora sin modificar lo que el servicio ya tiene instalado.
 
-La pestaña “Escanear” abre la cámara del dispositivo y está disponible para todos los perfiles. Antes de continuar, el sistema verifica que el equipo exista, por si la etiqueta es antigua o el código está mal. Enfermería llega al formulario de solicitud de servicio con el código ya completado, y técnico, coordinación y jefatura, a la ficha del equipo. Si la cámara no funciona o la etiqueta es ilegible, el código puede ingresarse a mano en la misma pantalla, de modo que ninguna de esas situaciones deje al usuario sin acceso a la información.
+La pestaña “Escanear” abre la cámara del dispositivo y está disponible para todos los perfiles (Figura~\ref{fig:escanear}). Antes de continuar, el sistema verifica que el equipo exista, por si la etiqueta es antigua o el código está mal. Enfermería llega al formulario de solicitud de servicio con el código ya completado, y técnico, coordinación y jefatura, a la ficha del equipo. Si la cámara no funciona o la etiqueta es ilegible, el código puede ingresarse a mano en la misma pantalla, de modo que ninguna de esas situaciones deje al usuario sin acceso a la información.
 
-(Figura 4.10. Pestaña “Escanear” de enfermería.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_10_escanear_enfermeria.png}}
+    \caption{Pestaña “Escanear” de enfermería.}
+    \label{fig:escanear}
+\end{figure}
 
-La pestaña “Equipos”, disponible para todos los perfiles excepto enfermería, lista los equipos de a 50 por página, con su código, ubicación, descripción, marca, modelo y estado. Permite buscar por código, nombre, marca o número de serie, filtrar por estado, grupo técnico, servicio y tipo de equipo, y registrar un equipo nuevo (técnico, coordinación y jefatura). Al pasar el mouse sobre un código de equipo o de ubicación, un cartel muestra su significado a partir del glosario de siglas y de los catálogos del hospital (por ejemplo, “DESF” se lee como desfibrilador), de modo que los códigos pueden interpretarse sin conocer de memoria todas las siglas.
+La pestaña “Equipos”, disponible para todos los perfiles excepto enfermería, lista los equipos de a 50 por página, con su código, ubicación, descripción, marca, modelo y estado (Figura~\ref{fig:equipos}). Permite buscar por código, nombre, marca o número de serie, filtrar por estado, grupo técnico, servicio y tipo de equipo, y registrar un equipo nuevo (técnico, coordinación y jefatura). Al pasar el mouse sobre un código de equipo o de ubicación, un cartel muestra su significado a partir del glosario de siglas y de los catálogos del hospital (por ejemplo, “DESF” se lee como desfibrilador), de modo que los códigos pueden interpretarse sin conocer de memoria todas las siglas.
 
-(Figura 4.11. Pestaña “Equipos” de coordinación.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_11_equipos_coordinacion.png}}
+    \caption{Pestaña “Equipos” de coordinación.}
+    \label{fig:equipos}
+\end{figure}
 
-El botón “Nuevo equipo” abre un formulario cuyos datos permiten identificar, ubicar y evaluar el equipo, en línea con la sección~\ref{sec:inventario}. Son obligatorios el área, que se escribe a mano, y el tipo de equipo y el servicio, que se eligen de listas cerradas. La ubicación es opcional pero, si se carga, debe elegirse del catálogo de ubicaciones validadas del hospital. También se registran la marca, el modelo, el número de serie, la orden de compra, la fecha de instalación, el estado y, si ya tiene la etiqueta, el código QR. La casilla “Es equipo médico” indica si se le calcula la criticidad y, solo cuando está marcada, aparece “No tiene backup”, que señala que no hay otro equipo que pueda reemplazarlo y aumenta su nivel de riesgo. Opcionalmente puede programarse su mantenimiento preventivo, indicando en qué mes se abre la primera orden y cada cuántos meses se repite, valor que el sistema sugiere a partir del checklist del tipo de equipo.
+El botón “Nuevo equipo” abre un formulario (Figura~\ref{fig:nuevo-equipo}) cuyos datos permiten identificar, ubicar y evaluar el equipo, en línea con la sección~\ref{sec:inventario}. Son obligatorios el área, que se escribe a mano, y el tipo de equipo y el servicio, que se eligen de listas cerradas. La ubicación es opcional pero, si se carga, debe elegirse del catálogo de ubicaciones validadas del hospital. También se registran la marca, el modelo, el número de serie, la orden de compra, la fecha de instalación, el estado y, si ya tiene la etiqueta, el código QR. La casilla “Es equipo médico” indica si se le calcula la criticidad y, solo cuando está marcada, aparece “No tiene backup”, que señala que no hay otro equipo que pueda reemplazarlo y aumenta su nivel de riesgo. Opcionalmente puede programarse su mantenimiento preventivo, indicando en qué mes se abre la primera orden y cada cuántos meses se repite, valor que el sistema sugiere a partir del checklist del tipo de equipo.
 
 El código no se escribe: lo genera el sistema con el formato que ya usan las etiquetas (prefijo, área, tipo de equipo y número correlativo, por ejemplo B-INTR-DESF-070). El número es el siguiente disponible para ese tipo en todo el hospital, sin importar el área, lo que evita los códigos mal construidos detectados en la base actual (sección~\ref{sec:analisis-maximo}). El área se carga a mano porque, como se observó en ese análisis, no coincide con el servicio del equipo. Con el mismo criterio, la descripción se completa con el nombre del tipo y el grupo técnico responsable se asigna según ese tipo, de modo que dos equipos del mismo tipo quedan siempre registrados con la misma denominación. Coordinación y jefatura disponen además de la pestaña “Catálogos”, donde dan de alta los tipos de equipo, los servicios y las siglas del glosario.
 
-(Figura 4.12. Formulario “Nuevo equipo” de coordinación.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=0.62\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_12_nuevo_equipo.png}}
+    \caption{Formulario “Nuevo equipo” de coordinación.}
+    \label{fig:nuevo-equipo}
+\end{figure}
 
-La ficha de un equipo reúne sus datos, su estado actual, la fecha del próximo mantenimiento preventivo, el grupo de bioingeniería responsable y el historial de órdenes y mantenimientos con su estado. Junto a cada integrante del grupo hay un botón “Contactar” que abre un correo, lo que permite el contacto directo con el bioingeniero a cargo, y el botón “Descargar reporte” genera un PDF con los datos del equipo y el historial completo de sus órdenes. Según el perfil se suman dos accesos: “Ver estado de la reparación”, que lleva a la orden abierta del equipo, si la hay (técnico y coordinación), y “Ver plan de mantenimiento”, que lleva al plan de su tipo (coordinación y jefatura). Técnico y coordinación pueden abrir cada orden del historial dentro de los límites de su grupo; jefatura consulta las órdenes desde la pestaña “Órdenes”, en modo lectura.
+La ficha de un equipo (Figura~\ref{fig:ficha-equipo}) reúne sus datos, su estado actual, la fecha del próximo mantenimiento preventivo, el grupo de bioingeniería responsable y el historial de órdenes y mantenimientos con su estado. Junto a cada integrante del grupo hay un botón “Contactar” que abre un correo, lo que permite el contacto directo con el bioingeniero a cargo, y el botón “Descargar reporte” genera un PDF con los datos del equipo y el historial completo de sus órdenes. Según el perfil se suman dos accesos: “Ver estado de la reparación”, que lleva a la orden abierta del equipo, si la hay (técnico y coordinación), y “Ver plan de mantenimiento”, que lleva al plan de su tipo (coordinación y jefatura). Técnico y coordinación pueden abrir cada orden del historial dentro de los límites de su grupo; jefatura consulta las órdenes desde la pestaña “Órdenes”, en modo lectura.
 
 Técnico, coordinación y jefatura pueden usar además el botón “Editar ficha”, que abre un formulario con los datos del alta, excepto el área. Antes de guardar, el sistema pide confirmar (“¿Confirmás que querés modificar este equipo?”), porque de la ficha dependen el historial, los indicadores y el nivel de riesgo, y envía solo lo que cambió. No pueden editarse el código, clave con la que se vincula todo el historial, ni las fechas de mantenimiento calculadas por el sistema; si se cambia el tipo de equipo, la descripción y el grupo responsable se recalculan solos. La edición permite corregir errores de carga, actualizar la ubicación cuando un equipo cambia de sector y registrar su baja con el estado “De baja”: el equipo deja de generar preventivos y de figurar en el pronóstico del calendario, pero conserva su historial.
 
-(Figura 4.13. Ficha de un equipo, vista de coordinación.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=0.55\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_13_ficha_equipo.png}}
+    \caption{Ficha de un equipo, vista de coordinación.}
+    \label{fig:ficha-equipo}
+\end{figure}
 
-La ficha muestra además el estado de vida útil del equipo y, si es médico, su criticidad y su nivel de riesgo (alto, medio o bajo), calculados como se explicó en la sección~\ref{sec:criticidad-riesgo}; es información de uso interno del servicio y no se muestra a enfermería. Al tocar el nivel de riesgo se abre la ventana “Cómo se calcula”, que ubica el puntaje en una barra con los cortes de cada nivel y detalla los factores y las condiciones que aumentaron su peso. Si falta algún dato, como la fecha de instalación, la ficha indica el motivo en lugar de mostrar un resultado incompleto. El nivel de riesgo también sugiere la prioridad al aceptar una solicitud (sección~\ref{sec:solicitudes}) y se incluye en la descarga de equipos (sección~\ref{sec:descarga-datos}).
+La ficha muestra además el estado de vida útil del equipo y, si es médico, su criticidad y su nivel de riesgo (alto, medio o bajo), calculados como se explicó en la sección~\ref{sec:criticidad-riesgo}; es información de uso interno del servicio y no se muestra a enfermería. Al tocar el nivel de riesgo se abre la ventana “Cómo se calcula” (Figura~\ref{fig:riesgo-calculo}), que ubica el puntaje en una barra con los cortes de cada nivel y detalla los factores y las condiciones que aumentaron su peso. Si falta algún dato, como la fecha de instalación, la ficha indica el motivo en lugar de mostrar un resultado incompleto. El nivel de riesgo también sugiere la prioridad al aceptar una solicitud (sección~\ref{sec:solicitudes}) y se incluye en la descarga de equipos (sección~\ref{sec:descarga-datos}).
 
-(Figura 4.14. Ficha con el nivel de riesgo y la ventana “Cómo se calcula”.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=0.55\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_14_riesgo_como_se_calcula.png}}
+    \caption{Ficha con el nivel de riesgo y la ventana “Cómo se calcula”.}
+    \label{fig:riesgo-calculo}
+\end{figure}
 
 \subsubsection{Reporte y clasificación de fallas (solicitudes de servicio)}
 \label{sec:solicitudes}
 Cuando un equipo falla, quien lo detecta suele ser quien lo está usando y no Bioingeniería, por lo que el circuito correctivo tiene que empezar ahí. El módulo de solicitudes de servicio es la puerta de entrada de todo trabajo correctivo. La solicitud es una entidad separada de la orden de trabajo porque es un pedido que el servicio debe evaluar antes de comprometer a alguien, y porque así queda registro incluso de los reportes que no derivan en una intervención. Enfermería accede desde la pestaña “Mis solicitudes” y coordinación, desde “Solicitudes”.
 
-\textbf{Enfermería.} Es el único perfil que reporta fallas. En “Mis solicitudes” se encuentran las opciones “Crear solicitud” (la que se abre por defecto), “Enviadas”, “Aceptadas” y “Rechazadas”, y un botón para escanear el QR de un equipo. El formulario de creación pide:
+\textbf{Enfermería.} Es el único perfil que reporta fallas. En “Mis solicitudes” (Figura~\ref{fig:mis-solicitudes}) se encuentran las opciones “Crear solicitud” (la que se abre por defecto), “Enviadas”, “Aceptadas” y “Rechazadas”, y un botón para escanear el QR de un equipo. El formulario de creación pide:
 \begin{itemize}
     \item \textbf{¿Es un equipo médico?} Se responde con “Sí, es un equipo médico” o “No (ej: instrumental)”, porque el servicio también recibe pedidos que no involucran equipamiento registrado y el circuito posterior es distinto en cada caso.
     \item \textbf{Identificador del equipo.} Se valida contra los equipos existentes y sugiere coincidencias mientras se escribe, para que no puedan reportarse equipos inexistentes ni códigos con errores de tipeo; llega completo si el formulario se abrió escaneando el QR. Si no es un equipo médico, se describe en cambio qué es (por ejemplo, una pinza de oftalmología).
@@ -767,11 +852,17 @@ Cuando un equipo falla, quien lo detecta suele ser quien lo está usando y no Bi
 \end{itemize}
 Al enviarla, la solicitud recibe un número correlativo. Si es de un equipo médico, se dirige automáticamente al coordinador del grupo técnico que corresponde a su tipo de equipo; si no lo es, la ven todos los coordinadores y quien la toma define el grupo.
 
-(Figura 4.15. Pestaña “Mis solicitudes” de enfermería, opción “Crear solicitud”.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_15_mis_solicitudes_enfermeria.png}}
+    \caption{Pestaña “Mis solicitudes” de enfermería, opción “Crear solicitud”.}
+    \label{fig:mis-solicitudes}
+\end{figure}
 
 Las pestañas “Enviadas”, “Aceptadas” y “Rechazadas” muestran el historial del propio usuario, con búsqueda por número o por equipo y filtro por fecha. En las aceptadas se indica si el pedido ya tiene un técnico asignado, sin acceso al detalle de la intervención, que excede el interés de enfermería; en las rechazadas se muestra el motivo indicado por coordinación.
 
-\textbf{Coordinación.} La pestaña “Solicitudes” lista las pendientes de los grupos que el coordinador tiene a cargo, más las que no involucran un equipo. Si el pedido incluye fotos o PDF, la tarjeta ofrece “Ver archivos adjuntos (n)” para abrirlos antes de decidir; una vez aceptado, se consultan desde el detalle de la orden. Cada una ofrece tres acciones (Figura 4.16), aplicables solo mientras esté pendiente:
+\textbf{Coordinación.} La pestaña “Solicitudes” lista las pendientes de los grupos que el coordinador tiene a cargo, más las que no involucran un equipo. Si el pedido incluye fotos o PDF, la tarjeta ofrece “Ver archivos adjuntos (n)” para abrirlos antes de decidir; una vez aceptado, se consultan desde el detalle de la orden. Cada una ofrece tres acciones (Figura~\ref{fig:solicitudes-coord}), aplicables solo mientras esté pendiente:
 \begin{itemize}
     \item \textbf{Aceptar.} El formulario pide el grupo (se deduce del tipo de equipo si es médico y se elige si no lo es), el técnico a asignar, la clasificación de la falla como técnica o de usuario y la prioridad. La clasificación es obligatoria, porque de ella depende que la falla cuente en los indicadores (sección~\ref{sec:estados}). El técnico es opcional, de modo que la orden puede generarse sin responsable y asignarse más adelante, algo habitual cuando el pedido entra fuera de horario. Para un equipo médico con riesgo calculado, la prioridad se precarga según su nivel (sección~\ref{sec:criticidad-riesgo}) y se aclara el origen de la sugerencia; coordinación puede cambiarla, incluso a “Crítica”, que se reserva como decisión manual. Así, la prioridad no depende solo del criterio de quien acepta, en línea con propuestas como la de Hamdi et al., que asignan a cada solicitud una prioridad según el impacto de la inactividad del equipo \cite{hamdi2012}. Al confirmar, se genera una orden correctiva vinculada a la solicitud y se avisa por correo al servicio (sección~\ref{sec:notificaciones}). La orden conserva como fecha de notificación la de creación de la solicitud y no la de aceptación, para que los indicadores de falla tomen el momento real del aviso. 
     \item \textbf{Modificar.} Permite corregir antes de aceptarla el título, la descripción, la ubicación y el equipo: se puede cambiar el identificador, que se verifica contra los equipos existentes, o pasar de equipo médico a otra cosa y a la inversa. Si el título era el que arma el sistema, se actualiza con el nuevo equipo, y si este pertenece a otro grupo, la solicitud pasa a la bandeja de su coordinador y se avisa en pantalla. Así no se rechaza un pedido legítimo por un error de carga y se evita obligar a reportarlo de nuevo. 
@@ -779,7 +870,13 @@ Las pestañas “Enviadas”, “Aceptadas” y “Rechazadas” muestran el his
 \end{itemize}
 La aceptación sólo es posible sobre las solicitudes de los grupos que el coordinador tiene a cargo.
 
-(Figura 4.16. Pestaña “Solicitudes” de coordinación.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_16_solicitudes_coordinacion.png}}
+    \caption{Pestaña “Solicitudes” de coordinación.}
+    \label{fig:solicitudes-coord}
+\end{figure}
 
 \subsubsection{Órdenes de trabajo}
 La orden de trabajo registra cada intervención sobre un equipo y es la entidad en la que convergen los demás módulos. Nace de una solicitud aceptada (sección~\ref{sec:solicitudes}), de una falla detectada durante un preventivo o de la generación automática de preventivos (sección~\ref{sec:mantenimiento-preventivo}), y se identifica con un número correlativo, como OT-0037. Sus estados se describieron en la sección~\ref{sec:estados}.
@@ -791,11 +888,17 @@ La orden de trabajo registra cada intervención sobre un equipo y es la entidad 
     \item \textbf{Coordinación.} La pestaña “Órdenes” muestra las de los grupos que tiene a cargo. El filtro “Sin asignar” funciona como su bandeja de pendientes, ya que repartir el trabajo es una tarea propia de este perfil.
     \item \textbf{Jefatura.} La pestaña “Órdenes” muestra las de todos los grupos, solo para consulta: ve el detalle completo, pero ninguna acción que modifique la orden, y el backend rechaza sus intentos de asignarla, editarla, completarla, cerrarla o registrar consumos en ella aunque se hagan por fuera de la interfaz (sección~\ref{sec:backend-bd}).
 \end{itemize}
-En todos los casos el listado se filtra por estado, tipo, prioridad y fecha de notificación, y se busca por número de orden o por código de equipo. La búsqueda por número admite variantes (“37”, “OT 37” u “OT-037”), de modo que nadie tenga que recordar el formato exacto. Las preventivas se distinguen de las correctivas con una etiqueta y un borde de color.
+En todos los casos el listado se filtra por estado, tipo, prioridad y fecha de notificación, y se busca por número de orden o por código de equipo. La búsqueda por número admite variantes (“37”, “OT 37” u “OT-037”), de modo que nadie tenga que recordar el formato exacto. Las preventivas se distinguen de las correctivas con una etiqueta y un borde de color (Figura~\ref{fig:mis-ordenes}).
 
-(Figura 4.17. Pestaña “Mis órdenes” del técnico.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_17_mis_ordenes_tecnico.png}}
+    \caption{Pestaña “Mis órdenes” del técnico.}
+    \label{fig:mis-ordenes}
+\end{figure}
 
-\noindent \textbf{Detalle de una orden.} Reúne los datos del equipo y su criticidad, el tipo, la prioridad y el estado, quién reportó la falla, a quién está asignada y quién la inició y la cerró, con sus fechas. Una correctiva generada durante un preventivo indica la orden de origen, y si proviene de una solicitud con fotos o documentos, estos se muestran en “Archivos adjuntos”. Desde el detalle se realizan las siguientes acciones:
+\noindent \textbf{Detalle de una orden.} Reúne los datos del equipo y su criticidad, el tipo, la prioridad y el estado, quién reportó la falla, a quién está asignada y quién la inició y la cerró, con sus fechas (Figura~\ref{fig:detalle-orden}). Una correctiva generada durante un preventivo indica la orden de origen, y si proviene de una solicitud con fotos o documentos, estos se muestran en “Archivos adjuntos”. Desde el detalle se realizan las siguientes acciones:
 
 \begin{itemize}
     \item \textbf{Asignar o reasignar.} Coordinación asigna una correctiva a un integrante del grupo de la orden con “Asignar / Reasignar técnico”. Un técnico del grupo puede hacer lo mismo para pasársela a un compañero, o tomar una orden sin asignar con “Tomar esta orden”. Las preventivas pertenecen al grupo y no se asignan a una persona 
@@ -805,7 +908,13 @@ En todos los casos el listado se filtra por estado, tipo, prioridad y fecha de n
     \item \textbf{Editar orden.} Mientras no esté cerrada, permite corregir la descripción, la prioridad y el equipo asociado, por ejemplo cuando la solicitud se cargó con un equipo equivocado, con una confirmación previa. Si el nuevo equipo pertenece a otro grupo, la orden pasa a ese grupo y, si el técnico asignado no pertenece a él, queda sin asignar. En las correctivas, coordinación puede además corregir la clasificación de la falla (sección~\ref{sec:estados}). Pueden editarla los técnicos del grupo y coordinación.
     \item \textbf{Registrar consumo de accesorios.} Descuenta del stock lo utilizado en la intervención (sección~\ref{sec:stock}).
 \end{itemize}
-(Figura 4.18. Detalle de una orden correctiva, vista del técnico.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_18_detalle_orden_correctiva.png}}
+    \caption{Detalle de una orden correctiva, vista del técnico.}
+    \label{fig:detalle-orden}
+\end{figure}
 
 \noindent \textbf{Cierre de una correctiva.} La cierra el técnico asignado o la coordinación del grupo con el botón “Cerrar la orden”, completando el campo “Qué se hizo”, que queda en el historial del equipo.  Si al cerrar una correctiva, o al completar una preventiva, queda una parada sin finalizar, el sistema la finaliza con esa fecha para que no distorsione el tiempo de inactividad. Las preventivas siguen otro circuito (sección~\ref{sec:mantenimiento-preventivo}).
 \subsubsection{Mantenimientos preventivos}
@@ -818,13 +927,25 @@ Hasta ahora, los preventivos de los meses siguientes se planificaban en planilla
 
 \textbf{Generación automática de las órdenes.} La tarea programada (sección~\ref{sec:backend-bd}) crea una orden preventiva abierta, asignada al grupo responsable y vinculada a su checklist, para cada equipo cuyo próximo mantenimiento vence en el mes en curso o antes, excepto los dados de baja y los que ya tienen una preventiva sin cerrar. En el mismo paso calcula la fecha del ciclo siguiente, sumando la frecuencia del equipo. Como la reprogramación se hace al generar la orden y no al cerrarla, un mantenimiento completado con retraso no desplaza el resto del calendario.
 
-\textbf{Calendario de mantenimientos.} La pestaña “Calendario MP”, disponible para técnicos, coordinación y jefatura, reemplaza a las planillas de cada grupo. Muestra, mes a mes, los mantenimientos programados, que pueden estar generados, con el número y el estado de la orden, o en pronóstico, cuando la orden todavía no existe, algo habitual en los meses futuros. Los primeros llevan al detalle de la orden y los segundos, a la ficha del equipo. La lista se filtra por equipo, estado y grupo, y el gráfico “Carga de mantenimientos por mes” resalta el mes más cargado, lo que permite redistribuir el trabajo con anticipación. Coordinación y jefatura disponen además de “Generar ahora”, para forzar la generación sin esperar a la tarea diaria.
+\textbf{Calendario de mantenimientos.} La pestaña “Calendario MP”, disponible para técnicos, coordinación y jefatura, reemplaza a las planillas de cada grupo (Figura~\ref{fig:calendario-mp}). Muestra, mes a mes, los mantenimientos programados, que pueden estar generados, con el número y el estado de la orden, o en pronóstico, cuando la orden todavía no existe, algo habitual en los meses futuros. Los primeros llevan al detalle de la orden y los segundos, a la ficha del equipo. La lista se filtra por equipo, estado y grupo, y el gráfico “Carga de mantenimientos por mes” resalta el mes más cargado, lo que permite redistribuir el trabajo con anticipación. Coordinación y jefatura disponen además de “Generar ahora”, para forzar la generación sin esperar a la tarea diaria.
 
-(Figura 4.19. Pestaña “Calendario MP”.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_19_calendario_mp.png}}
+    \caption{Pestaña “Calendario MP”.}
+    \label{fig:calendario-mp}
+\end{figure}
 
-\textbf{Ejecución del checklist.} Cualquier técnico del grupo, o su coordinación, puede iniciar una preventiva con “Empezar a trabajar”; desde entonces solo esa persona puede trabajarla, y el resto del grupo puede verla pero no modificarla. En la sección “Checklist de mantenimiento” cada ítem se responde con “Pasa” o “No pasa” (“Sí” o “No” en “Necesidad de correctivo”, para que la pregunta se entienda). Con “No pasa” se describe el problema en “Qué encontraste” y se puede “Generar una orden correctiva por esto”, opción marcada por defecto y con prioridad opcional, que queda vinculada a la preventiva y asignada a quien realiza el mantenimiento. “Cambiar” corrige una respuesta ya cargada, y “Algo no funciona: generar correctiva” abre una correctiva por un problema que no corresponde a ningún ítem. Las correctivas generadas se listan en la misma orden.
+\textbf{Ejecución del checklist.} Cualquier técnico del grupo, o su coordinación, puede iniciar una preventiva con “Empezar a trabajar”; desde entonces solo esa persona puede trabajarla, y el resto del grupo puede verla pero no modificarla. En la sección “Checklist de mantenimiento” (Figura~\ref{fig:checklist}) cada ítem se responde con “Pasa” o “No pasa” (“Sí” o “No” en “Necesidad de correctivo”, para que la pregunta se entienda). Con “No pasa” se describe el problema en “Qué encontraste” y se puede “Generar una orden correctiva por esto”, opción marcada por defecto y con prioridad opcional, que queda vinculada a la preventiva y asignada a quien realiza el mantenimiento. “Cambiar” corrige una respuesta ya cargada, y “Algo no funciona: generar correctiva” abre una correctiva por un problema que no corresponde a ningún ítem. Las correctivas generadas se listan en la misma orden.
 
-(Figura 4.20. Checklist de mantenimiento de una orden preventiva.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.40\textheight,keepaspectratio]{fotos/Figura_4_20_checklist_mantenimiento.png}}
+    \caption{Sección “Checklist de mantenimiento” de una orden preventiva en curso, con ítems respondidos y pendientes.}
+    \label{fig:checklist}
+\end{figure}
 
 \textbf{Completar y autorizar.} Al responder todos los ítems obligatorios se abre la ventana “Validación de datos”, con el resumen de las respuestas, que se reabre con “Revisar y completar la orden”. Si la orden se completa fuera del mes programado, pide el motivo del retraso; no pide un texto sobre lo realizado, porque cada ítem ya registra su observación. Con “Completar orden de trabajo” la orden queda pendiente de cierre, y coordinación la revisa desde el mismo detalle con “Autorizar cierre”, con un comentario opcional, o “Devolver al técnico”, con un motivo obligatorio que queda en la bitácora (circuito de la sección~\ref{sec:estados}).
 
@@ -842,9 +963,15 @@ Este módulo lleva el stock de accesorios y repuestos y lo vincula con las órde
     \item Stock crítico (rojo). La cantidad llegó al stock mínimo o bajó de él.
 \end{itemize}
 
-La lista se busca por nombre, código o descripción, se filtra por el tipo de equipo al que corresponde cada accesorio (incluidos los de uso general, como guantes o alcohol en gel) y puede limitarse a los que requieren atención. El botón “Ver historial” lleva al historial de movimientos, al final de la pantalla.
+La lista se busca por nombre, código o descripción, se filtra por el tipo de equipo al que corresponde cada accesorio (incluidos los de uso general, como guantes o alcohol en gel) y puede limitarse a los que requieren atención. El botón “Ver historial” lleva al historial de movimientos, al final de la pantalla (Figura~\ref{fig:accesorios}).
 
-(Figura 4.21. Pestaña “Accesorios”.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_21_accesorios.png}}
+    \caption{Pestaña “Accesorios”.}
+    \label{fig:accesorios}
+\end{figure}
 
 \textbf{Alta y eliminación.} Por ser una tarea de catálogo, el botón “Nuevo accesorio” está disponible solo para coordinación y jefatura. Pide el nombre (obligatorio), la descripción, la unidad y el tipo de equipo (opcionales) y los valores de stock actual, mínimo y punto de reposición. El código lo asigna el sistema con el formato INS-0001. Un accesorio cargado por error puede eliminarse, pero solo si todavía no tiene movimientos, para no perder historial.
 
@@ -867,7 +994,7 @@ Los avisos son únicamente por correo, ya que el sistema no cuenta con notificac
 
 \subsubsection{Panel de indicadores}
 \label{sec:panel-indicadores}
-El panel de indicadores responde a la dificultad para obtener informes del sistema actual, el tema más repetido en la encuesta (sección~\ref{sec:encuesta}), y materializa los indicadores de la sección~\ref{sec:indicadores-gestion}. Se accede desde la pestaña “Dashboard”, disponible solo para jefatura, y todos los valores se calculan en el momento de abrir la pantalla con los datos registrados, sin necesidad de armar informes por fuera del sistema.
+El panel de indicadores responde a la dificultad para obtener informes del sistema actual, el tema más repetido en la encuesta (sección~\ref{sec:encuesta}), y materializa los indicadores de la sección~\ref{sec:indicadores-gestion}. Se accede desde la pestaña “Dashboard” (Figura~\ref{fig:panel-indicadores}), disponible solo para jefatura, y todos los valores se calculan en el momento de abrir la pantalla con los datos registrados, sin necesidad de armar informes por fuera del sistema.
 
 Dos criterios rigen el panel. El primero es que un porcentaje o un promedio sin datos suficientes muestra “Sin datos” y nunca un cero: un cumplimiento del 0 % y la ausencia de preventivos cargados significan cosas opuestas, y confundirlos podría llevar a decisiones equivocadas sobre el parque. El segundo es que los indicadores de falla (tiempo fuera de servicio, cantidad de fallas, tiempo medio de reparación y tiempo medio entre fallas) miden la confiabilidad de los equipos, por lo que no incluyen las fallas de usuario ni las órdenes sin un equipo asociado, como las de instrumental, que no pueden atribuirse a ninguno. Todas ellas sí cuentan como trabajo del servicio en las órdenes totales y en la carga por grupo (sección~\ref{sec:estados}); solo las órdenes sin equipo quedan fuera cuando se filtra por grupo o por tipo, porque el filtro opera sobre equipos. 
 
@@ -885,7 +1012,13 @@ En la parte superior, los filtros “Grupo técnico” y “Tipo de equipo” re
     \item \textbf{Equipos menos confiables.} Los equipos ordenados por tiempo medio entre fallas (MTBF), de modo que los que fallan más seguido aparecen primero. En línea con la sección~\ref{sec:indicadores-gestion}, solo se calcula para equipos con al menos dos fallas registradas. Al seleccionar uno, se accede a su ficha.
 \end{itemize}
 
-(Figura 4.22. Panel de indicadores.)
+\begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
+    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_22_panel_indicadores.png}}
+    \caption{Panel de indicadores, vista de jefatura.}
+    \label{fig:panel-indicadores}
+\end{figure}
 
 Así, jefatura puede pasar de una vista general del servicio a un equipo puntual en pocos pasos, con información concreta para decisiones como la revisión de un plan de mantenimiento o el recambio de un equipo.
 
@@ -934,6 +1067,7 @@ La Tabla~\ref{tab:datos-incorporados} resume lo que quedó cargado. El inventari
 \end{table}
 
 \subsubsection{Hallazgos de la prueba con datos reales}
+\label{sec:hallazgos-datos-reales}
 La base de prueba no permitía anticipar tres situaciones que aparecieron al trabajar con los datos reales:
 
 \begin{itemize}
@@ -945,24 +1079,106 @@ La base de prueba no permitía anticipar tres situaciones que aparecieron al tra
 Con esta carga, SYNAP opera con el inventario completo y con los usuarios del servicio, y la prueba permitió detectar y resolver tres situaciones que la base ficticia no mostraba. La migración abarcó los equipos, sus catálogos y las cuentas de usuario. Los planes de mantenimiento y sus checklists quedan para definirse con el servicio al momento de la puesta en marcha, que, como se aclaró en la sección~\ref{sec:enfoque-trabajo}, excede el alcance de este trabajo. 
 
 \newpage
-\section{Resultados}
+\section{Resultados y limitaciones}
 \label{sec:resultados}
 
+Este capítulo presenta los resultados del trabajo. En primer lugar se describe el sistema obtenido y se resume su integración con los datos del hospital. Luego se presentan la valoración del servicio de Bioingeniería y las limitaciones de los resultados.
+
+\subsection{Sistema obtenido}
+\label{sec:sistema-obtenido}
+
+El resultado del trabajo es SYNAP, un prototipo funcional de sistema web para la gestión del equipamiento médico del servicio de Bioingeniería. Se utiliza desde el navegador, tanto en computadoras como en celulares (sección~\ref{sec:arquitectura-tecnologias}), y ofrece cuatro perfiles de usuario, enfermería, técnico, coordinación y jefatura, cada uno con las pantallas y acciones que le corresponden (sección~\ref{sec:perfiles-usuario}).
+
+El sistema acompaña el recorrido de un equipo dentro del servicio. Enfermería reporta una falla escaneando el QR del equipo, y coordinación la clasifica y la convierte en una orden de trabajo asignada a un técnico. Los mantenimientos preventivos se generan cada mes a partir del plan de cada tipo de equipo, y jefatura cuenta con un panel de indicadores. Todo esto responde a los requerimientos relevados en el servicio (secciones~\ref{sec:casos-uso} y~\ref{sec:requerimientos-funcionales}), y su cumplimiento frente a los objetivos de la sección~\ref{sec:objetivos} se retoma en las conclusiones (sección~\ref{sec:conclusiones}).
+
+\subsection{Integración de los datos del hospital}
+\label{sec:integracion-resultados}
+
+Para validar el sistema en un caso de uso real, tal como plantea el último de los objetivos de mínima (sección~\ref{sec:objetivos}), se incorporaron los datos del servicio de Bioingeniería del Hospital Alemán, cuya migración se describe en la sección~\ref{sec:integracion-datos}. SYNAP opera hoy con 6.178 equipos, 358 tipos de equipo, 77 sectores, 6 grupos de trabajo y las cuentas de 14 usuarios del servicio. La prueba con esos datos permitió detectar y resolver tres situaciones que la base ficticia no mostraba, relacionadas con la activación de las cuentas, el volumen de la lista de equipos y la asignación de planes de mantenimiento preventivo (sección~\ref{sec:hallazgos-datos-reales}).
+
+\subsection{Validación con el servicio}
+\label{sec:validacion-servicio}
+
+Además de describir el sistema y probarlo con los datos del hospital, interesaba conocer la opinión del propio servicio de Bioingeniería, para el que se desarrolló. Por eso, SYNAP se mostró a la jefa del servicio y a varios técnicos y bioingenieros del equipo. Quienes lo vieron se mostraron muy satisfechos con el programa y consideraron que cumple con los requisitos solicitados y que está en línea con su modelo de trabajo.
+
+Esta valoración es relevante porque los requisitos del sistema se relevaron con el propio servicio (sección~\ref{sec:relevamiento}). Que el servicio los considere cumplidos indica que el prototipo responde a lo que se pidió y que se adapta a su forma de trabajar. Se trata de una valoración cualitativa, basada en la opinión de quienes conocieron el sistema, y sus alcances se detallan en la sección~\ref{sec:alcance-limitaciones}.
+
+\subsection{Alcance y limitaciones}
+\label{sec:alcance-limitaciones}
+
+Los resultados de este capítulo corresponden a un prototipo desarrollado para un único servicio, por lo que no pueden generalizarse sin más a otras instituciones. La valoración del servicio (sección~\ref{sec:validacion-servicio}) proviene de personal de Bioingeniería y es cualitativa, por lo que conviene complementarla con la opinión de los demás perfiles, en particular de enfermería, que es quien reporta las fallas, y con el efecto del sistema sobre el trabajo cotidiano, algo que solo podrá evaluarse con un uso sostenido en producción.
+
+También hay límites propios del sistema. Los indicadores del panel se calculan sobre las órdenes registradas en SYNAP, por lo que dependen de que el personal registre las paradas y los cierres, y su utilidad para detectar patrones de falla crece a medida que se acumula el historial. Además, el sistema todavía no está en producción, una etapa que excede el alcance de este trabajo (sección~\ref{sec:propuesta-justificacion}) y se retoma en las perspectivas futuras (capítulo~\ref{sec:futuro}).
+
 \newpage
-\section{Conclusiones y discusión}
+\section{Discusión y conclusiones}
 \label{sec:discusion}
+
+Este capítulo interpreta los resultados del capítulo~\ref{sec:resultados} a la luz de los antecedentes presentados en el capítulo~\ref{sec:estado-arte} y del sistema que el hospital utiliza hoy, y cierra con las conclusiones del trabajo. Sus límites se detallaron en la sección~\ref{sec:alcance-limitaciones}. Como los trabajos relevados no comparten métricas ni se evaluaron en el mismo contexto, la comparación se hace por las funciones y el enfoque de cada uno, y no por su desempeño.
+
+\subsection{Frente a los antecedentes}
+\label{sec:frente-antecedentes}
+
+Las funciones centrales de SYNAP coinciden con las de los trabajos relevados, entre ellas la gestión de los equipos y de su mantenimiento preventivo y correctivo, presente en las plataformas de Miranda Dulanto y Takayama Nakasato \cite{miranda_takayama2017} y de Khider y Hamza \cite{khider_hamza2023}; la priorización de las intervenciones según el equipo, que Hamdi et al. \cite{hamdi2012} resuelven con un índice basado en el impacto de la inactividad sobre los pacientes y Neovero \cite{neovero} según la criticidad; los indicadores de desempeño del mantenimiento propuestos por Iadanza et al. \cite{iadanza2019}; y el reporte de fallas mediante el QR del equipo, como en Kibbo \cite{leex_medical}. Es decir, SYNAP no parte de una idea aislada, sino de funciones que otros desarrollos ya habían resuelto.
+
+Lo que lo distingue es la manera de resolverlas. SYNAP se diseñó junto a un servicio en funcionamiento, a partir de sus procesos y de sus datos (sección~\ref{sec:relevamiento}), y eso se refleja en varias decisiones. Los problemas que mostró el análisis de Maximo, como los códigos mal construidos o las descripciones sin normalizar, se atienden desde el diseño, ya que el sistema arma el código de cada equipo y las listas cerradas reemplazan al texto libre (sección~\ref{sec:modelo-datos}). El QR lleva a un destino distinto según quién lo escanea. Enfermería llega al formulario para reportar la falla, con el equipo ya cargado, y el resto del personal, a la ficha del equipo. La prioridad de cada orden se sugiere con las tablas de riesgo PRIUX que el hospital ya utilizaba por fuera de su sistema de gestión, y la decisión final queda en manos de coordinación (secciones~\ref{sec:criticidad-riesgo} y~\ref{sec:solicitudes}). Además, coordinación revisa los preventivos antes de cerrarlos, el tiempo fuera de servicio se mide en cada orden, un dato que Maximo no registra (sección~\ref{sec:analisis-maximo}), y las fallas por mal uso se separan de las técnicas para no distorsionar los indicadores.
+
+Como contrapartida, SYNAP no incluye funciones que sí ofrecen algunas soluciones del mercado, como la tecnovigilancia de Neovero \cite{neovero} o la compra y el recambio de equipos que abarca Equipasis \cite{equipasis}. El servicio pidió funciones de este tipo, pero quedaron fuera del alcance del trabajo (sección~\ref{sec:ampliaciones}), de modo que SYNAP cubre hoy el circuito de mantenimiento y no todo el ciclo de vida del equipamiento.
+
+\subsection{Frente al sistema actual del hospital}
+\label{sec:frente-maximo}
+
+Maximo es una plataforma general que el hospital adaptó a su equipamiento médico (capítulo~\ref{sec:estado-arte}), y SYNAP busca cubrir esa distancia con un diseño propio de la ingeniería clínica. Cada perfil ve solo las pantallas y las acciones que le corresponden, el reporte de una falla se completa desde una única pantalla y todo puede usarse desde el celular, sin instalar nada. Sin embargo, no se plantea como un reemplazo inmediato. Es un prototipo que cubre el circuito de trabajo del servicio de Bioingeniería, y su adopción requeriría la puesta en producción descrita en la sección~\ref{sec:propuesta-justificacion} y la incorporación del histórico de órdenes de Maximo (capítulo~\ref{sec:futuro}).
+
+\subsection{Lo aprendido con los datos reales}
+\label{sec:aprendido-datos}
+
+Los ajustes que exigió la integración (sección~\ref{sec:hallazgos-datos-reales}) muestran que una base ficticia no alcanza para validar un sistema de este tipo, ya que no reproduce el volumen de datos de la institución ni las dificultades de una migración. Por eso, la prueba con datos reales fue parte de la validación del prototipo y no solo una carga de información, y es un paso que conviene prever en cualquier despliegue.
+
+\subsection{Conclusiones}
+\label{sec:conclusiones}
+
+Este trabajo tuvo como objetivo desarrollar un prototipo funcional de sistema web para la gestión de equipos médicos que centralice su información y sirva de soporte al servicio de Bioingeniería del Hospital Alemán. El resultado es SYNAP, que reúne en una única plataforma el inventario de equipos con acceso por código QR, el reporte de fallas, las órdenes de trabajo, el stock de accesorios y repuestos y un panel de indicadores para la jefatura.
+
+Los objetivos del proyecto, cinco de mínima y tres de máxima, se plantearon a partir del relevamiento realizado en el servicio y del análisis de los datos de Maximo. Los de mínima se cumplieron, ya que SYNAP ofrece una interfaz web responsive para consultar y reportar, órdenes de trabajo con sus estados, un módulo de stock vinculado a ellas y un panel de indicadores para jefatura, y se probó con los datos reales del hospital (secciones~\ref{sec:desarrollo-modulos}, \ref{sec:integracion-datos} y~\ref{sec:integracion-resultados}). Los de máxima se cumplieron en su versión inicial, con el contacto del responsable desde la ficha del equipo, los avisos automáticos por correo y el análisis de fallas del panel, que ganará valor a medida que se acumule el historial (secciones~\ref{sec:activos-qr}, \ref{sec:notificaciones} y~\ref{sec:panel-indicadores}, y capítulo~\ref{sec:futuro}).
+
+Frente a los antecedentes, SYNAP coincide en las funciones centrales y se distingue por haberse diseñado a partir de los procesos y los datos de un servicio en funcionamiento (sección~\ref{sec:frente-antecedentes}). Quienes conocieron el sistema, la jefa de Bioingeniería y varios técnicos y bioingenieros del equipo, lo valoraron muy positivamente y consideraron que cumple con los requisitos solicitados y que está en línea con su modelo de trabajo (sección~\ref{sec:validacion-servicio}).
+
+Por tratarse de un prototipo desarrollado en un único servicio, sus resultados no pueden extenderse sin más a otras instituciones (sección~\ref{sec:alcance-limitaciones}), y su paso al uso cotidiano es la etapa que sigue (capítulo~\ref{sec:futuro}). Aun así, el trabajo muestra que es viable construir, a partir de los datos y los procesos de un servicio real, una herramienta de gestión pensada específicamente para la ingeniería clínica. SYNAP deja al servicio de Bioingeniería una base concreta, con los requerimientos del servicio documentados, un modelo de datos y el inventario del hospital ya incorporado, para mejorar la trazabilidad de su equipamiento, ordenar su mantenimiento y apoyar con indicadores las decisiones sobre el parque tecnológico.
 
 \newpage
 \section{Perspectivas futuras}
 \label{sec:futuro}
 
+SYNAP es un prototipo, y su continuidad puede seguir tres caminos. El primero es completar lo necesario para ponerlo en uso, el segundo es incorporar funciones que el modelo de datos ya prevé y el tercero es ampliar su alcance con nuevas funcionalidades. Varias de ellas ya se mencionaron en capítulos anteriores.
+
+\subsection{Hacia la puesta en uso}
+\label{sec:puesta-en-uso}
+
+Como se aclaró en la sección~\ref{sec:propuesta-justificacion}, llevar el sistema a producción exige desplegarlo, capacitar al personal y revisar los recaudos de seguridad sobre la información confidencial de la institución. En ese marco habría que evaluar si la base de datos, que hoy se aloja en Supabase, un servicio en la nube, debe pasar a la infraestructura del hospital, y definir una política de gobernanza de los datos que establezca quién accede a cada información, cómo se conserva y cómo se protege. SYNAP no almacena datos de pacientes, pero sí información del equipamiento y del personal de la institución.
+
+También habría que completar la información que la migración dejó pendiente. Por un lado, los planes de mantenimiento y los checklists de cada tipo de equipo, que no se migraron y deben definirse con el servicio (sección~\ref{sec:hallazgos-datos-reales}). Por otro, el histórico de órdenes de trabajo de Maximo, que reúne 57.065 órdenes registradas entre 2015 y 2026 (sección~\ref{sec:analisis-maximo}). Con ese histórico, la ficha de cada equipo mostraría sus intervenciones previas y el panel de indicadores podría identificar patrones de falla y tiempos de resolución sobre más de diez años de información, en lugar de partir del momento en que el servicio empiece a usar SYNAP.
+
+Con el sistema en uso, convendría evaluar su usabilidad con cada perfil, en particular con enfermería, y medir su efecto sobre el trabajo cotidiano del servicio. A futuro, para integrar la información con la de otros sistemas del hospital y analizarla sin recargar la base operativa, podría incorporarse un \emph{data warehouse}, ya que hoy el panel calcula sus indicadores sobre la misma base operativa. Por último, hoy cada técnico pertenece a un único grupo de trabajo, y admitir que una persona integre más de uno daría mayor flexibilidad a la asignación.
+
+\subsection{Funciones previstas en el modelo de datos}
+\label{sec:funciones-previstas}
+
+El modelo de datos incluye tablas para registrar los cambios hechos sobre la información y los movimientos de los equipos entre servicios (sección~\ref{sec:modelo-datos}), que todavía no están incorporadas a la aplicación. Registrar quién modificó qué y cuándo, y dónde estuvo cada equipo, completaría la trazabilidad que el sistema ya ofrece sobre las intervenciones. Otra evolución natural son las notificaciones. Los avisos actuales llegan por correo a una única casilla del servicio (sección~\ref{sec:notificaciones}), y podrían dirigirse al grupo o al técnico responsable y mostrarse también dentro de la aplicación.
+
+\subsection{Ampliaciones funcionales}
+\label{sec:ampliaciones}
+
+El servicio pidió dos funciones que quedaron fuera del alcance de este trabajo. La primera es una sección de tecnovigilancia, que permitiría registrar y seguir los incidentes en los que interviene un equipo, por ejemplo cuando una falla pone en riesgo a un paciente o a quien lo usa, y que también ofrecen soluciones como Neovero \cite{neovero}. La segunda es la integración con el circuito de compras de la institución (sección~\ref{sec:requerimientos-funcionales}), que cerraría el recorrido de los accesorios y repuestos que SYNAP ya registra desde el pedido hasta su consumo en las órdenes.
+
+Por último, el sistema podría usar el nivel de riesgo de cada equipo, su antigüedad y su historial de fallas para sugerir acciones que reduzcan el riesgo, como revisar su plan de mantenimiento, o para evaluar su baja. Como esta última es una decisión que la ley asigna al servicio de tecnología biomédica (sección~\ref{sec:inventario}) \cite{ley_26906}, el sistema solo aportaría los datos que la respaldan.
 
 
 %=======================================================================================================
 \newpage
 \prefsection{Bibliografía}
 
-\begin{thebibliography}{19}
+\begin{thebibliography}{20}
 
 \bibitem{ministerio2002}
 Ministério da Saúde, \emph{Equipamentos médico-hospitalares e o gerenciamento da manutenção}. Brasília, Brasil: Secretaria de Gestão de Investimentos em Saúde, 2002. [En línea]. Disponible en: \url{https://bvsms.saude.gov.br/bvs/publicacoes/equipamentos_gerenciamento1.pdf}
@@ -1021,6 +1237,9 @@ Organización Mundial de la Salud, \emph{Introducción al programa de mantenimie
 \bibitem{iram_62353}
 Instituto Argentino de Normalización y Certificación, \emph{Aparatos electromédicos. Ensayos recurrentes y ensayos después de la reparación del aparato electromédico}, IRAM 62353:2019, Buenos Aires, Argentina, 2019.
 
+\bibitem{iadanza2019}
+E. Iadanza, V. Gonnelli, F. Satta y M. Gherardelli, ``Evidence-based medical equipment management: a convenient implementation,'' \emph{Med. Biol. Eng. Comput.}, vol. 57, pp. 2215--2230, 2019, doi: 10.1007/s11517-019-02021-x.
+
 \end{thebibliography}
 
 %=======================================================================================================
@@ -1064,7 +1283,7 @@ La encuesta se realizó mediante un formulario en línea y fue respondida por oc
 \end{enumerate}
 }
 
-\subsection*{B.2 Resultados de las preguntas cerradas}
+\subsection*{A.2 Resultados de las preguntas cerradas}
 
 La Tabla~\ref{tab:encuesta-cerradas} resume las respuestas de las preguntas cerradas del cuestionario. Las preguntas con escala se valoraron de 1 a 5.
 
@@ -1187,6 +1406,157 @@ La Tabla~\ref{tab:encuesta-cerradas} resume las respuestas de las preguntas cerr
         CU-30 & Registrar la parada de un equipo & Técnico, Coordinador & Dentro de una orden de trabajo, se registra el inicio de la parada cuando el equipo queda fuera de servicio y su fin cuando vuelve a estar disponible, y el sistema suma el tiempo de cada parada. Si la orden se cierra con una parada abierta, el sistema la cierra. \\
     \hline
         CU-31 & Enviar avisos automáticos por correo & Sistema & El sistema envía un correo a la casilla de notificaciones del servicio cuando se abre una orden correctiva, cuando un accesorio llega a nivel crítico y cuando un mantenimiento preventivo está por vencer, es decir, en la última semana del mes sin haberse realizado. \\
+\end{longtable}
+\endgroup
+
+\section[]{Requerimientos del sistema}
+\label{anexo:requerimientos}
+
+Los orígenes de los requerimientos se abrevian como R (relevamiento del proceso), E (encuesta al servicio), B (análisis de los datos de Maximo) y N (marco normativo y teórico). En los requerimientos no funcionales se agrega T, que corresponde al criterio técnico de diseño.
+
+\begingroup
+\small
+\setstretch{1}
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{
+    >{\raggedright\arraybackslash}p{1.3cm}
+    >{\raggedright\arraybackslash}p{\dimexpr\textwidth-1.3cm-3.0cm-2.4cm-6\tabcolsep-10pt\relax}
+    >{\raggedright\arraybackslash}p{3.0cm}
+    >{\raggedright\arraybackslash}p{2.4cm}}
+
+    \caption{Requerimientos funcionales del sistema.}
+    \label{tab:rf} \\
+    \toprule
+    \textbf{ID} & \textbf{Requerimiento} & \textbf{Origen} & \textbf{Casos de uso} \\
+    \midrule
+    \endfirsthead
+
+    \multicolumn{4}{l}{\small\textit{Continuación de la Tabla~\ref{tab:rf}}} \\
+    \toprule
+    \textbf{ID} & \textbf{Requerimiento} & \textbf{Origen} & \textbf{Casos de uso} \\
+    \midrule
+    \endhead
+
+    \midrule
+    \multicolumn{4}{r}{\small\textit{Continúa en la página siguiente}} \\
+    \endfoot
+
+    \bottomrule
+    \endlastfoot
+        RF-01 & Mantener un inventario centralizado en el que cada equipo tenga un código único, generado por el sistema con un formato fijo, sin permitir identificadores repetidos ni mal construidos. & E, B, N (Ley 26.906) & CU-13 \\
+    \hline
+        RF-02 & Permitir el alta de equipos con los campos esenciales obligatorios y con listas cerradas para el tipo de equipo y el servicio, en lugar de texto libre. & E, B & CU-13, CU-14 \\
+    \hline
+        RF-03 & Mostrar para cada equipo una ficha con su historial completo de órdenes de trabajo, fallas y mantenimientos. & E, N (Ley 26.906, art. 15 inc. g) & CU-12 \\
+    \hline
+        RF-04 & Permitir el acceso a un equipo mediante el escaneo de su código QR, con un comportamiento distinto según el perfil: reporte de falla para el personal asistencial y ficha del equipo para Bioingeniería. & E & CU-02 \\
+    \hline
+        RF-05 & Permitir que el personal asistencial reporte fallas indicando el equipo, la descripción del problema y la ubicación, incluso las que no correspondan a un equipo médico, sin asociarlas a un activo. & E, R, B & CU-03 \\
+    \hline
+        RF-06 & Permitir que quien reporta una falla siga el estado de su solicitud y de la orden de trabajo asociada. & R & CU-04 \\
+    \hline
+        RF-07 & Permitir que coordinación revise las solicitudes antes de convertirlas en órdenes de trabajo (aceptarlas, rechazarlas con un motivo o corregirlas) y que, al aceptarlas, clasifique la falla como técnica o de usuario. & R & CU-05 \\
+    \hline
+        RF-08 & Gestionar órdenes de trabajo correctivas y preventivas, con estados, asignación de técnico y reasignación dentro del grupo. & R & CU-05, CU-06, CU-11 \\
+    \hline
+        RF-09 & Registrar una bitácora de avance por orden de trabajo, con fecha y autor de cada entrada. & E & CU-07 \\
+    \hline
+        RF-10 & Definir planes de mantenimiento preventivo con un checklist por tipo de equipo, y un plan genérico para los tipos que no tengan uno propio. & E, N (Res. 2725/2023) & CU-15 \\
+    \hline
+        RF-11 & Advertir cuando se crea un tipo de equipo sin plan de mantenimiento asociado. & E & CU-14 \\
+    \hline
+        RF-12 & Generar automáticamente las órdenes preventivas de los equipos que corresponden según su frecuencia, todos los días y al iniciarse el sistema y sin duplicar las ya generadas, y reprogramar el ciclo siguiente. & E, R & CU-16 \\
+    \hline
+        RF-13 & Permitir registrar el resultado de cada ítem del checklist durante un preventivo, junto con una observación. & R & CU-08 \\
+    \hline
+        RF-14 & Permitir generar una orden correctiva vinculada a un preventivo en curso cuando se detecta una falla. & R, N (Res. 2725/2023) & CU-09 \\
+    \hline
+        RF-15 & Exigir una justificación cuando un preventivo se completa fuera del mes programado. & N (sección~\ref{sec:indicadores-gestion}) & CU-21 \\
+    \hline
+        RF-16 & Gestionar el stock de accesorios y repuestos: alta con umbrales de alerta, eliminación de los que no tienen movimientos, compras en dos etapas (pedido y recepción), consumo vinculado a órdenes de trabajo y alertas por nivel de stock. & E & CU-10, CU-17, CU-18, CU-19 \\
+    \hline
+        RF-17 & Presentar un panel de indicadores con el cumplimiento de los preventivos, el tiempo de inactividad, las fallas por equipo y por urgencia, el tiempo medio de reparación (MTTR) y el tiempo medio entre fallas (MTBF), calculados sobre las fallas técnicas, con filtros por grupo y por tipo de equipo. & E, N (sección~\ref{sec:indicadores-gestion}) & CU-20 \\
+    \hline
+        RF-18 & Permitir buscar, filtrar y paginar los listados de equipos, órdenes de trabajo, solicitudes, calendario de mantenimientos y accesorios, por criterios como el estado, el tipo, la prioridad y un rango de fechas, con un mismo formato en todas las pantallas. & E & CU-04, CU-05, CU-12, CU-19, CU-26 \\
+    \hline
+        RF-19 & Restringir las acciones disponibles según el perfil del usuario y el grupo al que pertenece. & R & CU-01 \\
+    \hline
+        RF-20 & Enviar notificaciones automáticas por correo electrónico a una casilla del servicio ante la creación de una orden correctiva, un accesorio en nivel crítico y los preventivos próximos a vencer (objetivo de máxima). & E & CU-31 \\
+    \hline
+        RF-21 & Permitir adjuntar fotos o documentos al reportar una falla y consultarlos luego desde la orden de trabajo asociada. & E & CU-03 \\
+    \hline
+        RF-22 & Permitir descargar el inventario, las órdenes de trabajo, los mantenimientos y los accesorios en archivos que puedan abrirse en una planilla de cálculo, respetando, en los equipos y las órdenes, la búsqueda y los filtros aplicados en pantalla. & E & CU-29 \\
+    \hline
+        RF-23 & Someter las órdenes preventivas a una revisión de coordinación antes del cierre: el técnico las completa y coordinación autoriza el cierre o las devuelve con un motivo. & R, N (Res. 2725/2023) & CU-21, CU-22 \\
+    \hline
+        RF-24 & Registrar el tiempo durante el cual un equipo permanece fuera de servicio, mediante el inicio y el fin de cada parada dentro de la orden de trabajo. & B, N (sección~\ref{sec:indicadores-gestion}) & CU-30 \\
+    \hline
+        RF-25 & Calcular automáticamente la criticidad y el nivel de riesgo de cada equipo médico según las tablas PRIUX del hospital, y utilizarlos para sugerir la prioridad de las órdenes correctivas. & E, N (sección~\ref{sec:plan-mantenimiento}) & CU-05, CU-12 \\
+    \hline
+        RF-26 & Permitir modificar la ficha de un equipo, los planes de mantenimiento y las órdenes de trabajo que todavía no fueron cerradas, con confirmación previa a cada cambio. & E, B, N (Ley 26.906, art. 15 inc. e) & CU-23, CU-24, CU-25 \\
+    \hline
+        RF-27 & Permitir consultar las órdenes de trabajo según el perfil: el técnico las de su grupo, coordinación las de los grupos que tiene a cargo y la jefatura todas, esta última sin poder modificarlas. & R & CU-26 \\
+    \hline
+        RF-28 & Clasificar los equipos según su vida útil, a partir de su antigüedad (moderno, aceptable, medianamente aceptable u obsoleto), y mostrar esa clasificación en la ficha de cada equipo y en el panel de indicadores. & E, R & CU-12, CU-20 \\
+    \hline
+        RF-29 & Generar un reporte en PDF de cada equipo, con sus datos y el historial completo de sus órdenes de trabajo. & E, N (Ley 26.906, art. 15 inc. g) & CU-27 \\
+    \hline
+        RF-30 & Permitir que coordinación asigne un plan de mantenimiento preventivo a un equipo, eligiendo el plan y el mes de la primera orden, y reprograme el mes del próximo preventivo de un equipo que ya lo tiene, sin modificar el plan ni la frecuencia. & E, B & CU-28 \\
+    \hline
+        RF-31 & Clasificar cada falla como técnica o de usuario al aceptar una solicitud, para que las fallas por mal uso no se cuenten en los indicadores de confiabilidad, y permitir que coordinación corrija esa clasificación mientras la orden no esté cerrada. & E, N (sección~\ref{sec:indicadores-gestion}) & CU-05, CU-25, CU-20 \\
+\end{longtable}
+\endgroup
+
+\begingroup
+\small
+\setstretch{1}
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{
+    >{\raggedright\arraybackslash}p{1.4cm}
+    >{\raggedright\arraybackslash}p{2.4cm}
+    >{\raggedright\arraybackslash}p{\dimexpr\textwidth-1.4cm-2.4cm-2.4cm-6\tabcolsep-10pt\relax}
+    >{\raggedright\arraybackslash}p{2.4cm}}
+
+    \caption{Requerimientos no funcionales del sistema.}
+    \label{tab:rnf} \\
+    \toprule
+    \textbf{ID} & \textbf{Categoría} & \textbf{Requerimiento} & \textbf{Origen} \\
+    \midrule
+    \endfirsthead
+
+    \multicolumn{4}{l}{\small\textit{Continuación de la Tabla~\ref{tab:rnf}}} \\
+    \toprule
+    \textbf{ID} & \textbf{Categoría} & \textbf{Requerimiento} & \textbf{Origen} \\
+    \midrule
+    \endhead
+
+    \midrule
+    \multicolumn{4}{r}{\small\textit{Continúa en la página siguiente}} \\
+    \endfoot
+
+    \bottomrule
+    \endlastfoot
+        RNF-01 & Accesibilidad & El sistema debe utilizarse desde el navegador, sin necesidad de instalar ninguna aplicación, tanto en computadoras como en celulares. & E \\
+    \hline
+        RNF-02 & Adaptabilidad & La interfaz debe adaptarse a pantallas de distintos tamaños sin perder funcionalidad, de modo que las tareas que se realizan fuera del escritorio, como el reporte de una falla, puedan completarse desde un celular. & E \\
+    \hline
+        RNF-03 & Usabilidad & Las tareas frecuentes deben completarse en pocos pasos y sin pantallas intermedias innecesarias. En particular, el reporte de una falla debe poder realizarse desde una única pantalla, y los errores de carga deben informarse en el mismo campo en que se producen. & E \\
+    \hline
+        RNF-04 & Legibilidad visual & Los estados de las órdenes, las solicitudes y el stock deben identificarse visualmente mediante colores, de manera que la situación de cada elemento pueda reconocerse sin leer el detalle. & E \\
+    \hline
+        RNF-05 & Rendimiento & Las consultas y operaciones habituales deben responder de forma ágil, dado que la lentitud fue una de las principales dificultades señaladas sobre el sistema actual. & E \\
+    \hline
+        RNF-06 & Seguridad & Las contraseñas deben almacenarse de forma irreversible, cada pedido debe validarse según la identidad y el perfil de quien lo realiza, el acceso a la base de datos debe ser posible únicamente a través del backend y las credenciales deben mantenerse fuera del código fuente. & T \\
+    \hline
+        RNF-07 & Integridad de datos & El sistema debe validar los datos antes de almacenarlos, apoyarse en restricciones relacionales y privilegiar las listas cerradas frente al texto libre, para evitar datos incompletos, duplicados o no normalizados. & E, B \\
+    \hline
+        RNF-08 & Trazabilidad & La información no debe eliminarse sino cambiar de estado, y cada registro debe conservar su fecha y su autor, de manera que el historial de cada equipo se mantenga completo y recuperable. & N (Ley 26.906) \\
+    \hline
+        RNF-09 & Consistencia temporal & Las fechas deben almacenarse en horario universal y mostrarse en la hora local de Argentina, para que los cálculos de tiempos de los indicadores no se vean afectados por diferencias de zona horaria. & T \\
+    \hline
+        RNF-10 & Mantenibilidad & El código debe organizarse por módulos y apoyarse en tecnologías con documentación y comunidad amplias, de modo que el sistema pueda ser retomado y ampliado por terceros. & T \\
+    \hline
+        RNF-11 & Costo & Todas las tecnologías utilizadas deben ser de uso libre, sin costo de licencias. & T \\
 \end{longtable}
 \endgroup
 
