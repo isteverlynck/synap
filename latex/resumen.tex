@@ -1,0 +1,143 @@
+\documentclass[10pt]{article}
+\usepackage[
+    letterpaper,
+    top=19mm,
+    bottom=25.4mm,
+    left=17.3mm,
+    right=17.3mm,
+    includefoot,
+    footskip=14mm
+]{geometry}
+
+
+\usepackage{amsmath}
+\usepackage[utf8]{inputenx}
+\usepackage[spanish]{babel}
+\usepackage[pdftex]{graphicx} 	%  uso de graficos en general		%  poder poner dos graficos como parte de uno
+\usepackage{fancyhdr} 		%  encabezado diferente para pag pares e impares
+\usepackage{epstopdf} 		%  Convertir .eps a .pdf (si fuera necesario)
+\usepackage{titling}
+\usepackage{fancyvrb,fancybox,calc} 
+\usepackage[svgnames]{xcolor} 
+\usepackage{enumerate}
+\usepackage{adjustbox}
+\usepackage{tabu}
+\usepackage{multicol}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{setspace}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{url}
+
+
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+% Secciones preliminares (antes de "Introducción"): sin número, pero
+% igualmente listadas en el índice.
+\newcommand{\prefsection}[1]{%
+  \phantomsection
+  \section*{#1}%
+  \addcontentsline{toc}{section}{#1}%
+}
+% \prefsectionnotitle agrega la entrada de nivel "section" solo al índice,
+% sin imprimir ningún título en la página (usado para "Prefacio").
+\newcommand{\prefsectionnotitle}[1]{%
+  \phantomsection
+  \addcontentsline{toc}{section}{#1}%
+}
+\newcommand{\prefsubsection}[1]{%
+  \phantomsection
+  \subsection*{#1}%
+  \addcontentsline{toc}{subsection}{#1}%
+}
+%\usepackage[usenames,dvipsnames]{color}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg} % busca en este orden! 
+
+% Texto de párrafo en 12pt (los títulos usan \Large/\huge/etc. y no cambian)
+\renewcommand{\normalsize}{\fontsize{12}{14.5}\selectfont}
+\normalsize
+
+\setlength{\parskip}{6pt}
+\parindent=2em          % sangría de primera línea
+\setlength{\parskip}{6pt} % espacio después de cada párrafo
+\onehalfspacing  % interlineado 1.5
+
+\definecolor{light-gray}{gray}{0.94}
+\definecolor{textgray}{gray}{0.5}
+\newenvironment{verbcode}{\VerbatimEnvironment
+    \begin{Sbox} \color{textgray}\scriptsize
+    \begin{minipage}{\linewidth+2\fboxsep-2\fboxrule-12pt}    
+    \begin{Verbatim}
+}{\end{Verbatim}  
+    \end{minipage}   
+    \end{Sbox} \color{black}\normalsize
+    \fcolorbox{black}{light-gray}{\TheSbox} 
+} 
+
+
+\begin{document}
+\begin{center}
+
+% Title
+{ \huge \bfseries  SYNAP \\[0.5cm] }
+{ \Large \emph  { Desarrollo de un sistema de gestión de equipamiento médico basado \\[0.1cm]
+en el Hospital Alemán} \\[0.2cm] }
+
+\vspace{1cm}
+
+\includegraphics[width=10cm]{fotos/logo_itba.png}
+
+\vspace{1cm}
+
+\emph {\Large Proyecto final de Carrera para la obtención del título de Bioingeniero}\\[0.2cm]
+\vspace{0.5cm}
+
+% Integrantes
+\textsc{Autoras:}\  Inés María  Steverlynck (63667), \ Camila Barbagelata (63047)\\[0.2cm]
+
+\vspace{0.5cm}
+
+% Author and supervisor
+\textsc{Tutor:}\  Siomara Figuereo\\[0.2cm]
+
+\textsc{Co-tutor:}\  Carlos Lazzarino\\[0.5cm]
+
+\large \textsc{Octubre 2026}\\[0.1cm]
+
+\vspace{0.5cm}
+
+
+\end{center}
+
+\vspace{0.2cm}
+
+
+\pagestyle{fancy}
+\headheight=60pt 	%para cambiar el tamaño del encabezado
+\fancyhead[L]	{	Proyecto final de carrera - 94.16 	}
+\fancyhead[R] 	{	ITBA  }
+\fancyfoot[C]	{	\thepage  }
+\thispagestyle{empty}
+
+\pagenumbering{roman}
+
+%=======================================================================================================
+\newpage
+\section*{Resumen}
+
+El equipamiento médico condiciona de manera directa las prestaciones que un hospital puede ofrecer, y su disponibilidad depende de cómo se gestiona su mantenimiento. En el Hospital Alemán, el servicio de Bioingeniería utiliza IBM Máximo, un sistema de propósito general que no está pensado para un servicio hospitalario. Por eso, tareas como la planificación de preventivos, el aviso de fallas y el seguimiento del stock se resuelven por fuera, en planillas, llamados y papel. 
+
+Este trabajo expone el diseño y desarrollo de SYNAP, un prototipo de sistema web que centraliza la información de cada equipo. Al escanear el código QR de su etiqueta se accede a su ficha, se reportan fallas y se siguen sus órdenes de trabajo, y la plataforma suma además la gestión de stock y un panel de indicadores. Los requerimientos surgieron de una encuesta al servicio, del análisis de las exportaciones de Máximo y del marco normativo y teórico. 
+
+El sistema se desarrolló de forma iterativa con FastAPI, PostgreSQL y React, con un diseño responsive para computadoras y celulares. Como resultado, se obtuvo un sistema con cuatro perfiles de usuario que calcula el riesgo de cada equipo, sugiere la prioridad de las órdenes y mide el cumplimiento de preventivos, la inactividad y los tiempos medios entre fallas y de reparación. Para validarlo en un caso de uso real, se migraron los 6.178 activos del inventario del hospital, de modo que la plataforma opera con los datos reales del servicio y no solo con datos de prueba. SYNAP muestra así que es posible una gestión del equipamiento médico más trazable, ágil y basada en datos.
+
+
+\vspace{\baselineskip}
+\noindent\textbf{Palabras clave}: gestión de equipamiento médico, bioingeniería, ingeniería clínica, mantenimiento preventivo, trazabilidad, gestión de tecnologías sanitarias, sistema de gestión de mantenimiento (CMMS).
+
+
+
+\end{document}

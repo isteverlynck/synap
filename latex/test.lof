@@ -1,1 +1,8 @@
 \babel@toc {spanish}{}\relax 
+\contentsline {figure}{\numberline {1}{\ignorespaces Ciclo de vida de un producto médico activo (PMA).}}{13}{figure.caption.15}%
+\contentsline {figure}{\numberline {2}{\ignorespaces Organigrama del servicio de Bioingeniería del Hospital Alemán.}}{18}{figure.caption.16}%
+\contentsline {figure}{\numberline {3}{\ignorespaces Diagrama de casos de uso del módulo de solicitudes y órdenes de trabajo.}}{25}{figure.caption.18}%
+\contentsline {figure}{\numberline {4}{\ignorespaces Diagrama de casos de uso del módulo de activos y mantenimiento preventivo }}{26}{figure.caption.19}%
+\contentsline {figure}{\numberline {5}{\ignorespaces Diagrama de casos de uso del módulo de stock e indicadores.}}{27}{figure.caption.20}%
+\contentsline {figure}{\numberline {6}{\ignorespaces blabla}}{30}{figure.caption.21}%
+\contentsline {figure}{\numberline {7}{\ignorespaces Endpoints del módulo de solicitudes de servicio en la documentación interactiva generada por FastAPI. Se observa cómo una misma dirección responde a distintos métodos según la operación solicitada.}}{32}{figure.caption.22}%

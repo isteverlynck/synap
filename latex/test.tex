@@ -31,6 +31,7 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{url}
+\usepackage{longtable}
 
 
 \newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
@@ -147,7 +148,16 @@ A nuestros amigos, que caminaron con nosotras en este proceso y que celebraran c
 \newpage
 \prefsubsection{Resumen}
 
-bla bla bla resumen 
+El equipamiento médico condiciona de manera directa las prestaciones que un hospital puede ofrecer, y su disponibilidad depende de cómo se gestiona su mantenimiento. En el Hospital Alemán, el servicio de Bioingeniería utiliza IBM Máximo, un sistema de propósito general que no está pensado para un servicio hospitalario. Por eso, tareas como la planificación de preventivos, el aviso de fallas y el seguimiento del stock se resuelven por fuera, en planillas, llamados y papel. 
+
+Este trabajo expone el diseño y desarrollo de SYNAP, un prototipo de sistema web que centraliza la información de cada equipo. Al escanear el código QR de su etiqueta se accede a su ficha, se reportan fallas y se siguen sus órdenes de trabajo, y la plataforma suma además la gestión de stock y un panel de indicadores. Los requerimientos surgieron de una encuesta al servicio, del análisis de las exportaciones de Máximo y del marco normativo y teórico. 
+
+El sistema se desarrolló de forma iterativa con FastAPI, PostgreSQL y React, con un diseño responsive para computadoras y celulares. Como resultado, se obtuvo un sistema con cuatro perfiles de usuario que calcula el riesgo de cada equipo, sugiere la prioridad de las órdenes y mide el cumplimiento de preventivos, la inactividad y los tiempos medios entre fallas y de reparación. Para validarlo en un caso de uso real, se migraron los 6.178 activos del inventario del hospital, de modo que la plataforma opera con los datos reales del servicio y no solo con datos de prueba. SYNAP muestra así que es posible una gestión del equipamiento médico más trazable, ágil y basada en datos.
+
+
+\vspace{\baselineskip}
+\noindent\textbf{Palabras clave}: gestión de equipamiento médico, bioingeniería, ingeniería clínica, mantenimiento preventivo, trazabilidad, gestión de tecnologías sanitarias, sistema de gestión de mantenimiento (CMMS).
+
 
 %=======================================================================================================
 \newpage
@@ -175,13 +185,7 @@ bla bla bla resumen
 %=======================================================================================================
 \newpage
 \prefsubsection{Índice de abreviaturas}
-\textbf{AUC:} \textit{Area Under the Curve} (área bajo la curva)
-
-\textbf{ERM:} \textit{Eccentric Rotating Mass} (masa rotativa excéntrica)
-
-\textbf{ESP32:} microcontrolador ESP32
-
-\textbf{F1:} \textit{F1-score} (media armónica entre precisión y recall)
+\textbf{CMMS:} \textit{Computerized Maintenance Management System} (Sistema Informatizado de Gestión del Mantenimiento)
 
 
 %=======================================================================================================
@@ -192,17 +196,22 @@ bla bla bla resumen
 
 \section{Introducción}
 \subsection{Contexto y planteamiento del problema}
-El equipamiento médico de un centro de salud forma parte de la infraestructura sobre la que se apoya la atención clínica. Un respirador, un monitor multiparamétrico o un ecógrafo no son un bien administrativo más dentro del patrimonio de una institución, sino recursos cuya disponibilidad condiciona de manera directa qué prestaciones puede ofrecer un hospital y en qué tiempos. Cuando un equipo queda fuera de servicio o no se encuentra en las condiciones adecuadas, el efecto se traslada al paciente en forma de estudios postergados, prácticas inseguras, diagnósticos erróneos o procedimientos reprogramados, obstaculizando el flujo de atención del centro y comprometiendo el sistema de salud. Esa disponibilidad y estado del equipo se define a lo largo de toda su vida útil, y depende en gran parte de cómo se administra su mantenimiento y de cómo y dónde se registra la información sobre el mismo \cite{ministerio2002}.
+\label{sec:contexto-problema}
 
-Por esa razón, las instituciones de salud cuentan con servicios de Bioingeniería o ingeniería clínica, que son responsables de sostener el parque tecnológico mediante una gestión efectiva: planificación de los mantenimientos preventivos, respuesta ante fallas, control del inventario y trazabilidad de cada activo \cite{cardoso_waqued}. Una gran parte de esta tarea es trabajo sobre información que debería estar disponible; un servicio necesita saber qué equipos tiene, a qué área pertenecen, en qué estado se encuentran, cuándo se intervino cada uno, a cargo de quien estuvo y qué ocurrió en esa intervención. Cuando esos datos se encuentran incompletos, dispersos entre planillas o resultan difíciles de recuperar, la gestión termina apoyándose en la memoria y la experiencia de quienes integran el área, limitando la eficiencia de la misma.
+El equipamiento médico de un centro de salud forma parte de la infraestructura sobre la que se apoya la atención clínica. Un respirador, un monitor multiparamétrico o un ecógrafo no son solo bienes administrativos dentro del patrimonio de una institución, sino recursos cuya disponibilidad condiciona de manera directa qué prestaciones puede ofrecer un hospital y en qué tiempos. Cuando un equipo queda fuera de servicio o no se encuentra en las condiciones adecuadas, el efecto se traslada al paciente en forma de estudios postergados, prácticas inseguras, diagnósticos erróneos o procedimientos reprogramados, obstaculizando el flujo de atención del centro y comprometiendo el sistema de salud. Esa disponibilidad y estado del equipo se define a lo largo de toda su vida útil, y depende en gran parte de cómo se administra su mantenimiento y de cómo y dónde se registra la información sobre el mismo \cite{ministerio2002}.
 
-Como se menciona en la tesis doctoral de Bertelli \cite{bertelli2023} sobre la gestión del equipamiento médico del Ministerio de Salud de la Ciudad Autónoma de Buenos Aires \cite{bertelli2023}, este equipamiento requiere que se lo gestione y se invierta tiempo, recursos humanos y materiales para su incorporación, buen uso, mantenimiento y hasta su desafectación. 
+Por esa razón, las instituciones de salud cuentan con servicios de Bioingeniería o Ingeniería Clínica, que son responsables de sostener el parque tecnológico mediante una gestión efectiva: planificación de los mantenimientos preventivos, respuesta ante fallas, control del inventario y trazabilidad de cada activo \cite{cardoso_waqued}. Una gran parte de esta tarea es trabajo sobre información que debería estar disponible; un servicio necesita saber qué equipos tiene, a qué área pertenecen, en qué estado se encuentran, cuándo se intervino cada uno, a cargo de quien estuvo y qué ocurrió en esa intervención. Cuando esos datos se encuentran incompletos, dispersos entre planillas o resultan difíciles de recuperar, la gestión termina apoyándose en la memoria y la experiencia de quienes integran el área, limitando la eficiencia de la misma.
 
-Para ordenar este trabajo en las instituciones existen los sistemas de gestión de mantenimiento, conocidos como CMMS, que centralizan el inventario de equipos, la programación de las intervenciones y el registro de lo realizado sobre cada uno. Lo que suele ocurrir en el ámbito hospitalario es que se adopta un sistema que nunca fue concebido para un hospital, ya que lo incorpora el área de mantenimiento edilicio para administrar ascensores, calderas e instalaciones, y una vez implementado se lo extiende al equipamiento médico. De esta forma, aparecen desajustes por el simple hecho de ser un sistema que no tiene en cuenta el traslado entre sectores de un equipo médico, que las fallas deben ser reportadas por personal médico en medio de un turno, o que cualquier intervención tiene que organizarse de acuerdo a la disponibilidad clínica. De ahí que desde hace años distintos trabajos vengan proponiendo sistemas diseñados específicamente para la gestión de equipamiento médico \cite{miranda_takayama2017}, \cite{khider_hamza2023}, \cite{hamdi2012}.
+Como se menciona en la tesis doctoral de Bertelli \cite{bertelli2023} sobre la gestión del equipamiento médico del Ministerio de Salud de la Ciudad Autónoma de Buenos Aires, este equipamiento requiere que se lo gestione y se invierta tiempo, recursos humanos y materiales para su incorporación, buen uso, mantenimiento y hasta su desafectación. 
+
+Para ordenar este trabajo en las instituciones existen los sistemas de gestión de mantenimiento, conocidos como CMMS por sus siglas en inglés (Computerized Maintenance Management System). Estos sistemas centralizan el inventario de equipos, la programación de las intervenciones y el registro de lo realizado sobre cada uno. Lo que suele ocurrir en el ámbito hospitalario es que se adopta un sistema que nunca fue concebido para un hospital, ya que lo incorpora el área de mantenimiento edilicio para administrar ascensores, calderas e instalaciones, y una vez implementado se lo extiende al equipamiento médico. De esta forma, aparecen desajustes por el simple hecho de ser un sistema que no tiene en cuenta que los equipos médicos se trasladan entre sectores, que las fallas deben ser reportadas por personal asistencial en medio de un turno, o que cualquier intervención tiene que organizarse de acuerdo a la disponibilidad clínica. Una de las coordinadoras del servicio de Bioingeniería del Hospital Alemán lo expresó en la encuesta realizada para este trabajo, al señalar que el sistema que utilizan tiene muchos campos que no les sirven por tratarse de un programa genérico pensado para la industria (sección~\ref{sec:encuesta}).
+
 \subsection{Propuesta y justificación}
-Frente a ese escenario, el presente proyecto propone el desarrollo de SYNAP, un sistema web de gestión de equipamiento médico pensado específicamente para un servicio hospitalario de Bioingeniería, que reúne en una única plataforma la información de cada activo, las órdenes de trabajo preventivas y correctivas, el stock de insumos y repuestos y los indicadores de desempeño del área. El nombre remite a la sinapsis neuronal, ya que lo que el sistema busca aportar son justamente las conexiones que hoy faltan o funcionan de manera débil entre el equipo registrado, la falla que se le reporta, la orden de trabajo que esa falla genera y el repuesto que se consume para resolverla.
+Frente a ese escenario, el presente documento detalla el diseño y desarrollo de SYNAP, un sistema web de gestión de equipamiento médico pensado específicamente para un servicio hospitalario de Bioingeniería, que reúne en una única plataforma la información de cada activo, las órdenes de trabajo preventivas y correctivas, el stock de insumos y repuestos y los indicadores de desempeño del área, entre otras funciones. El nombre remite a la sinapsis neuronal, ya que lo que el sistema busca aportar son justamente las conexiones que hoy faltan o funcionan de manera débil entre el equipo registrado, la falla que se le reporta, la orden de trabajo que esa falla genera y el repuesto que se consume para resolverla.
 
-El presente proyecto está basado en el Hospital Alemán, institución privada de alta complejidad de la Ciudad Autónoma de Buenos Aires, que actualmente gestiona su equipamiento médico con IBM Máximo \cite{ibm_maximo}. Tanto el desarrollo como la validación del prototipo funcional que se presenta se llevan adelante junto al equipo de Bioingeniería de la institución, que es a la vez el destinatario del sistema y la fuente de los requerimientos que definieron el sistema y su estructura, lo que permitió incorporar observaciones y necesidades reales a lo largo del proceso y no una vez que el sistema ya estaba cerrado. Se presenta como una herramienta que el equipo pueda adoptar de forma natural y que agregue valor al área desde el primer día de uso.
+El proyecto aquí presentado está basado en el Hospital Alemán, institución privada de la Ciudad Autónoma de Buenos Aires, que actualmente gestiona su equipamiento médico con IBM Máximo \cite{ibm_maximo}. Tanto el desarrollo como la validación de SYNAP se llevan adelante junto al equipo de Bioingeniería de la institución, que es fuente de los requerimientos que definen la estructura y, además, destinatario del. Esto permitió incorporar observaciones y necesidades reales a lo largo del proceso y no una vez que el sistema ya estaba cerrado. Se presenta como una herramienta que el equipo pueda adoptar de forma natural y que agregue valor al área desde el primer día de uso.
+
+Durante el desarrollo se trabajó con datos ficticios que respetan la estructura y los formatos de las bases reales, y luego se integró información del hospital para validar su funcionamiento en un caso de uso real (sección~\ref{sec:integracion-datos}). Cabe aclarar que se trata de un prototipo: su puesta en producción como reemplazo del sistema actual implicaría, además, un despliegue, la capacitación del personal y una revisión de los recaudos de seguridad sobre la información confidencial de la institución, tareas que exceden el alcance de este trabajo (sección~\ref{sec:enfoque-trabajo}).
 
 Los objetivos que guiaron el desarrollo se presentan a continuación, separados entre aquellos que el sistema debe cumplir necesariamente y aquellos que amplían su alcance en caso de que el avance del trabajo lo permita.
 
@@ -239,43 +248,445 @@ parque tecnológico.
 \end{itemize}
 
 \subsection{Estructura del documento}
-El informe continúa con el estado del arte y el marco teórico, que reúnen los antecedentes en sistemas de gestión de equipamiento médico y los conceptos que sustentan las decisiones de diseño. El diseño y desarrollo del sistema describe el relevamiento realizado en el servicio de Bioingeniería junto con el diseño de la base de datos, la arquitectura y el desarrollo de los módulos, mientras que los resultados presentan los hallazgos de ese relevamiento como línea de base, el sistema obtenido con los entregables correspondientes a cada objetivo, la integración de los datos del hospital y las pruebas de usabilidad. El trabajo cierra con la discusión de esos resultados frente a los antecedentes, las perspectivas futuras y las conclusiones.
+El informe continúa con el estado del arte y el marco teórico, que reúnen los antecedentes en sistemas de gestión de equipamiento médico y los conceptos que fundamentan las decisiones de diseño. El capítulo~\ref{sec:diseno-desarrollo} describe el diseño y desarrollo del sistema, desde el relevamiento realizado en el servicio de Bioingeniería y los requerimientos que surgieron de él hasta el modelo de datos, la arquitectura y las tecnologías, el desarrollo de cada módulo, la interfaz de cada perfil, la integración de los datos del hospital y la validación del sistema mediante pruebas funcionales y de usabilidad. Los resultados obtenidos se presentan en el capítulo~\ref{sec:resultados} y se discuten frente a los antecedentes en el capítulo~\ref{sec:discusion}. El trabajo finaliza con las perspectivas futuras y las conclusiones.
 
 %=======================================================================================================
 \newpage
 \section{Estado del arte}
-hola gola golaaaaaaaaa
+Diversos trabajos académicos abordaron la gestión del equipamiento médico mediante el desarrollo de sistemas informáticos propios, desde plataformas de soporte a los procesos de gestión basadas en los lineamientos de la OMS \cite{miranda_takayama2017} hasta sistemas para organizar el mantenimiento preventivo y correctivo \cite{khider_hamza2023} o modelos para priorizar las solicitudes de mantenimiento \cite{hamdi2012}. Sin embargo, se trata de desarrollos pensados para contextos institucionales y normativos ajenos al argentino, por lo que este apartado se centra en las soluciones que efectivamente se utilizan en el país.
+
+El Hospital Alemán trabaja actualmente con IBM Maximo \cite{ibm_maximo}, una plataforma de gestión de activos concebida para la industria en general que los hospitales adaptan a la gestión de su equipamiento médico. Esa adaptación limita su ajuste a las necesidades del servicio, como señaló una de las coordinadoras de Bioingeniería en la encuesta realizada para este trabajo (véase la sección~\ref{sec:encuesta}).
+
+A diferencia de Maximo, existen herramientas concebidas desde su origen para la ingeniería clínica, y cada una de ellas pone el énfasis en un aspecto distinto de la gestión. Neovero, un sistema de origen brasileño, se orienta a la gestión integral del parque, acompañando a cada equipo a lo largo de todo su ciclo de vida, desde la planificación de la compra hasta la obsolescencia \cite{neovero}. Su aporte más relevante es la clasificación de los equipos según su criticidad, que define la prioridad con la que se atiende cada falla y los tiempos de respuesta esperados, de modo que un respirador detenido no espera lo mismo que un equipo de menor riesgo. Según la propia empresa, el sistema ha sido implementado en instituciones argentinas como Fleni, la Fundación Favaloro y el Hospital de Alta Complejidad El Cruce \cite{neovero}.
+
+Por otro lado, se tiene Kibbo de la empresa Leex, que ataca otro punto crítico: el momento en que se detecta la falla. En lugar de depender de un llamado o de un pedido informal, el personal de salud escanea el código QR del equipo desde su celular y el reporte llega directamente al área de bioingeniería, identificando sin ambigüedad de qué equipo se trata. El mismo código le da acceso, además, a los manuales del equipo \cite{leex_medical}. Equipasis es otro sistema que fue presentado en las Jornadas Argentinas de Informática, y que principalmente pone el foco en la toma de decisiones. Está diseñada para registrar los datos de cada equipo de manera parametrizada para poder filtrarlos y construir indicadores, lo que permitió a sus usuarios medir la eficiencia de cada servicio y de cada proveedor, y admite la gestión de varios centros desde una misma plataforma \cite{equipasis}.
+
+Estos antecedentes muestran que las funciones centrales de un sistema de gestión de equipamiento médico, como el inventario, las órdenes de trabajo o el acceso mediante códigos QR, ya están resueltas en distintas herramientas. Lo que varía entre ellas es el punto de partida, ya que las soluciones comerciales se diseñan para adaptarse a instituciones muy distintas entre sí, y que en muchos casos, no trabajan con tecnología biomédica. SYNAP se construye a partir de un relevamiento de las necesidades concretas del servicio de Bioingeniería del Hospital Alemán, integra los datos que el servicio ya tiene y organiza sus procesos según el marco normativo vigente en la República Argentina.
 
 %=======================================================================================================
 \newpage
 \section{Marco teórico}
-hola gola golaaaaaaaaa
+\subsection{CMMS}
+Un Sistema Computarizado para la Gestión del Mantenimiento (CMMS, por sus siglas en inglés) es una herramienta informática pensada para registrar, ordenar y analizar la información vinculada al inventario de equipos médicos y a su mantenimiento durante todo su ciclo de vida. Su principal aporte es reunir en una sola plataforma datos que de otro modo quedarían dispersos, y es justamente esa idea la que guía el diseño de SYNAP, cuya base de datos se organiza en torno al código de activo como identificador único de cada equipo.
+
+A través de un CMMS es posible planificar y distribuir las tareas de mantenimiento y, al mismo tiempo, dejar constancia de cada intervención o evento que involucra a un equipo, de manera que su historia quede siempre disponible y sea trazable. Estos sistemas también permiten asignar prioridades según la urgencia de cada caso, algo que en SYNAP se resuelve mediante la clasificación de fallas por severidad, y canalizan los pedidos de insumos o reparaciones por una vía formal que reduce olvidos y malentendidos, razón por la cual el stock se vincula directamente con las órdenes de trabajo.
+
+Quizás la ventaja más valiosa sea la posibilidad de generar y analizar indicadores de desempeño, entre ellos la frecuencia de fallas, el tiempo medio entre fallas (MTBF) y el tiempo medio de reparación (MTTR). Con esa información se vuelve posible reconocer qué equipos son críticos, anticipar tendencias de falla y distribuir mejor los recursos técnicos y económicos, y por eso estos indicadores, junto con el cumplimiento del mantenimiento preventivo y el tiempo de inactividad, son los que conforman el dashboard de SYNAP orientado a jefatura.
+
+\subsection{Marco normativo}
+\label{sec:marco-normativo}
+En Argentina, la gestión del equipamiento médico en uso se encuadra en la Ley 26.906, sancionada y publicada en el año 2013, que establece el régimen de trazabilidad y verificación de aptitud técnica de los productos médicos activos de salud en uso \cite{ley_26906}. Su sanción responde a una necesidad concreta, que es garantizar que un equipo destinado a la atención de pacientes conserve a lo largo de toda su vida útil las condiciones de seguridad y funcionamiento para las que fue fabricado, y no únicamente en el momento de su adquisición. La ley alcanza a la totalidad de los productos médicos activos de los establecimientos de salud públicos y privados del territorio nacional, y designa como autoridad de aplicación al Ministerio de Salud de la Nación.
+
+El objeto de esa regulación se delimita con precisión en el artículo 3, que define como producto médico activo (PMA) a cualquier producto médico cuyo funcionamiento dependa de energía eléctrica o de una fuente de potencia distinta de la generada por el cuerpo humano o la gravedad, y que opere por conversión de esa energía. La misma definición excluye de manera expresa a aquellos productos destinados únicamente a transmitir energía, sustancias u otros elementos desde un PMA hacia el paciente sin provocar alteración significativa alguna. El criterio, que la ley toma del corpus normativo de la Administración Nacional de Medicamentos, Alimentos y Tecnología Médica (ANMAT) \cite{anmat_4306_1999}, traza una línea con consecuencias prácticas inmediatas sobre el alcance de cualquier inventario, ya que un respirador, un monitor multiparamétrico o una bomba de infusión quedan comprendidos, mientras que el circuito respiratorio o el latiguillo que los conecta al paciente no constituyen en sí mismos PMA aunque resulten imprescindibles para su funcionamiento.
+
+Profundizando sobre la ley, el artículo 1 define tres objetos que conviene explicar por separado, dado que cada uno se traduce en requerimientos distintos para un sistema de gestión. El primero es la trazabilidad de los PMA, entendida en el artículo 3 como el conjunto de acciones y procedimientos técnicos que permiten identificar y registrar cada equipo en uso. El segundo es la trazabilidad metrológica, definida como la propiedad por la cual el resultado de una medición puede vincularse con referencias determinadas mediante una cadena ininterrumpida y documentada de calibraciones. El tercero es la creación o el fortalecimiento de los Servicios de Tecnología Biomédica, a los que la misma norma caracteriza como los encargados de gestionar en forma integral el parque tecnológico \cite{ley_26906}; en el contexto de SYNAP, el servicio de Bioingeniería del Hospital Alemán.
+
+En este contexto, SYNAP se centra en la trazabilidad de los PMA. En la práctica, esto implica que cada equipo tenga un identificador único y que todas las intervenciones que recibe, desde las órdenes de trabajo y los mantenimientos preventivos hasta las fallas reportadas y los repuestos consumidos, queden vinculadas a él, de modo que su historia completa pueda recuperarse a partir de un único registro. Al mismo tiempo, SYNAP le da al servicio de Bioingeniería del Hospital Alemán una herramienta para cumplir una de las funciones que la ley le asigna, la de mantener documentada la verificación técnica y el mantenimiento de todos los equipos (art. 15, inc. g), y en ese sentido contribuye también al tercer componente de la ley, el fortalecimiento de los Servicios de Tecnología Biomédica.
+
+La ley 26.906 permaneció sin reglamentar durante casi una década, lo que implicaba que sus obligaciones estaban vigentes pero sin los procedimientos concretos para cumplirlas, hasta que el Decreto 517/2023 estableció su reglamentación \cite{decreto_517_2023}. Durante ese período, la gestión del equipamiento en uso quedó librada a los criterios que cada institución definiera por su cuenta, sin un marco común que asegurara prácticas homogéneas entre establecimientos, lo que pone de manifiesto una deuda del sistema de salud en su conjunto más que de un hospital en particular.
+
+Este decreto resulta relevante para el presente proyecto por dos razones. La primera es que establece que la ley se aplicará de manera gradual, de modo que el Ministerio de Salud irá definiendo qué tipos de equipos se incorporan primero al régimen y cómo se habilitan progresivamente los Servicios de Ingeniería Clínica, lo que termina de darle un lugar formal al área a la que está destinado este trabajo. La segunda es que reafirma la obligación de los establecimientos de salud de crear y mantener actualizado un registro de los PMA en uso, lo que constituye el fundamento normativo directo del inventario centralizado que el presente trabajo desarrolla. Cabe aclarar que tanto la ley como su reglamentación fueron modificadas posteriormente por el Decreto 70/2023 \cite{decreto_70_2023} y el Decreto 226/2024, que derogaron las disposiciones referidas a la habilitación de los PMA, aunque se mantienen sin cambios los artículos sobre los que se apoya este trabajo.
+
+En la misma semana en la que se publicó el decreto 517/2023, el Ministerio de Salud aprobó mediante la Resolución 2725/2023 las “Directrices de organización y funcionamiento de los Servicios de Ingeniería Clínica”, junto con un documento de procesos del plan de mantenimiento (véase la sección~\ref{sec:plan-mantenimiento}) y una grilla para la habilitación de estos servicios en los establecimientos de salud, todos incorporados al Programa Nacional de Garantía de Calidad de la Atención Médica (PNGCAM) \cite{res_2725_2023}. Si la ley define qué hay que cumplir, estas directrices empiezan a definir cómo debería organizarse un servicio para hacerlo.
+
+\subsection{El inventario del equipamiento médico}
+
+El inventario es la base sobre la que se apoyan todas las demás tareas de un servicio de Bioingeniería, ya que no es posible planificar un mantenimiento, reponer un repuesto o evaluar el desempeño de un equipo del que no se sabe con certeza que existe, dónde está o en qué estado se encuentra. Sin embargo, mantenerlo actualizado es una de las tareas más difíciles de sostener en un hospital, porque depende de que quienes intervienen sobre los equipos registren lo que hacen, y cada paso adicional en ese registro juega en contra de que efectivamente se haga. La facilidad con la que se accede a la información de un equipo y se deja constancia de lo actuado sobre él es una condición para que el inventario siga siendo confiable.
+
+Cada equipo se describe mediante un conjunto de datos que permiten identificarlo, ubicarlo y conocer su situación, entre los que se cuentan su identificador, el tipo de equipo, la marca, el modelo y el número de serie, la ubicación, la fecha de instalación, el estado y los datos de su adquisición \cite{oms_inventarios_2012}. Igual de importante es la forma en que se carga esta información; si cada equipo se identifica con un código armado siempre con la misma lógica, en el que ya figuran, por ejemplo, el tipo de equipo y el área a la que pertenece, encontrar todos los desfibriladores del hospital o todos los equipos de un área es tan simple como filtrar por esa parte del código. En cambio, cuando esos mismos datos se cargan como texto libre, aparecen las variantes de escritura, las abreviaturas distintas y los errores de tipeo que dificultan una búsqueda sencilla.
+
+Los datos de un equipo, además, no son fijos. A lo largo de su vida útil un equipo cambia de ubicación, pasa por reparaciones, se da de baja, y la información con la que se lo cargó puede contener errores que hay que corregir. Un inventario que no permite registrar esos cambios se desactualiza, y uno que los registra pisando lo anterior pierde la información que permite entender qué pasó. Por eso, el inventario necesita ofrecer una forma de modificar la ficha de cada equipo que evite tanto el error como la pérdida de datos, por ejemplo pidiendo una confirmación antes de aplicar cada cambio y conservando un registro de lo modificado.
+
+Por otro lado, dar de baja un equipo es una decisión que la ley asigna al propio servicio de tecnología biomédica, al incluir entre sus funciones el dictaminar sobre el alta y la baja de los PMA en uso \cite{ley_26906}. Como cualquier decisión técnica, esa baja tiene que poder justificarse más adelante, y para eso el equipo necesita conservar su historia completa aun cuando ya no esté en uso. Si se lo eliminara del inventario junto con sus registros, se perdería justamente la información que explica por qué se lo retiró. Por esa razón, en SYNAP la baja se registra como un cambio en el estado del equipo y no como la eliminación de su registro (sección~\ref{sec:activos-qr}).
+
+De todas formas, un inventario limitado a los equipos deja afuera buena parte de lo que un servicio necesita administrar. Como se vio al definir los PMA, un respirador necesita su circuito y un monitor sus latiguillos, y ninguno funciona sin ellos aunque no sean productos médicos activos. A eso se suman los repuestos que se consumen en las reparaciones y los insumos que se reemplazan en cada mantenimiento, de modo que un equipo puede quedar fuera de servicio sin haber fallado, simplemente por la falta de un accesorio o de un repuesto que nadie registro que se estaba agotando \cite{oms_inventarios_2012}. Por eso el inventario de un servicio necesita extenderse a esos elementos y vincularlos con las intervenciones en las que se consumen, de forma que su falta pueda anticiparse antes de que el equipo quede detenido o fuera de uso.
+
+\subsection{Plan de mantenimiento}
+\label{sec:plan-mantenimiento}
+
+No todos los equipos de un hospital requieren el mismo nivel de atención, ya que un respirador del que depende la vida de un paciente y una centrífuga de laboratorio no pueden mantenerse con el mismo criterio. Para establecer esas diferencias, uno de los modelos más difundidos en ingeniería clínica es el propuesto por Fennigkoh y Smith, que asigna a cada tipo de equipo un puntaje a partir de la función que cumple, el riesgo que implica su falla para el paciente y sus requerimientos de mantenimiento, y que puede ajustarse con el historial de fallas cuando se cuenta con esa información \cite{fennigkoh_smith}. Aunque la asignación de esos puntajes conserva cierto grado de subjetividad, el modelo deja en claro un principio que ordena todo el mantenimiento, que es que la frecuencia y el contenido de las intervenciones deben definirse según el tipo de equipo y no de manera uniforme para todo el parque.
+
+El Hospital Alemán aplica este enfoque a través de unas tablas de riesgo propias, denominadas PRIUX, que combinan la criticidad del equipo, resultante de sumar la función que cumple y el riesgo de su aplicación clínica, el tipo de mantenimiento que requiere y su antigüedad. SYNAP incorpora este cálculo para que el nivel de riesgo de cada equipo pueda consultarse y utilizarse al priorizar las intervenciones (sección~\ref{sec:criticidad-riesgo}).
+
+Esas diferencias se ordenan dentro del plan de mantenimiento, que el documento de procesos de la Resolución 2725/2023 define como uno de los pilares de la gestión del equipamiento en uso \cite{res_2725_2023}. Según ese documento, el plan establece los cronogramas de mantenimiento preventivo y de las verificaciones periódicas de seguridad y eficacia de cada equipo, con el objetivo de garantizar que se use en condiciones adecuadas, de extender su vida útil y de asegurar su disponibilidad para la atención sanitaria de la población. Siguiendo el esquema propuesto por la OMS, el plan se organiza en tres fases, planificación, gestión y ejecución, que se retroalimentan en un ciclo de mejora continua \cite{oms_manten_2012}. El documento distingue además entre quienes gestionan el cumplimiento del plan, que son los coordinadores del área, y quienes lo ejecutan, que es el personal técnico. Que el ciclo sea de mejora continua implica que los planes no son definitivos, sino que se ajustan a partir de lo que la ejecución va mostrando, por lo que un sistema de gestión necesita permitir que los checklists de cada tipo de equipo puedan revisarse y modificarse una vez creados.
+
+Dentro del plan de mantenimiento se tienen dos tipos de intervención con lógicas distintas: mantenimiento preventivo y mantenimiento correctivo. El primero se programa de antemano y se realiza de forma periódica, con el objetivo de conservar el equipo en condiciones y de detectar problemas antes de que se conviertan en fallas. El correctivo, en cambio, se realiza a demanda, cuando la falla ya se produjo, y su objetivo es corregir el funcionamiento del equipo bajo condiciones de seguridad y eficacia \cite{res_2725_2023}. En la práctica ambos están conectados, porque un correctivo no siempre surge porque un equipo dejó de funcionar durante su uso, sino que también puede originarse en un problema detectado durante la realización del preventivo. De este modo, es de suma importancia que el preventivo incluya verificaciones concretas y no solamente tareas de limpieza o reemplazo de consumibles.
+
+Ese plan se inscribe en un recorrido más amplio, el de la vida completa del equipo, que las directrices de la Resolución 2725/2023 representan como un ciclo de siete etapas (Figura~\ref{fig:ciclo-vida-pma}) \cite{res_2725_2023}. El equipo ingresa con su recepción y su alta en el inventario, se instala y entra en funcionamiento, etapa durante la cual el plan de mantenimiento lo hace pasar por mantenimientos preventivos, correctivos y ensayos de seguridad y eficacia. Cuando ya no puede seguir en uso se lo retira de servicio, recibe una disposición final y se lo inactiva de manera definitiva en el registro de inventario. A cada etapa le corresponde una documentación específica, desde la orden de compra y los certificados de la ANMAT en la recepción hasta el certificado de reciclaje en la disposición final, de modo que la historia del equipo queda respaldada de principio a fin. Esto es lo que da contenido concreto a la trazabilidad exigida por la ley (sección~\ref{sec:marco-normativo}), que no se limita a identificar un equipo sino que permite reconstruir qué ocurrió con él en cada momento de su vida.
+
+La etapa central es el funcionamiento, y es allí donde actúa el plan a través de tres tipos de intervención. El mantenimiento preventivo y el ensayo de seguridad y eficacia se realizan según un cronograma, y el correctivo ante una falla. La Figura~\ref{fig:ciclo-vida-pma} muestra cómo se encadenan según el resultado de cada uno, pero hay un punto que conviene destacar. Cualquiera sea el camino que recorra el equipo, solo puede volver a funcionamiento después de aprobar el ensayo de seguridad y eficacia, que el documento señala como la única vía de reingreso. Esto garantiza que ningún equipo se use con pacientes tras una intervención sin haber comprobado antes que es seguro y eficaz, en línea con lo desarrollado en la sección~\ref{sec:marco-normativo}. El gráfico también contempla la salida directa de servicio por obsolescencia, donación o venta, sin pasar por ninguna intervención.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{fotos/figura_ciclo_de_vida_PMA.png}
+    \caption{Ciclo de vida de un producto médico activo (PMA).}
+    \label{fig:ciclo-vida-pma}
+\end{figure}
+
+La norma IRAM 62353:2019, adopción nacional de la IEC 62353, establece los ensayos que deben realizarse sobre un equipo electromédico en uso para evaluar su seguridad \cite{iram_62353}. Comprende una inspección visual, mediciones de seguridad eléctrica como la resistencia de puesta a tierra, la resistencia de aislación y las corrientes de fuga, y un ensayo funcional de las prestaciones del equipo vinculadas a la seguridad. La norma indica además en qué momentos deben realizarse estos ensayos, que son antes de la puesta en servicio, durante el mantenimiento y la inspección, después de una reparación y de forma recurrente, aunque deja en manos de cada institución la definición de los intervalos.
+
+\subsection{Indicadores de gestión del servicio}
+\label{sec:indicadores-gestion}
+Un plan de mantenimiento que no se mide no permite saber si está funcionando, y por eso el documento de procesos de la Resolución 2725/2023 plantea como uno de sus objetivos que la ejecución del plan se traduzca en informes con indicadores de gestión, de modo que cada planificación aprenda de la anterior \cite{res_2725_2023}. Los indicadores sirven para transformar los registros acumulados en información que permite evaluar el desempeño del servicio y tomar decisiones sobre el parque.
+
+El indicador más directo del plan es el cumplimiento del mantenimiento preventivo, es decir, la proporción de preventivos programados que efectivamente se realizaron en un período. Aunque parece fácil de calcular, depende de cómo se defina qué cuenta como cumplido, porque no es lo mismo considerar cualquier preventivo realizado a que exigir que se haya hecho dentro de la fecha prevista. En este trabajo se adopta el segundo criterio: un preventivo se considera cumplido cuando se realiza dentro del mes para el que fue programado (sección~\ref{sec:estados}).
+
+Sin embargo, desde el punto de vista clínico, lo que más importa no es cuántos preventivos se hicieron sino cuánto tiempo estuvieron los equipos sin poder usarse. El tiempo de inactividad mide justamente eso, y puede obtenerse de dos maneras. La primera es estimarlo como la diferencia entre el momento en que se notifica una falla y el momento en que el equipo vuelve a estar disponible, lo que resulta sencillo pero incluye períodos en los que el equipo puede seguir en funcionamiento, como la demora en tramitar la orden o en cerrarla una vez que el equipo ya volvió a usarse. La segunda es medirlo de manera directa, registrando el inicio y el fin de cada período en que el equipo permanece efectivamente detenido, que es la alternativa adoptada en este trabajo (sección~\ref{sec:estados}). Es el indicador que conecta de manera más directa la gestión del servicio con la atención de los pacientes que se planteaba al comienzo de este trabajo.
+
+A estos se suman dos indicadores clásicos de la ingeniería de mantenimiento. El tiempo medio entre fallas, conocido por su sigla en inglés MTBF, que mide cuánto tiempo transcurre en promedio entre dos fallas consecutivas de un mismo equipo y es una medida de su confiabilidad. Y por otro lado, el tiempo medio de reparación, o MTTR, que mide cuánto se tarda en promedio en resolver una falla, reflejando la capacidad de respuesta del servicio. Analizados junto con la frecuencia y el tipo de fallas de cada equipo, estos indicadores permiten detectar patrones que de otro modo pasarían desapercibidos, como por ejemplo un modelo que falla más que otros de su misma familia, y aportan información concreta para decisiones como el reemplazo de un equipo o la revisión de su plan de mantenimiento. Conviene tener presente que el MTBF solo resulta representativo cuando se cuenta con un historial de fallas suficiente, ya que calculado sobre dos o tres eventos puede dar una imagen engañosa de la confiabilidad real del equipo. Por eso, en SYNAP se calcula como el promedio de días entre fallas consecutivas de un mismo equipo y se presenta siempre junto con la cantidad de fallas en las que se basa (sección~\ref{sec:panel-indicadores}).
+
+Por último, todos estos indicadores comparten una condición, que es que solo son tan confiables como los registros de los que se calculan. Un tiempo de inactividad no puede medirse si no queda registrado cuándo el equipo dejó de estar disponible y cuándo volvió a estarlo, y un MTBF pierde sentido si las fallas de un equipo no están vinculadas a su identificación o aparecen cargadas con descripciones distintas. De esta manera, la calidad de la información que el servicio es capaz de producir depende de las mismas condiciones de trazabilidad y registro desarrolladas a lo largo de este capítulo.
+
 
 %=======================================================================================================
 \newpage
 \section{Diseño y desarrollo del sistema}
-hola gola golaaaaaaaaa
+\label{sec:diseno-desarrollo}
 
-\subsection{Descripción general del sistema}
+\subsection{Enfoque de trabajo}
+\label{sec:enfoque-trabajo}
+SYNAP es un prototipo funcional de aplicación web para la gestión de equipamiento médico, desarrollado a partir del servicio de Bioingeniería del Hospital Alemán. El trabajo se planteó como una mejora sobre la forma en que el servicio gestiona hoy su parque tecnológico, proponiendo una herramienta más completa que la que utiliza actualmente. Si bien el informe explora la posibilidad de migrar los datos reales de la institución, concretar ese reemplazo implicaría un despliegue, una capacitación del personal y una revisión de los recaudos de seguridad sobre información confidencial que exceden ampliamente el alcance de este proyecto.
 
-\subsection{Análisis de requerimientos}
+El punto de partida fue un relevamiento del servicio, que se desarrolla en la sección~\ref{sec:relevamiento}, orientado a identificar las limitaciones del sistema vigente y a recolectar información de la experiencia de quienes lo usan todos los días. Ese relevamiento incluyó el análisis de las bases con las que el hospital administra su información, donde aparecieron nuevas oportunidades más claras para el sistema, principalmente para evitar errores y omisión de datos. 
 
+Con el problema ya definido, se armó una base de datos propia tomando como punto de partida las del Hospital Alemán y sumando los campos que el servicio debería empezar a registrar para que la aplicación pueda aprovecharlos. El desarrollo del backend se organizó de manera iterativa e incremental, avanzando módulo por módulo, de modo que cada uno quedara funcionando y verificado antes de comenzar con el siguiente. Durante toda esa etapa se trabajó con datos ficticios que respetan la estructura y los formatos de las bases reales, lo que permitió probar el sistema sin exponer información del hospital. A lo largo del proceso se consultó tanto al servicio de Bioingeniería como a docentes con experiencia en el área, para verificar que las decisiones tomadas fueran las adecuadas y para resolver las dudas que fueron apareciendo. 
+
+Para organizar el trabajo entre ambas integrantes se utilizó un repositorio en GitHub, que permitió mantener una única versión del código y llevar registro de cada cambio. Las tareas se repartieron por módulos, dejando siempre para trabajar en conjunto las conexiones entre distintas partes del sistema, y los avances y pendientes se registraron en una planilla compartida para que nada quedara librado a la memoria. A eso se sumó un diagrama de Gantt tentativo, que sirvió para distribuir los tiempos disponibles y seguir el cumplimiento de los objetivos planteados.
+
+\subsection{Relevamiento y requerimentos}
+\label{sec:relevamiento}
+Antes de definir qué debía hacer el sistema, fue necesario entender cómo trabaja hoy el servicio de Bioingeniería, con qué herramientas y en qué puntos aparecen las principales dificultades. Para eso se combinaron tres fuentes de información. La primera fue la experiencia directa dentro del servicio, ya que una de las integrantes del proyecto se desempeña como pasante en el área y participa de sus tareas cotidianas, desde los mantenimientos preventivos y correctivos hasta la gestión de órdenes de trabajo (OT) en Máximo. La segunda fue una encuesta al personal que utiliza el sistema actual. La tercera fue el análisis de los datos que el servicio registra en Máximo: el histórico de órdenes de trabajo y la base de activos.  A partir de ellas se definieron los perfiles de usuario, los casos de uso y los requerimientos funcionales y no funcionales que guiaron el desarrollo. 
+
+\subsubsection{El servicio de Bioingeniería del Hospital Alemán}
+\label{sec:serv-bioing}
+
+El servicio de Bioingeniería del Hospital Alemán fue creado en 2005 para gestionar el ciclo de vida del equipamiento médico de la institución, desde su ingreso hasta su baja definitiva. Depende jerárquicamente de la Dirección Médica y forma parte del área de Facilities Management Services (FMS), que reúne a los sectores responsables de la infraestructura y de los servicios técnicos del hospital. El servicio está a cargo de la jefa de Bioingeniería, Siomara Figueredo. Por debajo de la jefatura se encuentran dos coordinadores, responsables de supervisar el trabajo de los grupos, y el personal técnico, integrado por bioingenieros y técnicos en electromedicina. A este equipo se suma una pasante y un personal administrativo.
+
+La Figura~\ref{fig:organigrama} muestra la organización del servicio: el primer coordinador supervisa los grupos 1 y 2, y el segundo los grupos 3, 4 y 5. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{fotos/Figura_4_1_organigrama.png}
+    \caption{Organigrama del servicio de Bioingeniería del Hospital Alemán.}
+    \label{fig:organigrama}
+\end{figure}
+
+El trabajo se organiza en siete grupos, cada uno responsable de un conjunto de áreas del hospital o de un tipo de equipamiento:
+\begin{itemize}
+    \item Grupo 1 (tres integrantes): quirófanos centrales y ambulatorios, endoscopía, litotricia y salas de partos.
+    \item Grupo 2 (dos integrantes): terapias intensivas e intermedias, unidad coronaria, pediatría, neonatología, emergencias y esterilización.
+    \item Grupo 3 (dos integrantes): diagnóstico por imágenes y radioterapia.
+    \item Grupo 4 (dos integrantes): laboratorio e investigación.
+    \item Grupo 5 (dos integrantes): policlínica, hospital de día y consultorios externos.
+    \item Grupo 6: bombas de infusión.
+    \item Grupo 7: instrumental quirúrgico.
+\end{itemize}
+Los grupos 6 y 7 existen como grupos propios dentro de la organización del servicio y del sistema de gestión, pero no tienen personal exclusivo. El Grupo 6 está a cargo de una bioingeniera del Grupo 4 y el Grupo 7 de una bioingeniera del Grupo 1. Por eso, la carga de trabajo real de cada persona no depende solo del grupo al que pertenece, sino también de estas responsabilidades adicionales. Si bien los grupos tienen áreas definidas, existe además una colaboración continua entre ellos, dado que muchos equipos son transversales y requieren procedimientos comunes de control y verificación.
+
+Toda la actividad del servicio se registra en IBM Máximo, que concentra el inventario de activos, las solicitudes de servicio, las órdenes de trabajo y los planes de mantenimiento preventivo. En el caso de los preventivos, el sistema genera automáticamente el primer día de cada mes las órdenes de trabajo de los equipos que tienen un mantenimiento programado, según el plan asignado a cada activo. Sin embargo, como Máximo no permite visualizar con claridad los preventivos de los meses siguientes, cada grupo lleva además una planilla propia donde anticipa los equipos que van a vencer y aquellos que requieren emitir una orden de compra con anticipación. Los mantenimientos pueden realizarse de forma interna o estar tercerizados. En este último caso se agrega un circuito administrativo de presupuestos, firmas, requisiciones y órdenes de compra que se sigue por fuera del sistema. Una vez realizado el mantenimiento, la orden se completa en Máximo, se imprime junto con la planilla interna o el informe del proveedor y se entrega al coordinador del grupo. El coordinador revisa lo realizado, sella el documento y lo archiva en la carpeta física del equipo. Finalmente, se coloca en el equipo una etiqueta amarilla con la fecha de realización, el vencimiento y el responsable.
+
+Los correctivos, en cambio, se originan en una falla detectada por el personal de los servicios clínicos. La vía formal es la carga de una solicitud de servicio en Máximo, que aparece en la bandeja de entrada de Bioingeniería. En la práctica, los servicios suelen avisar además por teléfono para acelerar la respuesta. En situaciones urgentes se acude directamente al servicio y se pide que la solicitud se cargue después de resuelto el problema, de manera que el registro queda supeditado a que alguien lo complete a posteriori. En estos casos, la fecha que queda registrada no necesariamente refleja el momento en que realmente se detectó la falla. Las solicitudes son asignadas por los coordinadores o la jefatura, ya que el personal técnico no puede autoasignarse órdenes de trabajo. Cuando durante un preventivo se detecta una falla, Máximo permite generar una orden correctiva asociada que queda vinculada a la intervención original. Al cierre, la orden correctiva se imprime, la firma el servicio y el coordinador la valida antes de archivarla.
+
+Este recorrido muestra que una parte importante del proceso ocurre por fuera del sistema de gestión: las planillas de cada grupo, los avisos telefónicos, las firmas en papel y los circuitos de compras. La consecuencia es que la información de un mismo equipo queda repartida entre varios soportes. Como se planteó en la sección~\ref{sec:indicadores-gestion}, esa dispersión afecta directamente la posibilidad de calcular indicadores confiables.
+
+\subsubsection{Encuesta}
+\label{sec:encuesta}
+
+Para conocer la experiencia de quienes usan el sistema todos los días, se realizó una encuesta mediante un formulario en línea, respondida entre el 5 y el 18 de mayo de 2026. Participaron ocho integrantes del servicio: dos coordinadores, tres bioingenieros y tres técnicos, de un total de 16 personas que conforman el área. El formulario combinó preguntas cerradas, algunas de ellas con escala de 1 a 5, y preguntas abiertas. Se organizó en cinco bloques: el uso actual del sistema y su valoración, las dificultades y problemas concretos, las funcionalidades deseadas (acceso móvil, códigos QR, reporte de fallas y notificaciones), los indicadores de gestión y, por último, un espacio para comentarios libres. Las respuestas abiertas se analizaron agrupándolas por temas recurrentes. El detalle completo de las respuestas se incluye en el \ref{anexo:encuesta}.
+
+La totalidad de los encuestados utiliza Máximo varias veces por día, lo que confirma que el sistema de gestión es una herramienta central en la rutina del servicio y no un registro accesorio. Aun así, la valoración que recibe es baja. Sobre una escala de 1 a 5, la facilidad de uso obtuvo un promedio de 3,0, la completitud de la información un 2,6 y la eficiencia para el trabajo diario un 2,5. La mitad de los encuestados calificó la eficiencia con 1 o 2 y los más señalados fueron los siguientes:
+
+\begin{table}[H]
+    \caption{Problemas de eficiencia más señalados por el personal encuestado.}
+    \label{tab:problemas-eficiencia}
+    \centering
+    \begin{tabular}{lc}
+        \toprule
+        \textbf{Problema señalado} & \textbf{Respuestas} \\
+        \midrule
+        Falta de automatización & 6 de 8 \\
+        Dificultad para registrar fallas & 6 de 8 \\
+        Datos no normalizados & 5 de 8 \\
+        Falta de actualización de los datos & 5 de 8 \\
+        Información redundante o repetida & 4 de 8 \\
+        Dificultad para encontrar información del equipo & 2 de 8 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Las respuestas abiertas permitieron darle contenido concreto a esas categorías. El tema más repetido fue la generación de informes y reportes, mencionada en seis de las ocho respuestas, ya sea por la dificultad para obtenerlos o por la demora para imprimirlos. Cuatro encuestados señalaron además la lentitud del sistema y la cantidad de pasos y ventanas que requiere completar una tarea sencilla. Una de las coordinadoras describió que, cuando necesita información específica, filtra en Máximo hasta donde el sistema lo permite, exporta el resultado y continúa trabajando en una planilla aparte. Según su respuesta, todo lo que el sistema no resuelve termina haciéndose por fuera, con información duplicada y el doble de trabajo. La misma respuesta señala que Máximo tiene muchos campos que al servicio no le sirven por tratarse de un programa genérico pensado para la industria. Esto confirma, desde la experiencia de los propios usuarios, el desajuste planteado en la sección~\ref{sec:contexto-problema}.
+
+Además, la encuesta relevó necesidades puntuales que se tradujeron en requerimientos: registrar los repuestos utilizados y los accesorios entregados, y vincularlos con el circuito de compras (cuatro respuestas); filtrar mejor la información (tres); adjuntar archivos a las órdenes de trabajo (dos); y contar con un semáforo de vencimientos y un aviso para los activos sin protocolo de mantenimiento, con protocolos definidos según el tipo de equipo y su riesgo (una bioingeniera). Una coordinadora pidió también que el sistema no permita repetir ni armar mal el identificador de un equipo.
+
+Las funcionalidades propuestas tuvieron buena recepción. El acceso desde el celular sin instalar una aplicación obtuvo un promedio de 4,5 y la identificación por código QR, 4,4. Al escanear un equipo, lo más esperado era reportar fallas (6 respuestas), acceder a los manuales (5) y consultar el historial de mantenimiento (4). Una coordinadora observó que esto depende de quién escanea: al usuario del servicio clínico le interesa reportar una falla, mientras que a Bioingeniería le interesa ver el historial y el stock de accesorios, lo que fue determinante para el diseño. Siete de los ocho encuestados consideraron importante reportar fallas desde el sistema y seis, contar con un panel de indicadores, donde los más mencionados fueron el cumplimiento de los preventivos, las fallas por equipo y los tiempos de reparación y fuera de servicio. Las notificaciones por correo dividieron las opiniones (cuatro a favor y cuatro en contra), por lo que se las consideró complementarias.
+
+En conjunto, la encuesta mostró que las dificultades del servicio no se deben a la falta de un sistema, sino a que el sistema disponible no acompaña la forma en que el servicio trabaja. Cada hallazgo se tradujo en uno o más requerimientos (secciones~\ref{sec:requerimientos-funcionales} y~\ref{sec:requerimientos-no-funcionales}). Pedidos como la tecnovigilancia o la integración con compras exceden el alcance y se retoman en las perspectivas futuras.
+
+\subsubsection{Análisis exploratorio de los datos de IBM Máximo}
+\label{sec:analisis-maximo}
+Para complementar la encuesta con evidencia de los propios registros, se analizaron dos exportaciones de Máximo provistas por el servicio: el inventario de activos y el histórico de órdenes de trabajo. Como se trata de información real de la institución, el análisis se hizo sobre valores agregados, sin utilizar datos que identifiquen a personas.
+
+\noindent\textbf {Base de activos}
+
+El inventario reúne 6.302 registros, de los cuales cerca de 4.000 corresponden a equipos en uso. Se identificaron los siguientes problemas:
+\begin{itemize}
+    \item Códigos mal construidos: Maximo impide repetir un código, pero no controla su formato, y se encontraron 26 códigos con errores de tipeo, como espacios, puntos o guiones de más.
+    \item Registros que no son equipos: 120 activos son entradas genéricas, como los "pedidos a Bioingeniería" de cada servicio, creadas para canalizar pedidos que no se refieren a un equipo identificado.
+    \item Ubicación: el área del código no indica dónde está el equipo, y uno de cada cinco equipos activos no tiene ubicación cargada.
+    \item Descripciones sin normalizar: los oxímetros de pulso, por ejemplo, figuran con 21 descripciones distintas, y en un cuarto de los registros la descripción incluye el estado del equipo.
+    \item Datos faltantes: el 9\% de los activos no tiene un número de serie utilizable y casi un tercio de los equipos activos tiene al menos un campo vacío.
+\end{itemize}
+\textbf {Histórico de órdenes de trabajo}
+
+Reúne 57.065 órdenes registradas entre agosto de 2015 y septiembre de 2026, unas 5.000 por año. Los problemas identificados fueron:
+
+\begin{itemize}
+    \item No se distingue el tipo de orden: la exportación no incluye un campo que indique si es preventiva o correctiva, por lo que se lo dedujo a partir de la descripción y del origen. Con esa clasificación, más de la mitad de las órdenes son preventivas y alrededor de un tercio, correctivas.
+    \item Estados superpuestos: el campo admite nueve valores, y tres de ellos son formas de dar una orden por finalizada.
+    \item Fechas poco confiables: más de la mitad de las órdenes finalizadas se cerraron en lotes, de modo que la fecha de cierre no refleja cuándo se hizo el trabajo, y la fecha de cumplimiento está vacía en la mayoría de las correctivas.
+    \item Sin tiempo fuera de servicio: ningún campo indica cuándo un equipo dejó de estar disponible ni cuándo volvió a estarlo.
+    \item Fallas sin equipo: el 34\% de las correctivas se cargó sobre los registros genéricos, por lo que esas fallas no forman parte del historial de ningún equipo.
+    \item Descripciones que no informan la falla: casi la mitad de las correctivas se describe con una o dos palabras, como "bomba" o "monitor", y la descripción se usa también para anotar novedades, a falta de un lugar donde registrar el avance de la intervención.
+    \item Prioridad sin uso: el campo está vacío en prácticamente todas las órdenes.
+\end{itemize}
+\textbf {Consecuencias para la gestión}
+
+Con estos registros no es posible calcular de manera confiable la mayoría de los indicadores de la sección~\ref{sec:indicadores-gestion}. El tiempo de inactividad y el tiempo medio de reparación no pueden obtenerse, y el cumplimiento del mantenimiento preventivo y el tiempo medio entre fallas solo pueden estimarse. El problema, entonces, no es la falta de registros, ya que en once años se acumularon más de 57.000 órdenes, sino que esos registros no capturan los datos necesarios para evaluar la gestión, y los que sí capturan no están normalizados.
+Estos hallazgos se tradujeron en requerimientos del sistema: códigos de equipo generados automáticamente, catálogos cerrados en lugar de texto libre, solicitudes que no requieren inventar un activo, clasificación explícita de cada orden, un conjunto reducido de estados, medición del tiempo de parada y una bitácora propia para cada orden.
+
+\subsubsection{Perfiles de usuario}
+A partir del relevamiento se definieron cuatro perfiles de usuario. Cada persona que accede a SYNAP tiene asignado uno, y ese perfil determina qué pantallas ve y qué acciones puede realizar. El control se aplica en el backend, como se detalla en la sección~\ref{sec:backend-bd}. La definición de los perfiles retoma la distinción que establece el documento de procesos de la Resolución 2725/2023 entre quienes gestionan el cumplimiento del plan de mantenimiento y quienes lo ejecutan \cite{res_2725_2023}, y suma el personal asistencial, que detecta y reporta las fallas, y la jefatura del servicio, que necesita una visión global del área. Los perfiles se presentan en el orden en que intervienen a lo largo del recorrido de una falla, desde su detección hasta la evaluación del desempeño del servicio.
+
+\textbf {Enfermería.} Representa al personal asistencial de los servicios clínicos, enfermeros y médicos, que utiliza el equipamiento en la atención de los pacientes y suele ser el primero en detectar una falla. Reporta en medio de un turno o de un procedimiento y tiene poco conocimiento técnico de los equipos, por lo que su recorrido se redujo a lo indispensable: escanear el código QR del equipo o ingresar su identificador, indicar la falla y la ubicación, y seguir el estado de la solicitud enviada. Si el problema no corresponde a un equipo médico, puede describirlo sin asociarlo a un activo. No tiene acceso al inventario, a las órdenes de trabajo ni al stock, ya que no los necesita para su tarea.
+
+\textbf {Técnico.} Corresponde a los bioingenieros y técnicos en electromedicina que integran los grupos del servicio y ejecutan los mantenimientos. Cada técnico pertenece a un grupo y trabaja sobre las órdenes de ese grupo: toma las que están sin asignar, las reasigna a un compañero, registra el avance en la bitácora, completa el checklist de los preventivos, registra los insumos consumidos y cierra las órdenes. Además puede consultar la ficha y el historial de cualquier equipo, dar de alta equipos nuevos y consultar el stock.
+
+\textbf {Coordinación.} Gestiona uno o más grupos y es responsable de que el trabajo se distribuya y se cumpla. Recibe las solicitudes de sus grupos y decide si aceptarlas, rechazarlas indicando el motivo o corregirlas antes de convertirlas en una orden de trabajo, que puede asignar a un técnico o dejar disponible para el grupo. Define los planes de mantenimiento preventivo y sus checklists, administra los catálogos de tipos de equipo, da de alta insumos y gestiona las compras. También revisa las órdenes preventivas completadas, y autoriza su cierre o las devuelve para que se corrijan.
+
+\textbf {Jefatura.} Corresponde a la jefatura del servicio, que necesita una visión global del área sin restricción por grupo. Su herramienta principal es el panel de indicadores, que le permite evaluar el desempeño del servicio y fundamentar decisiones sobre el parque, como el recambio de un equipo o la revisión de un plan de mantenimiento. Puede consultar toda la información del sistema, incluidas las órdenes de trabajo de todos los grupos, que ve en modo de solo lectura, ya que supervisa el trabajo pero no lo ejecuta.
+
+\subsubsection{Casos de uso}
+
+Los casos de uso describen las interacciones concretas que cada perfil realiza con el sistema para cumplir un objetivo. Se definieron a partir de los procesos relevados en la sección~\ref{sec:serv-bioing} y de las necesidades expresadas en la encuesta. Algunos pueden ser realizados por más de un perfil, y en ellos el alcance de cada uno no es el mismo. El caso más claro son las órdenes de trabajo: el técnico solo opera sobre las de su grupo y la coordinación sobre las de los grupos que coordina, mientras que la jefatura puede consultarlas todas, pero no modificarlas. 
+
+Para facilitar su lectura, los casos de uso se representan en tres diagramas, uno por cada módulo del sistema. El primero reúne las solicitudes de servicio y las órdenes de trabajo (Figura~\ref{fig:caso-1}), el segundo los activos y el mantenimiento preventivo (Figura~\ref{fig:caso-2}) y el tercero el stock y los indicadores (Figura~\ref{fig:caso-3}). En el primer diagrama, los casos se agrupan además según la etapa del circuito a la que pertenecen, desde el reporte de la falla hasta la ejecución del mantenimiento, de modo que el diagrama puede leerse de arriba hacia abajo siguiendo el recorrido de una orden. 
+
+Los casos comunes a todos los perfiles, como el inicio de sesión y el escaneo de un equipo, se asocian a un actor general denominado Usuario, del que heredan los cuatro perfiles. La relación «extend» señala un caso que se agrega de forma opcional a otro, como la generación de una correctiva durante el checklist de un preventivo. El segundo diagrama incluye además un actor que no corresponde a un perfil sino al propio sistema: una tarea programada que, el primer día de cada mes, genera las órdenes de mantenimiento preventivo sin intervención del personal.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\linewidth]{fotos/Figura_4_2_casos_de_uso_solicitudes_y_ordenes.png}
+    \caption{Diagrama de casos de uso del módulo de solicitudes y órdenes de trabajo.}
+    \label{fig:caso-1}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{fotos/Figura_4_3_casos_de_uso_activos_y_mantenimiento.png}
+    \caption{Diagrama de casos de uso del módulo de activos y mantenimiento preventivo }
+    \label{fig:caso-2}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{fotos/Figura_4_4_casos_de_uso_stock_e_indicadores.png}
+    \caption{Diagrama de casos de uso del módulo de stock e indicadores.}
+    \label{fig:caso-3}
+\end{figure}
+
+Los casos de uso con una descripción detallada se presentan en el \ref{anexo:casos-uso}, en la Tabla~\ref{tab:casos-uso}.
+
+\subsubsection{Requerimientos funcionales}
+\label{sec:requerimientos-funcionales}
+
+
+\subsubsection{Requerimientos no funcionales}
+\label{sec:requerimientos-no-funcionales}
+
+\subsection{Datos de partida y modelo de datos}
+El modelo de datos es la base sobre la que se apoya todo el sistema, y cualquier error en esta etapa se arrastra a cada módulo que se construye encima. Por eso, como se mencionó en la sección~\ref{sec:enfoque-trabajo}, no se diseñó desde cero. Se partió de la estructura con la que el Hospital Alemán registra hoy su información, se corrigieron los problemas detectados en el histórico de órdenes y en la base de activos (sección~\ref{sec:analisis-maximo}) y se incorporaron los datos que el servicio necesita empezar a registrar para que los requerimientos definidos puedan cumplirse. 
+
+\subsubsection{Bases existentes}
+La información del servicio se encuentra hoy repartida en varios soportes. El principal es Máximo, donde se registran el inventario de activos, las solicitudes de servicio, las órdenes de trabajo y los planes de mantenimiento. A esto se suman las planillas internas de cada grupo, en las que se anticipan los preventivos de los meses siguientes, los registros en papel archivados en las carpetas físicas de cada equipo, el relevamiento del parque tecnológico realizado en 2024 y el relevamiento de las 3.081 ubicaciones del hospital, en el que cada una tiene un código jerárquico según edificio, piso y sector. 
+
+Como punto de partida para el modelo se tomó la estructura del inventario de activos de Máximo, analizada en la sección~\ref{sec:analisis-maximo}. De esa estructura se conservaron los datos que el servicio ya utiliza y conoce. El principal es el código de activo, con su formato de cuatro segmentos, que además está impreso en las etiquetas de identificación de los equipos. También se conservaron la ubicación, codificada según edificio, piso y sector, el servicio, la marca, el modelo, el número de serie, el grupo de trabajo, la fecha de instalación y el estado. Mantener esa estructura tiene una ventaja práctica: el personal no necesita aprender una nueva forma de identificar los equipos, y la migración de los datos reales, que se aborda en la sección~\ref{sec:integracion-datos}, se simplifica.
+
+Lo que cambió fue la forma de cargar esos datos. Los campos que en Máximo son texto libre pasaron a elegirse de catálogos cerrados siempre que fue posible. El código pasó a construirse de manera automática. El estado quedó como un campo con valores definidos, sin repetirse dentro de la descripción. Además, dejaron de ser necesarios los registros genéricos que hoy funcionan como falsos activos para canalizar pedidos, ya que el sistema permite registrar una solicitud que no corresponde a un equipo médico sin asociarla a un activo.
+
+A esa base se sumaron los datos que hoy no se registran en ningún lado y que resultan indispensables para calcular los indicadores descritos en la sección~\ref{sec:indicadores-gestion}. Entre ellos están la fecha y hora en que se notifica cada falla, los insumos y repuestos consumidos en cada intervención, la frecuencia de mantenimiento de cada equipo y la justificación de los preventivos realizados fuera de término.
+
+
+\subsubsection{Modelo de datos de SYNAP}
+
+\subsubsection{Estados de las solicitudes, órdenes de trabajo y mantenimientos}
+\label{sec:estados}
+
+\subsubsection{Datos de prueba}
+Durante el desarrollo y las pruebas funcionales se trabajó con una base de datos ficticia, construida con la misma estructura y los mismos formatos que las bases del hospital: se replicaron los formatos de código de activo y de ubicación, los tipos de equipo, los servicios y los grupos, y se crearon usuarios de prueba para cada uno de los cuatro perfiles. Esto permitió probar cada módulo en condiciones realistas sin exponer información confidencial de la institución. Los datos reales del hospital se incorporaron después, en una base separada, como se describe en la sección~\ref{sec:integracion-datos}.
+
+\subsubsection{Criticidad y nivel de riesgo de los equipos}
+\label{sec:criticidad-riesgo}
+
+\subsection{Arquitectura y tecnologías}
+SYNAP es una aplicación web: se usa desde el navegador y no requiere instalar nada en las computadoras ni en los celulares del hospital. La decisión responde a que el sistema debe estar disponible tanto para un técnico frente a su escritorio como para una enfermera que encuentra un equipo con problemas en medio de un turno, y pedirle que instale una aplicación sería una barrera más entre la falla y su registro. Las tecnologías se eligieron con tres criterios: que fueran de uso libre y sin costos de licencia, que contaran con documentación y comunidad amplias para resolver problemas durante el desarrollo, y que resultaran razonables de mantener por alguien que retome el proyecto en el futuro. 
+
+\subsubsection{Arquitectura general}
+El sistema se divide en tres capas (Figura~\ref{fig:arq}). El frontend es la interfaz que corre en el navegador, donde el personal carga y consulta los datos de equipos, órdenes y mantenimientos. Por otro lado, el backend es el servidor de la aplicación que se encarga de recibir los pedidos, aplicar las reglas del sistema y decidir qué se puede hacer y qué no. La base de datos guarda toda la información de forma permanente.
+
+La comunicación sigue siempre el mismo recorrido: el navegador envía un pedido al backend; este verifica quién lo hace y si tiene permiso, consulta o modifica la base y devuelve una respuesta que el navegador muestra. El navegador nunca se comunica directamente con la base, y esto es intencional: cualquiera puede inspeccionar lo que ocurre dentro de su navegador, por lo que las credenciales de la base quedarían expuestas si estuvieran ahí. Además, como las reglas del sistema viven solo en el backend, el comportamiento sería el mismo desde otra interfaz, como una aplicación nativa.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{fotos/Figura_4_7_arquitectura.png}
+    \caption{blabla}
+    \label{fig:arq}
+\end{figure}
+
+\subsubsection{Backend y base de datos}
+\label{sec:backend-bd}
+
+El backend se encuentra implementado en Python (v3.11.4), un lenguaje ampliamente utilizado en el desarrollo de aplicaciones web, con documentación abundante y una comunidad grande detrás. Sobre él se construyó una interfaz de programación de aplicaciones (API, por sus siglas en inglés), que es el conjunto de direcciones a las que el frontend le pide o le envía información, por ejemplo una para consultar los datos de un activo y otra para registrar una falla. Cada una de esas direcciones se denomina endpoint.
+
+Para construir la API se utilizó FastAPI (v0.141.1), una herramienta que provee la estructura base sobre la que se escriben los endpoints, evitando tener que programar desde cero el manejo de las conexiones. Se escogió ya que valida automáticamente que los datos que llegan tengan la forma esperada, de manera que información incompleta o mal cargada nunca alcanza la base, y además, genera por su cuenta una documentación interactiva de todos los endpoints disponibles, que durante el desarrollo permitió probar cada funcionalidad desde el navegador antes de que existiera una sola pantalla. 
+
+Cada endpoint se identifica por su dirección y por el tipo de operación que realiza, lo que en el Protocolo de Transferencia de Hipertexto (HTTP, por sus siglas en inglés) se conoce como método. Se utilizaron en el sistema las siguientes operaciones:
+\begin{itemize}
+    \item GET: se utiliza para consultar información de la base sin modificar nada, como cuando se abre la ficha de un activo o se lista el stock de insumos. 
+    \item POST: se utiliza para crear algo que antes no existía, por ejemplo al reportar una falla o al registrar el consumo de un repuesto. 
+    \item PATCH: se utiliza para modificar de forma parcial un registro ya creado, como al cambiar el estado de una orden de trabajo sin tocar el resto de sus datos. 
+    \item DELETE: se utiliza para eliminar un registro, aunque en este sistema prácticamente no se usa, ya que la información no se borra sino que cambia de estado, de manera que el historial se conserva.
+\end{itemize}
+
+Al separar las operaciones por método, una misma dirección puede responder de manera distinta según lo que se le pida, y el sistema puede definir qué perfiles tienen permitido consultar cierta información y cuáles además pueden modificarla, como se puede observar en la Figura~\ref{fig:endpoints}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{fotos/endpoints}
+    \caption{Endpoints del módulo de solicitudes de servicio en la documentación interactiva generada por FastAPI. Se observa cómo una misma dirección responde a distintos métodos según la operación solicitada.}
+    \label{fig:endpoints}
+\end{figure}
+
+El código está organizado por temas y no en un único archivo. Cada área del sistema tiene su propio módulo de rutas, de modo que todo lo relacionado con activos vive en un lugar y lo de órdenes de trabajo en otro, tal como se detalla en el cuadro~\ref{tab:backend}. Los archivos restantes concentran las funciones transversales, o sea la conexión con la base, la definición de las tablas, los contratos de entrada y salida, la seguridad, el cálculo de riesgo, los informes, los correos y las tareas programadas.
+
+\begin{table}[H]
+    \caption{Módulos de rutas del backend.}
+    \label{tab:backend}
+    \centering
+    \begin{tabular}{>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{\dimexpr\linewidth-4.2cm-2\tabcolsep\relax}}
+        \toprule
+        \textbf{Módulo} & \textbf{Responsabilidad} \\
+        \midrule
+        \texttt{auth} & Activación de cuenta, inicio de sesión y recuperación de contraseña \\
+        \texttt{usuarios} & Consulta de usuarios del sistema \\
+        \texttt{activos} & Ficha de cada equipo, búsqueda y acceso mediante código QR \\
+        \texttt{solicitudes} & Reporte de fallas por parte de enfermería, con sus archivos adjuntos \\
+        \texttt{ordenes\_trabajo} & Apertura, asignación, seguimiento y cierre de órdenes \\
+        \texttt{preventivas} & Generación de las órdenes de mantenimiento preventivo del período \\
+        \texttt{mantenimientos} & Consulta del historial de mantenimientos de cada equipo \\
+        \texttt{planes\_mantenimiento} & Definición de los planes por tipo de equipo \\
+        \texttt{checklists} & Plantillas de verificación y registro de sus resultados \\
+        \texttt{stock} & Insumos, compras, consumos y alertas de reposición \\
+        \texttt{dashboard} & Cálculo de los indicadores de gestión \\
+        \texttt{exportar} & Descarga de la información en formato CSV \\
+        \texttt{catalogos} & Glosario de siglas y catálogo de ubicaciones validadas del hospital \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+Cada endpoint define además qué información acepta y qué información devuelve, a través de estructuras llamadas esquemas. Su función es doble. Por un lado validan la entrada, de modo que si falta un campo obligatorio o llega con un tipo equivocado, el pedido se rechaza antes de tocar la base. Por el otro acotan la salida, lo que significa que solo se devuelve aquello que fue declarado explícitamente, y por eso datos como el hash de una contraseña nunca salen del backend aunque estén guardados en la misma tabla que el resto de la información del usuario.
+
+Para comunicarse con la base se usó SQLAlchemy (v2.0.52), que permite trabajar con las tablas como objetos de Python en lugar de escribir consultas SQL a mano, lo que hace el código más legible y evita una familia de vulnerabilidades que aparecen cuando las consultas se arman concatenando texto. Todas las tablas se reflejan en un único archivo, que replica la estructura creada en Supabase. El motor es PostgreSQL, relacional y de código abierto, adecuado porque cada elemento del sistema depende de otro: una orden de trabajo existe porque hay un activo al que corresponde, y un consumo de accesorios porque hay una orden en la que se usó. Esas dependencias se declaran como restricciones, de modo que el motor mismo impide, por ejemplo, registrar una orden para un equipo inexistente.
+
+La base está alojada en Supabase, que la ofrece como servicio en la nube y evitó instalar y mantener un servidor. Se aprovecha solo el alojamiento: la autenticación se resolvió dentro del backend. Como Supabase ofrece además una vía propia de acceso a los datos que no pasa por el backend, se la bloqueó de manera deliberada activando la seguridad a nivel de fila en las tablas, de modo que la única entrada a la información es FastAPI, donde cada pedido se valida según quién lo hace y qué rol tiene.
+
+Cada pedido abre su propia sesión con la base y la cierra al terminar, pase lo que pase. Las operaciones que deben ocurrir juntas se confirman de una sola vez: por ejemplo, el consumo de un accesorio y el descuento del stock, de modo que no puede quedar un consumo asentado sin que el stock baje ni al revés. Como el servicio cierra las conexiones inactivas, el sistema verifica que la conexión siga viva antes de reutilizarla y la renueva cada 30 minutos, lo que evita errores intermitentes.
+
+En cuanto a la seguridad del software, las contraseñas no se guardan tal como el usuario las escribe. Antes de llegar a la base pasan por bcrypt (versión 4.0.1), una función que las transforma en una cadena de caracteres irreconocible y que funciona en un solo sentido, de manera que nadie puede recuperar la contraseña original a partir de lo que quedó guardado. Para verificar un ingreso, el sistema le aplica la misma transformación a lo que el usuario escribió y compara si coinciden.
+
+Una vez que el usuario ingresa al sistema, este necesita reconocerlo en cada pantalla que abre sin volver a pedirle la contraseña, y para eso se utiliza un token web JSON (JWT, por sus siglas en inglés). Se trata de una credencial temporal que el backend entrega al iniciar sesión y que el navegador adjunta en cada pedido posterior, y que identifica al usuario por su número. Para impedir que ese contenido se altere, el backend le agrega una firma calculada a partir de la información del token y de una clave secreta que solo el servidor conoce, y la verifica en cada pedido. El rol, en cambio, no viaja en el token sino que se consulta en la base cada vez, de modo que no hay forma de asignarse otro editando la credencial, y un cambio de rol se aplica en el pedido siguiente sin esperar a que el token venza.
+
+Verificada la validez del token, el sistema pasa a controlar qué puede hacer esa persona. Cada endpoint declara qué perfiles tienen permitido utilizarlo, y esa verificación está escrita en una única función reutilizable que se ejecuta antes que el resto y corta el pedido si el rol no alcanza, de manera que el control no depende de que se recuerde escribirlo endpoint por endpoint. La función tiene dos variantes según el tipo de operación, ya que en la general jefatura siempre pasa porque necesita visión completa del servicio, mientras que en la estricta queda afuera, y esta última se aplica a las acciones operativas como completar un checklist o cerrar una orden, que jefatura supervisa pero no ejecuta. Gracias a esta distinción, jefatura puede consultar las órdenes de trabajo de todos los grupos, pero el backend rechaza cualquier intento de modificarlas. 
+
+Cuando un pedido no puede completarse, el sistema responde indicando el motivo en lugar de fallar sin explicación, y para eso utiliza los códigos previstos por el protocolo HTTP. Un token vencido o inválido devuelve 401, un rol insuficiente 403, un recurso inexistente 404, un dato con formato inválido 422 y una acción que no cumple las reglas del sistema 400, lo que permite que el frontend muestre un mensaje comprensible y editable en cada caso.
+
+Por otro lado, las solicitudes admiten archivos adjuntos, como fotografías del equipo, que se guardan en la propia base junto con su nombre y tipo, con un límite de 5 archivos de 10 MB por solicitud. La alternativa habitual es un servicio de archivos separado, pero para pocos archivos de tamaño acotado habría implicado credenciales adicionales y un punto más de falla sin beneficio real. Por último, las fechas con hora se guardan en horario universal y el frontend las muestra en la hora local, para que un cambio de huso horario no altere el orden de dos eventos consecutivos. 
+
+Por último, el backend incorpora tres herramientas para las tareas que no responden a un pedido directo del usuario en pantalla: el envío de correos, la generación de informes y la ejecución de tareas programadas.
+
+\textbf{Envío de correos.} El sistema envía correos por SMTP a través de Brevo, un servicio de envío con plan gratuito. Las credenciales y la dirección del remitente, que debe estar verificada en Brevo, se leen de variables de entorno y no forman parte del código; lo mismo ocurre con la dirección de la aplicación con la que se arman los enlaces de los correos, que hoy apunta a la computadora local y se reemplaza al publicar el sistem. Los mensajes son de dos tipos: el enlace para restablecer la contraseña, que llega al correo personal del usuario, vence a la hora y puede usarse una sola vez, y los avisos automáticos del sistema (orden correctiva creada, stock crítico y mantenimiento próximo a vencer), que llegan siempre a una única casilla del servicio. Si no hay credenciales cargadas, el mensaje se muestra en la consola del backend en lugar de enviarse, lo que permite probar el resto del sistema sin configurar nada. Si el envío falla, el error queda registrado pero no interrumpe la operación, de modo que una orden o un ajuste de stock se guardan aunque el aviso no salga. 
+
+\textbf{Generación de informes en PDF.} Los informes se generan con ReportLab (v5.0.1), en memoria y cada vez que se solicitan, con los datos vigentes en ese momento; no se guardan como archivos.Hay dos tipos de informes que se pueden descargar: el informe de cada mantenimiento preventivo cerrado, que reúne los datos del equipo y de la orden y el resultado de cada punto del checklist (sección~\ref{sec:mantenimiento-preventivo}), y el informe de un equipo, con sus datos y el historial completo de sus órdenes de trabajo (sección~\ref{sec:activos-qr}).
+
+\textbf{Tareas programadas.} Se ejecutan con APScheduler (v3.11.3), dentro del propio proceso del backend y con la hora de Buenos Aires, por lo que no requieren un servicio aparte. Al iniciarse el backend y todos los días a las 00:05 se generan las órdenes preventivas del mes en curso; a las 00:10 se verifica si ya comenzó la última semana del mes y, de ser así, se avisa de los mantenimientos del mes que todavía no se realizaron. Cada aviso se marca en el mantenimiento correspondiente para no repetirse los días siguientes, y la generación de órdenes está diseñada para poder ejecutarse más de una vez sin duplicar las ya existentes. Gracias a ello, la ejecución al iniciar el backend recupera el caso en que haya estado apagado el primer día del mes. Si una tarea falla, el error se registra y se reintenta en la siguiente ejecución, sin detener el backend. El funcionamiento desde el punto de vista del usuario se describe en las secciones~\ref{sec:mantenimiento-preventivo} y~\ref{sec:notificaciones}.
+
+
+\subsubsection{Frontend}
+
+La interfaz se construyó con React (v19.2.8), una biblioteca de JavaScript que organiza la pantalla en componentes, es decir, piezas independientes que se escriben una vez y se reutilizan. Así, elementos como el encabezado que acompaña cada pantalla se definen en un solo archivo, se ven y se comportan igual en toda la aplicación y cualquier cambio se aplica una sola vez. Como entorno de desarrollo se utilizó Vite (v8.2.2), que levanta un servidor local y aplica cada cambio guardado de inmediato, sin recargar la página ni perder el estado de la pantalla que se está modificando. 
+
+El proyecto está organizado en cuatro grupos de archivos que cumplen funciones distintas: 
+\begin{itemize}
+    \item Páginas - pages. Corresponden a cada pantalla completa del sistema, desde el inicio de sesión hasta el panel de indicadores. 
+    \item Componentes - componentes. Reúnen las piezas que aparecen en más de una pantalla, como el armazón general que envuelve a todas o el checklist de un mantenimiento preventivo. 
+    \item Comunicación con el backend - api. Concentra todas las llamadas al servidor, con un archivo por tema que agrupa las relacionadas con activos, órdenes, stock y demás.
+    \item Utilidades - utiles. Reúnen funciones auxiliares, como el formato de fechas y el tratamiento de los códigos.
+\end{itemize}
+La capa api se diseñó para que las pantallas no se comuniquen directamente con el backend, cuando una necesita información se la pide a la función correspondiente, que es la única que conoce la dirección y el formato del pedido. Si algo cambia en el backend, se corrige en ese archivo y no en cada pantalla que lo usaba. 
+
+El token y el rol del usuario se guardan en el almacenamiento local del navegador, por lo que la sesión se mantiene aunque la persona cierre la pestaña, hasta que el token vence (un día) o ella cierra sesión. Si un pedido es rechazado porque el token venció, la aplicación borra la sesión guardada y vuelve al inicio de sesión. Esto resulta razonable en un servicio donde se entra y se sale del sistema varias veces por turno. Existen alternativas más resistentes a ciertos tipos de ataque, pero se consideró adecuada esta opción para un prototipo de uso interno. 
+
+La navegación entre pantallas se resuelve con react-router-dom (v7.18), que asigna una dirección propia a cada vista y permite moverse entre ellas sin recargar la página completa. A partir del rol guardado en la sesión, la aplicación determina qué opciones se muestran en cada caso, de manera que la interfaz acompaña el control de accesos que el backend aplica por detrás. 
+
+El escaneo de códigos QR se resuelve con html5-qrcode (v2.3.8), una biblioteca que accede a la cámara del dispositivo desde el propio navegador, lo que evitó desarrollar una aplicación nativa solo para esa función. La contrapartida es que los navegadores habilitan la cámara únicamente sobre conexiones seguras, por lo que durante el desarrollo fue necesario probarlo a través de un túnel HTTPS y, en su uso definitivo, el sistema debe servirse bajo ese mismo protocolo. 
+
+Por último, los gráficos de la aplicación, como los del panel de indicadores, se generan con recharts (v3.10.1), y el aspecto visual se apoya en un archivo central de estilos que define colores, tipografía y estilos reutilizables, cuyos criterios se desarrollan en la sección~\ref{sec:interfaz-perfil}.
+
+
+
+\subsection{Desarrollo de los módulos}
+\subsubsection{Autenticación y control de accesos}
+\subsubsection{Activos y acceso por QR}
+\label{sec:activos-qr}
+\subsubsection{Reporte y clasificación de fallas (solicitudes de servicio)}
+\subsubsection{Órdenes de trabajo}
+\subsubsection{Mantenimiento preventivo}
+\label{sec:mantenimiento-preventivo}
+\subsubsection{Stock de accesorios y repuestos}
+\subsubsection{Notificaciones automáticas}
+\label{sec:notificaciones}
+\subsubsection{Panel de indicadores}
+\label{sec:panel-indicadores}
+\subsubsection{Descarga de datos}
+
+\subsection{Interfaz y recorrido por perfil}
+\label{sec:interfaz-perfil}
+\subsubsection{}
+\subsubsection{}
+\subsubsection{}
+\subsubsection{}
+
+\subsection{Integración de los datos del hospital}
+\label{sec:integracion-datos}
+\subsubsection{Criterios de la migración}
+\subsubsection{Datos incorporados}
+\subsubsection{Hallazgos de la prueba con datos reales}
 
 
 \newpage
 \section{Resultados}
+\label{sec:resultados}
 4.3 Análisis de resultados
 4.3.1 Métricas evaluadas
 4.3.2 Métodos estadísticos y software
 
 \newpage
 \section{Discusión}
+\label{sec:discusion}
 
 %=======================================================================================================
 \newpage
 \prefsection{Bibliografía}
 
-\begin{thebibliography}{7}
+\begin{thebibliography}{19}
 
 \bibitem{ministerio2002}
 Ministério da Saúde, \emph{Equipamentos médico-hospitalares e o gerenciamento da manutenção}. Brasília, Brasil: Secretaria de Gestão de Investimentos em Saúde, 2002. [En línea]. Disponible en: \url{https://bvsms.saude.gov.br/bvs/publicacoes/equipamentos_gerenciamento1.pdf}
@@ -286,6 +697,9 @@ J. R. Cardoso y C. A. Waqued, ``Engenharia clínica como vetor do avanço na ges
 \bibitem{bertelli2023}
 S. T. Bertelli, ``Gestión del equipamiento médico del Ministerio de Salud del Gobierno de la Ciudad Autónoma de Buenos Aires (MSGCABA),'' Tesis doctoral, Doctorado en Salud Pública, Univ. de Ciencias Empresariales y Sociales, Buenos Aires, Argentina, 2023. [En línea]. Disponible en: \url{https://dspace.uces.edu.ar/jspui/handle/123456789/6635}
 
+\bibitem{ibm_maximo}
+IBM, ``IBM Maximo Application Suite.'' [En línea]. Disponible en: \url{https://www.ibm.com/products/maximo}. [Accedido: 21 de septiembre de 2026].
+
 \bibitem{miranda_takayama2017}
 L. M. Miranda Dulanto y K. A. Takayama Nakasato, ``Implementación de una plataforma informática avanzada que sirva de soporte a los procesos que intervienen en la gestión de equipos médicos en establecimientos de salud peruanos,'' Tesis de grado, Fac. de Ciencias e Ingeniería, Pontificia Univ. Católica del Perú, Lima, Perú, 2017. [En línea]. Disponible en: \url{http://hdl.handle.net/20.500.12404/8805}
 
@@ -295,9 +709,147 @@ M. O. Khider y A. O. Hamza, ``Medical equipment maintenance management system: D
 \bibitem{hamdi2012}
 N. Hamdi, R. Oweis, H. Abu Zraiq, y D. Abu Sammour, ``An intelligent healthcare management system: A new approach in work-order prioritization for medical equipment maintenance requests,'' \emph{J. Med. Syst.}, vol. 36, no. 2, pp. 557--567, abr. 2012, doi: 10.1007/s10916-010-9501-4.
 
-\bibitem{ibm_maximo}
+\bibitem{neovero}
+Neovero Sistemas, ``Software de Engenharia Clínica e Hospitalar.'' [En línea]. Disponible en: \url{https://www.neovero.com/engenharia-clinica-e-hospitalar/}. [Accedido: 21 de septiembre de 2026].
+
+\bibitem{leex_medical}
+Leex Medical, ``Kibbo: una solución ideal para la gestión de activos médicos.'' [En línea]. Disponible en: \url{https://hightech.leexmedical.com/kibbo-una-solucion-ideal-para-la-gestion-de-activos-medicos}. [Accedido: 21 de septiembre de 2026].
+
+\bibitem{equipasis}
+Equipasis, ``Equipasis: software de gestión de activos.'' [En línea]. Disponible en: \url{https://equipasis.com/}. [Accedido: 21 de septiembre de 2026].
+
+\bibitem{ley_26906}
+Honorable Congreso de la Nación Argentina, \emph{Régimen de trazabilidad y verificación de aptitud técnica de los productos médicos activos de salud en uso}, Ley 26.906, sancionada el 13 de noviembre de 2013, publicada en el Boletín Oficial el 19 de diciembre de 2013. Texto actualizado. [En línea]. Disponible en: \url{https://www.argentina.gob.ar/normativa/nacional/norma-224109/actualizacion}. [Accedido: 30 de septiembre de 2026].
+
+\bibitem{anmat_4306_1999}
+Administración Nacional de Medicamentos, Alimentos y Tecnología Médica, \emph{Requisitos esenciales de seguridad y eficacia de los productos médicos}, Disposición ANMAT N.º 4306/1999, Buenos Aires, Argentina, 1999. [En línea]. Disponible en: \url{https://www.anmat.gob.ar/webanmat/normativas_productosmedicos_cuerpo.asp}
+
+\bibitem{decreto_517_2023}
+Poder Ejecutivo Nacional, \emph{Reglamentación de la Ley N.º 26.906}, Decreto 517/2023, Boletín Oficial, 10 de octubre de 2023. [En línea]. Disponible en: \url{https://www.boletinoficial.gob.ar/detalleAviso/primera/295806/20231010}. [Accedido: 30 de septiembre de 2026].
+
+\bibitem{decreto_70_2023}
+Poder Ejecutivo Nacional, \emph{Bases para la reconstrucción de la economía argentina}, Decreto 70/2023, Boletín Oficial, 21 de diciembre de 2023. [En línea]. Disponible en: \url{https://www.argentina.gob.ar/normativa/nacional/norma-395521}.
+
+\bibitem{res_2725_2023}
+Ministerio de Salud de la Nación, \emph{Directrices de organización y funcionamiento de los servicios de ingeniería clínica}, Resolución 2725/2023, Boletín Oficial, 10 de octubre de 2023. [En línea]. Disponible en: \url{https://www.boletinoficial.gob.ar/detalleAviso/primera/295838/20231010}. [Accedido: 30 de septiembre de 2026].
+
+\bibitem{oms_inventarios_2012}
+Organización Mundial de la Salud, \emph{Introducción a la gestión de inventarios de equipo médico}, Serie de documentos técnicos de la OMS sobre dispositivos médicos. Ginebra, Suiza: OMS, 2012. ISBN: 978-92-4-250139-1. [En línea]. Disponible en: \url{https://iris.who.int/handle/10665/44820}
+
+\bibitem{fennigkoh_smith}
+L. Fennigkoh y B. Smith, ``Clinical equipment management,'' \emph{JCAHO Plant, Technology \& Safety Management Series}, vol. 2, pp. 5--14, 1989.
+
+\bibitem{oms_manten_2012}
+Organización Mundial de la Salud, \emph{Introducción al programa de mantenimiento de equipos médicos}, Serie de documentos técnicos de la OMS sobre dispositivos médicos. Ginebra, Suiza: OMS, 2012. ISBN: 978-92-4-350153-6. [En línea]. Disponible en: \url{https://apps.who.int/iris/handle/10665/44830}
+
+\bibitem{iram_62353}
+Instituto Argentino de Normalización y Certificación, \emph{Aparatos electromédicos. Ensayos recurrentes y ensayos después de la reparación del aparato electromédico}, IRAM 62353:2019, Buenos Aires, Argentina, 2019.
 
 \end{thebibliography}
+
+%=======================================================================================================
+\newpage
+\appendix
+\renewcommand{\thesection}{Anexo \Alph{section}}
+\section{Resultados completos de la encuesta}
+\label{anexo:encuesta}
+
+\newpage
+\section{Casos de uso detallados}
+\label{anexo:casos-uso}
+
+\begingroup
+\small
+\setstretch{1}
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{
+    >{\raggedright\arraybackslash}p{1.3cm}
+    >{\raggedright\arraybackslash}p{3.2cm}
+    >{\raggedright\arraybackslash}p{2.4cm}
+    >{\raggedright\arraybackslash}p{\dimexpr\textwidth-1.3cm-3.2cm-2.4cm-6\tabcolsep-10pt\relax}}
+
+    \caption{Descripción detallada de los casos de uso.}
+    \label{tab:casos-uso} \\
+    \toprule
+    \textbf{ID} & \textbf{Caso de uso} & \textbf{Rol} & \textbf{Descripción} \\
+    \midrule
+    \endfirsthead
+
+    \multicolumn{4}{l}{\small\textit{Continuación de la Tabla \ref{tab:casos-uso}}} \\
+    \toprule
+    \textbf{ID} & \textbf{Caso de uso} & \textbf{Rol} & \textbf{Descripción} \\
+    \midrule
+    \endhead
+
+    \midrule
+    \multicolumn{4}{r}{\small\textit{Continúa en la página siguiente}} \\
+    \endfoot
+
+    \bottomrule
+    \endlastfoot
+        CU-01 & Iniciar sesión & Todos & El usuario ingresa con su identificador y contraseña, y el sistema lo dirige a la pantalla inicial que corresponde a su perfil. \\
+    \hline
+        CU-02 & Escanear un equipo & Todos & El usuario escanea el código QR del equipo y el sistema verifica que exista. El enfermero/médico accede al formulario de solicitud con el equipo ya cargado, y el resto de los perfiles a la ficha del equipo. \\
+    \hline
+        CU-03 & Reportar una falla & Enfermería & El usuario genera una solicitud de servicio sobre un equipo del inventario o, si el problema no corresponde a un equipo médico, sobre una descripción libre, indicando la falla y la ubicación. Puede adjuntar fotos o documentos. \\
+    \hline
+        CU-04 & Seguir el estado de una solicitud & Enfermería & El usuario consulta sus solicitudes enviadas, aceptadas y rechazadas, y el avance de la orden de trabajo asociada. \\
+    \hline
+        CU-05 & Revisar solicitudes pendientes & Coordinador & El coordinador acepta la solicitud, lo que genera una orden correctiva con o sin técnico asignado. También puede rechazarla indicando el motivo o corregir sus datos. Si la solicitud corresponde a un equipo médico, el sistema sugiere la prioridad según el nivel de riesgo del equipo. \\
+    \hline
+        CU-06 & Asignar o reasignar una orden & Coordinador, Técnico & El coordinador asigna la orden a un integrante del grupo. Un técnico/bioingeniero puede tomar una orden sin asignar o traspasarla a un compañero del mismo grupo. \\
+    \hline
+        CU-07 & Registrar avances en la bitácora & Técnico, Coordinador & El usuario agrega entradas con fecha y autor mientras la orden está abierta. \\
+    \hline
+        CU-08 & Completar el checklist de un preventivo & Técnico, Coordinador & El usuario registra el resultado de cada ítem del plan de mantenimiento del equipo. \\
+    \hline
+        CU-09 & Generar una correctiva desde un preventivo & Técnico, Coordinador & Ante una falla detectada durante el preventivo, el usuario abre una orden correctiva vinculada a la orden de origen. \\
+    \hline
+        CU-10 & Registrar consumo de insumos & Técnico, Coordinador & El usuario registra los insumos o repuestos utilizados en una orden, y el stock se descuenta. \\
+    \hline
+        CU-11 & Cerrar una orden correctiva & Técnico, Coordinador & El técnico asignado o el coordinador del grupo cierra la orden correctiva una vez resuelta la falla, y queda registrada la fecha de cierre. \\
+    \hline
+        CU-12 & Consultar la ficha de un equipo & Técnico, Coordinador, Jefatura & El usuario visualiza los datos del equipo, su criticidad y nivel de riesgo, y su historial de órdenes, fallas y mantenimientos. \\
+    \hline
+        CU-13 & Dar de alta un equipo & Técnico, Coordinador, Jefatura & El usuario carga un equipo nuevo, el sistema genera su código y, de manera opcional, se le programa el mantenimiento preventivo. \\
+    \hline
+        CU-14 & Gestionar tipos de equipo & Coordinador & El usuario da de alta un tipo de equipo, y el sistema ofrece crearle su plan de mantenimiento. \\
+    \hline
+        CU-15 & Crear un plan de mantenimiento & Coordinador, Jefatura & El usuario define el checklist de un tipo de equipo o uno genérico. \\
+    \hline
+        CU-16 & Generar los preventivos del mes & Tarea programada (sistema) & Todos los días, y al iniciarse el sistema, se crean las órdenes preventivas de los equipos cuyo mantenimiento vence en el mes en curso o antes, sin duplicar las ya generadas, y se reprograma el ciclo siguiente según la frecuencia de cada equipo. \\
+    \hline
+        CU-17 & Dar de alta un accesorio & Coordinador, Jefatura & El usuario incorpora un accesorio o repuesto al stock con sus umbrales de alerta. \\
+    \hline
+        CU-18 & Registrar una compra de accesorios & Técnico, Coordinador & El usuario registra el pedido de un accesorio o repuesto y, al recibirlo, lo marca como recibido, lo que actualiza el stock disponible. \\
+    \hline
+        CU-19 & Consultar el stock & Técnico, Coordinador, Jefatura & El usuario visualiza los insumos con su nivel de alerta y el historial de compras y consumos. \\
+    \hline
+        CU-20 & Consultar indicadores & Jefatura & El usuario visualiza el panel de indicadores del servicio. \\
+    \hline
+        CU-21 & Completar una orden preventiva & Técnico, Coordinador & Una vez realizado el mantenimiento y completado el checklist, el técnico da la orden por completada y queda pendiente de cierre. Si se completa fuera del mes programado, el sistema exige una justificación del retraso. \\
+    \hline
+        CU-22 & Revisar una orden preventiva & Coordinador & El coordinador revisa una orden pendiente de cierre y autoriza el cierre, con un comentario opcional, o la devuelve al técnico indicando el motivo, que queda registrado en la bitácora. \\
+    \hline
+        CU-23 & Editar la ficha de un equipo & Técnico, Coordinador, Jefatura & El usuario corrige o actualiza los datos de un equipo, como su ubicación, su estado o su tipo, y el sistema solicita una confirmación antes de aplicar el cambio. Si cambia el tipo de equipo, el sistema recalcula su descripción y su grupo técnico. \\
+    \hline
+        CU-24 & Editar un plan de mantenimiento & Coordinador, Jefatura & El usuario modifica el nombre, la frecuencia sugerida o los ítems de un checklist, con confirmación previa. \\
+    \hline
+        CU-25 & Editar una orden de trabajo & Técnico, Coordinador & El usuario corrige la descripción, la prioridad o el equipo asociado a una orden que todavía no fue cerrada, con confirmación previa. Un técnico solo puede editar las órdenes de su grupo y un coordinador las de los grupos que coordina. \\
+    \hline
+        CU-26 & Consultar órdenes de trabajo & Técnico, Coordinador, Jefatura & El usuario visualiza el listado de órdenes y el detalle de cada una: estado, bitácora, checklist, insumos consumidos y archivos adjuntos. El técnico ve las de su grupo, la coordinación las de los grupos que tiene a cargo y la jefatura todas, esta última en modo de solo lectura. \\
+    \hline
+        CU-27 & Descargar el reporte de un equipo & Técnico, Coordinador, Jefatura & El usuario genera desde la ficha de un equipo un informe en PDF con sus datos y el historial completo de sus órdenes de trabajo. \\
+    \hline
+        CU-28 & Asignar o reprogramar el mantenimiento de un equipo & Coordinador & Desde la ficha del equipo, el coordinador le asigna un plan de mantenimiento y el mes de la primera orden, si todavía no tiene uno. Si ya lo tiene, mueve el mes del próximo preventivo sin modificar el plan o la frecuencia. \\
+    \hline
+        CU-29 & Descargar listados en CSV & Técnico, Coordinador, Jefatura & Se descargan en CSV los listados de equipos, órdenes de trabajo, mantenimientos preventivos y accesorios. En los equipos y las órdenes, la descarga respeta la búsqueda y los filtros aplicados en pantalla. \\
+    \hline
+        CU-30 & Registrar la parada de un equipo & Técnico, Coordinador & Dentro de una orden de trabajo, se registra el inicio de la parada cuando el equipo queda fuera de servicio y su fin cuando vuelve a estar disponible, y el sistema suma el tiempo de cada parada. Si la orden se cierra con una parada abierta, el sistema la cierra. \\
+    \hline
+        CU-31 & Enviar avisos automáticos por correo & Sistema & El sistema envía un correo a la casilla de notificaciones del servicio cuando se abre una orden correctiva, cuando un accesorio llega a nivel crítico y cuando un mantenimiento preventivo está por vencer, es decir, en la última semana del mes sin haberse realizado. \\
+\end{longtable}
+\endgroup
 
 \label{LastPage}
 
