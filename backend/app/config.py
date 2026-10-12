@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     # el .env (URL_FRONTEND=https://...).
     url_frontend: str = "http://localhost:5173"
 
+    # ─── Tareas programadas en Vercel ───
+    # Clave con la que el Cron de Vercel se identifica al llamar a
+    # GET /tareas/diarias (ver routers/tareas.py). Solo hace falta en Vercel:
+    # en la compu las tareas las corre el scheduler local y esto queda vacío.
+    cron_secret: str = ""
+
     # ─── Debug ───
     # Habilita endpoints de demo/prueba. Poner en False en producción.
     debug: bool = True

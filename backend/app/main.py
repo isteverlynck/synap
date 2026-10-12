@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from .config import settings
-from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock, checklists, planes_mantenimiento, dashboard, exportar, solicitudes, preventivas, usuarios, catalogos
+from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock, checklists, planes_mantenimiento, dashboard, exportar, solicitudes, preventivas, usuarios, catalogos, tareas
 from .scheduler import iniciar_scheduler, detener_scheduler
 
 
@@ -30,7 +30,8 @@ async def lifespan(app: FastAPI):
     # En Vercel el backend no queda prendido todo el tiempo: se despierta con
     # cada pedido y se apaga solo, así que un scheduler adentro del proceso
     # no serviría (se apagaría con todo lo demás). Por eso en Vercel no lo
-    # prendemos: esas tareas las va a disparar un Cron de Vercel.
+    # prendemos: esas tareas las dispara un Cron de Vercel una vez por día
+    # (ver backend/vercel.json y routers/tareas.py).
     # Vercel define sola la variable VERCEL=1. En tu compu no existe, así que
     # localmente el scheduler sigue funcionando igual que antes.
     en_vercel = os.environ.get("VERCEL") == "1"
@@ -89,6 +90,7 @@ app.include_router(preventivas.router)
 app.include_router(usuarios.router)
 app.include_router(exportar.router)
 app.include_router(catalogos.router)
+app.include_router(tareas.router)
 
 
 @app.get("/health", tags=["health"])
