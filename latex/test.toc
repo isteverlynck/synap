@@ -42,32 +42,33 @@
 \contentsline {subsubsection}{\numberline {4.4.2}Backend y base de datos}{33}{subsubsection.4.4.2}%
 \contentsline {subsubsection}{\numberline {4.4.3}Frontend}{38}{subsubsection.4.4.3}%
 \contentsline {subsubsection}{\numberline {4.4.4}Interfaz}{39}{subsubsection.4.4.4}%
-\contentsline {subsection}{\numberline {4.5}Desarrollo de los módulos}{40}{subsection.4.5}%
-\contentsline {subsubsection}{\numberline {4.5.1}Autenticación y control de accesos}{40}{subsubsection.4.5.1}%
-\contentsline {subsubsection}{\numberline {4.5.2}Activos y acceso por QR}{42}{subsubsection.4.5.2}%
-\contentsline {subsubsection}{\numberline {4.5.3}Reporte y clasificación de fallas (solicitudes de servicio)}{46}{subsubsection.4.5.3}%
-\contentsline {subsubsection}{\numberline {4.5.4}Órdenes de trabajo}{49}{subsubsection.4.5.4}%
-\contentsline {subsubsection}{\numberline {4.5.5}Mantenimientos preventivos}{52}{subsubsection.4.5.5}%
-\contentsline {subsubsection}{\numberline {4.5.6}Stock de accesorios y repuestos}{54}{subsubsection.4.5.6}%
-\contentsline {subsubsection}{\numberline {4.5.7}Notificaciones automáticas}{56}{subsubsection.4.5.7}%
-\contentsline {subsubsection}{\numberline {4.5.8}Panel de indicadores}{57}{subsubsection.4.5.8}%
-\contentsline {subsubsection}{\numberline {4.5.9}Descarga de datos}{58}{subsubsection.4.5.9}%
-\contentsline {subsection}{\numberline {4.6}Integración de los datos del hospital}{59}{subsection.4.6}%
-\contentsline {subsubsection}{\numberline {4.6.1}Criterios de la migración}{59}{subsubsection.4.6.1}%
-\contentsline {subsubsection}{\numberline {4.6.2}Datos incorporados}{60}{subsubsection.4.6.2}%
-\contentsline {subsubsection}{\numberline {4.6.3}Hallazgos de la prueba con datos reales}{60}{subsubsection.4.6.3}%
-\contentsline {section}{\numberline {5}Resultados}{62}{section.5}%
-\contentsline {subsection}{\numberline {5.1}Sistema obtenido}{62}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Integración de los datos del hospital}{62}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Validación con el servicio}{63}{subsection.5.3}%
-\contentsline {section}{\numberline {6}Discusión}{64}{section.6}%
-\contentsline {subsection}{\numberline {6.1}Frente a los antecedentes}{64}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}Frente al sistema actual del hospital}{65}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}Implicaciones y limitaciones}{65}{subsection.6.3}%
-\contentsline {section}{\numberline {7}Perspectivas futuras}{66}{section.7}%
-\contentsline {section}{\numberline {8}Conclusiones}{67}{section.8}%
-\contentsline {section}{Bibliografía}{69}{section*.44}%
-\contentsline {section}{\numberline {Anexo A}}{72}{appendix.A}%
-\contentsline {section}{\numberline {Anexo B}}{73}{appendix.B}%
-\contentsline {section}{\numberline {Anexo C}}{75}{appendix.C}%
-\contentsline {section}{\numberline {Anexo D}}{78}{appendix.D}%
+\contentsline {subsubsection}{\numberline {4.4.5}Despliegue}{40}{subsubsection.4.4.5}%
+\contentsline {subsection}{\numberline {4.5}Desarrollo de los módulos}{41}{subsection.4.5}%
+\contentsline {subsubsection}{\numberline {4.5.1}Autenticación y control de accesos}{41}{subsubsection.4.5.1}%
+\contentsline {subsubsection}{\numberline {4.5.2}Activos y acceso por QR}{43}{subsubsection.4.5.2}%
+\contentsline {subsubsection}{\numberline {4.5.3}Reporte y clasificación de fallas (solicitudes de servicio)}{47}{subsubsection.4.5.3}%
+\contentsline {subsubsection}{\numberline {4.5.4}Órdenes de trabajo}{50}{subsubsection.4.5.4}%
+\contentsline {subsubsection}{\numberline {4.5.5}Mantenimientos preventivos}{53}{subsubsection.4.5.5}%
+\contentsline {subsubsection}{\numberline {4.5.6}Stock de accesorios y repuestos}{55}{subsubsection.4.5.6}%
+\contentsline {subsubsection}{\numberline {4.5.7}Notificaciones automáticas}{57}{subsubsection.4.5.7}%
+\contentsline {subsubsection}{\numberline {4.5.8}Panel de indicadores}{58}{subsubsection.4.5.8}%
+\contentsline {subsubsection}{\numberline {4.5.9}Descarga de datos}{59}{subsubsection.4.5.9}%
+\contentsline {subsection}{\numberline {4.6}Integración de los datos del hospital}{60}{subsection.4.6}%
+\contentsline {subsubsection}{\numberline {4.6.1}Criterios de la migración}{60}{subsubsection.4.6.1}%
+\contentsline {subsubsection}{\numberline {4.6.2}Datos incorporados}{61}{subsubsection.4.6.2}%
+\contentsline {subsubsection}{\numberline {4.6.3}Hallazgos de la prueba con datos reales}{61}{subsubsection.4.6.3}%
+\contentsline {section}{\numberline {5}Resultados}{63}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Sistema obtenido}{63}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Integración de los datos del hospital}{63}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Validación con el servicio}{64}{subsection.5.3}%
+\contentsline {section}{\numberline {6}Discusión}{65}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Frente a los antecedentes}{65}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Frente al sistema actual del hospital}{66}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Implicaciones y limitaciones}{66}{subsection.6.3}%
+\contentsline {section}{\numberline {7}Perspectivas futuras}{67}{section.7}%
+\contentsline {section}{\numberline {8}Conclusiones}{68}{section.8}%
+\contentsline {section}{Bibliografía}{70}{section*.45}%
+\contentsline {section}{\numberline {Anexo A}}{73}{appendix.A}%
+\contentsline {section}{\numberline {Anexo B}}{74}{appendix.B}%
+\contentsline {section}{\numberline {Anexo C}}{76}{appendix.C}%
+\contentsline {section}{\numberline {Anexo D}}{79}{appendix.D}%
