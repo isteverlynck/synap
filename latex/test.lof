@@ -1,30 +1,30 @@
 \babel@toc {spanish}{}\relax 
-\contentsline {figure}{\numberline {1}{\ignorespaces Ciclo de vida de un producto médico activo (PMA).}}{13}{figure.caption.15}%
-\contentsline {figure}{\numberline {2}{\ignorespaces Organigrama del servicio de Bioingeniería del Hospital Alemán.}}{17}{figure.caption.16}%
-\contentsline {figure}{\numberline {3}{\ignorespaces Etiquetas de identificación y de mantenimiento preventivo de los equipos.}}{19}{figure.caption.17}%
-\contentsline {figure}{\numberline {4}{\ignorespaces Diagrama de casos de uso del módulo de solicitudes y órdenes de trabajo.}}{25}{figure.caption.19}%
-\contentsline {figure}{\numberline {5}{\ignorespaces Diagrama de casos de uso del módulo de activos y mantenimiento preventivo.}}{26}{figure.caption.20}%
-\contentsline {figure}{\numberline {6}{\ignorespaces Diagrama de casos de uso del módulo de stock e indicadores.}}{27}{figure.caption.21}%
-\contentsline {figure}{\numberline {7}{\ignorespaces Estados de una orden de trabajo y de un mantenimiento preventivo.}}{32}{figure.caption.22}%
-\contentsline {figure}{\numberline {8}{\ignorespaces Arquitectura de SYNAP. El navegador se comunica solo con el backend, que accede a la base de datos y envía los avisos por correo.}}{35}{figure.caption.23}%
-\contentsline {figure}{\numberline {9}{\ignorespaces Endpoints del módulo de solicitudes de servicio en la documentación de FastAPI.}}{36}{figure.caption.24}%
-\contentsline {figure}{\numberline {10}{\ignorespaces Pantalla de inicio de sesión.}}{43}{figure.caption.26}%
-\contentsline {figure}{\numberline {11}{\ignorespaces Pestaña “Mi cuenta” del perfil de coordinación.}}{43}{figure.caption.27}%
-\contentsline {figure}{\numberline {12}{\ignorespaces Pestaña “Escanear” de enfermería.}}{44}{figure.caption.28}%
-\contentsline {figure}{\numberline {13}{\ignorespaces Pestaña “Equipos” de coordinación.}}{45}{figure.caption.29}%
-\contentsline {figure}{\numberline {14}{\ignorespaces Formulario “Nuevo equipo” de coordinación.}}{46}{figure.caption.30}%
-\contentsline {figure}{\numberline {15}{\ignorespaces Ficha de un equipo, vista de coordinación.}}{47}{figure.caption.31}%
-\contentsline {figure}{\numberline {16}{\ignorespaces Ficha con el nivel de riesgo y la ventana “Cómo se calcula”.}}{48}{figure.caption.32}%
-\contentsline {figure}{\numberline {17}{\ignorespaces Pestaña “Mis solicitudes” de enfermería, opción “Crear solicitud”.}}{49}{figure.caption.33}%
-\contentsline {figure}{\numberline {18}{\ignorespaces Pestaña “Solicitudes” de coordinación.}}{51}{figure.caption.34}%
-\contentsline {figure}{\numberline {19}{\ignorespaces Pestaña “Mis órdenes” del técnico.}}{52}{figure.caption.35}%
-\contentsline {figure}{\numberline {20}{\ignorespaces Detalle de una orden correctiva, vista del técnico.}}{53}{figure.caption.36}%
-\contentsline {figure}{\numberline {21}{\ignorespaces Pestaña “Calendario MP”.}}{55}{figure.caption.37}%
-\contentsline {figure}{\numberline {22}{\ignorespaces Sección “Checklist de mantenimiento” de una orden preventiva en curso, con ítems respondidos y pendientes.}}{56}{figure.caption.38}%
-\contentsline {figure}{\numberline {23}{\ignorespaces Pestaña “Accesorios”.}}{57}{figure.caption.39}%
-\contentsline {figure}{\numberline {24}{\ignorespaces Panel de indicadores, vista de jefatura.}}{60}{figure.caption.40}%
-\contentsline {figure}{\numberline {25}{\ignorespaces Guía de primer ingreso al sistema, para todos los perfiles.}}{80}{figure.caption.48}%
-\contentsline {figure}{\numberline {26}{\ignorespaces Guía de uso para enfermería: cómo reportar una falla y seguir el pedido.}}{81}{figure.caption.49}%
-\contentsline {figure}{\numberline {27}{\ignorespaces Guía de uso para el técnico: resolver órdenes y hacer los preventivos.}}{81}{figure.caption.50}%
-\contentsline {figure}{\numberline {28}{\ignorespaces Guía de uso para coordinación: recibir los pedidos y organizar el trabajo.}}{82}{figure.caption.51}%
-\contentsline {figure}{\numberline {29}{\ignorespaces Guía de uso para jefatura: seguir el estado del servicio.}}{82}{figure.caption.52}%
+\contentsline {figure}{\numberline {1}{\ignorespaces Ciclo de vida de un producto médico activo (PMA).}}{11}{figure.caption.15}%
+\contentsline {figure}{\numberline {2}{\ignorespaces Organigrama del servicio de Bioingeniería del Hospital Alemán.}}{15}{figure.caption.16}%
+\contentsline {figure}{\numberline {3}{\ignorespaces Etiquetas de identificación y de mantenimiento preventivo de los equipos.}}{17}{figure.caption.17}%
+\contentsline {figure}{\numberline {4}{\ignorespaces Diagrama de casos de uso del módulo de solicitudes y órdenes de trabajo.}}{23}{figure.caption.19}%
+\contentsline {figure}{\numberline {5}{\ignorespaces Diagrama de casos de uso del módulo de activos y mantenimiento preventivo.}}{24}{figure.caption.20}%
+\contentsline {figure}{\numberline {6}{\ignorespaces Diagrama de casos de uso del módulo de stock e indicadores.}}{25}{figure.caption.21}%
+\contentsline {figure}{\numberline {7}{\ignorespaces Estados de una orden de trabajo y de un mantenimiento preventivo.}}{30}{figure.caption.22}%
+\contentsline {figure}{\numberline {8}{\ignorespaces Arquitectura de SYNAP. El navegador se comunica solo con el backend, que accede a la base de datos y envía los avisos por correo.}}{33}{figure.caption.23}%
+\contentsline {figure}{\numberline {9}{\ignorespaces Endpoints del módulo de solicitudes de servicio en la documentación de FastAPI.}}{34}{figure.caption.24}%
+\contentsline {figure}{\numberline {10}{\ignorespaces Pantalla de inicio de sesión.}}{41}{figure.caption.26}%
+\contentsline {figure}{\numberline {11}{\ignorespaces Pestaña “Mi cuenta” del perfil de coordinación.}}{41}{figure.caption.27}%
+\contentsline {figure}{\numberline {12}{\ignorespaces Pestaña “Escanear” de enfermería.}}{42}{figure.caption.28}%
+\contentsline {figure}{\numberline {13}{\ignorespaces Pestaña “Equipos” de coordinación.}}{43}{figure.caption.29}%
+\contentsline {figure}{\numberline {14}{\ignorespaces Formulario “Nuevo equipo” de coordinación.}}{44}{figure.caption.30}%
+\contentsline {figure}{\numberline {15}{\ignorespaces Ficha de un equipo, vista de coordinación.}}{45}{figure.caption.31}%
+\contentsline {figure}{\numberline {16}{\ignorespaces Ficha con el nivel de riesgo y la ventana “Cómo se calcula”.}}{46}{figure.caption.32}%
+\contentsline {figure}{\numberline {17}{\ignorespaces Pestaña “Mis solicitudes” de enfermería, opción “Crear solicitud”.}}{47}{figure.caption.33}%
+\contentsline {figure}{\numberline {18}{\ignorespaces Pestaña “Solicitudes” de coordinación.}}{49}{figure.caption.34}%
+\contentsline {figure}{\numberline {19}{\ignorespaces Pestaña “Mis órdenes” del técnico.}}{50}{figure.caption.35}%
+\contentsline {figure}{\numberline {20}{\ignorespaces Detalle de una orden correctiva, vista del técnico.}}{51}{figure.caption.36}%
+\contentsline {figure}{\numberline {21}{\ignorespaces Pestaña “Calendario MP”.}}{53}{figure.caption.37}%
+\contentsline {figure}{\numberline {22}{\ignorespaces Sección “Checklist de mantenimiento” de una orden preventiva en curso, con ítems respondidos y pendientes.}}{54}{figure.caption.38}%
+\contentsline {figure}{\numberline {23}{\ignorespaces Pestaña “Accesorios”.}}{55}{figure.caption.39}%
+\contentsline {figure}{\numberline {24}{\ignorespaces Panel de indicadores, vista de jefatura.}}{58}{figure.caption.40}%
+\contentsline {figure}{\numberline {25}{\ignorespaces Guía de primer ingreso al sistema, para todos los perfiles.}}{78}{figure.caption.48}%
+\contentsline {figure}{\numberline {26}{\ignorespaces Guía de uso para enfermería: cómo reportar una falla y seguir el pedido.}}{79}{figure.caption.49}%
+\contentsline {figure}{\numberline {27}{\ignorespaces Guía de uso para el técnico: resolver órdenes y hacer los preventivos.}}{79}{figure.caption.50}%
+\contentsline {figure}{\numberline {28}{\ignorespaces Guía de uso para coordinación: recibir los pedidos y organizar el trabajo.}}{80}{figure.caption.51}%
+\contentsline {figure}{\numberline {29}{\ignorespaces Guía de uso para jefatura: seguir el estado del servicio.}}{80}{figure.caption.52}%
