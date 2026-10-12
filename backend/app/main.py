@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 from .config import settings
 from .routers import auth, activos, ordenes_trabajo, fallas, mantenimientos, stock, checklists, planes_mantenimiento, dashboard, exportar, solicitudes, preventivas, usuarios, catalogos
@@ -26,13 +27,18 @@ from .scheduler import iniciar_scheduler, detener_scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Al arrancar: prende el scheduler que genera solo las OT preventivas
-    # (ver scheduler.py — antes esto era 100% manual, por Swagger).
-    iniciar_scheduler()
+    # En Vercel el backend no queda prendido todo el tiempo: se despierta con
+    # cada pedido y se apaga solo, así que un scheduler adentro del proceso
+    # no serviría (se apagaría con todo lo demás). Por eso en Vercel no lo
+    # prendemos: esas tareas las va a disparar un Cron de Vercel.
+    # Vercel define sola la variable VERCEL=1. En tu compu no existe, así que
+    # localmente el scheduler sigue funcionando igual que antes.
+    en_vercel = os.environ.get("VERCEL") == "1"
+    if not en_vercel:
+        iniciar_scheduler()
     yield
-    # Al apagar (Ctrl+C, o --reload recargando por un cambio de archivo):
-    # lo apaga prolijo, para no dejar el hilo del scheduler colgado.
-    detener_scheduler()
+    if not en_vercel:
+        detener_scheduler()
 
 
 app = FastAPI(
