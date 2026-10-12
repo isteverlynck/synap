@@ -5,7 +5,9 @@
 // el rol es QUÉ ítems tiene ese menú.
 //
 // En compu el menú es una barra lateral oscura; en celular pasa abajo, como
-// pestañas. Es el mismo componente: solo cambia dónde se dibuja.
+// pestañas. Es el mismo componente: solo cambia dónde se dibuja. En celular
+// entran cómodas hasta 5 pestañas: si el rol tiene más, se muestran las
+// primeras 4 y el resto queda en "Más", que abre un panel con las demás.
 
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -15,8 +17,13 @@ import { toast } from "sonner";
 import { color } from "../tema";
 import {
   QrCode, Inbox, ClipboardList, HeartPulse, Package,
-  CalendarClock, CalendarDays, BarChart3, Boxes, Download,
+  CalendarClock, CalendarDays, BarChart3, Boxes, Download, Ellipsis,
 } from "lucide-react";
+
+// Cuántas pestañas entran abajo en el celular sin que se amontonen los
+// textos. Si el rol tiene más, van las primeras (PESTANAS_CELULAR - 1) y una
+// pestaña "Más" con el resto.
+const PESTANAS_CELULAR = 5;
 
 // ─── Qué ve cada rol ──────────────────────────────────────────────────────
 // Escanear va primero para todos: cualquiera puede sacar la ficha de un
@@ -136,6 +143,21 @@ function Cascaron() {
 
   const activo = (item) => ubicacion.pathname.startsWith(item.ruta);
 
+  // Pestañas de abajo en el celular: si no entran todas, las primeras van a
+  // la vista y el resto a "Más".
+  const itemsListos = items.filter((i) => i.listo);
+  const hayMas = itemsListos.length > PESTANAS_CELULAR;
+  const itemsAbajo = hayMas ? itemsListos.slice(0, PESTANAS_CELULAR - 1) : itemsListos;
+  const itemsMas = hayMas ? itemsListos.slice(PESTANAS_CELULAR - 1) : [];
+  const [masAbierto, setMasAbierto] = useState(false);
+  // "Más" se ve marcado si la pantalla actual es una de las que tiene adentro.
+  const masActivo = itemsMas.some(activo);
+
+  // Al cambiar de pantalla, el panel de "Más" se cierra solo.
+  useEffect(() => {
+    setMasAbierto(false);
+  }, [ubicacion.pathname]);
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: color.fondo }}>
 
@@ -233,9 +255,31 @@ function Cascaron() {
       </div>
 
       {/* ─── Pestañas de abajo (solo en celular) ─── */}
+      {esCelular && masAbierto && (
+        <>
+          {/* Fondo: tocar afuera del panel lo cierra. */}
+          <div style={estilos.fondoMas} onClick={() => setMasAbierto(false)} />
+          <div style={estilos.panelMas}>
+            {itemsMas.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => irA(item)}
+                style={{
+                  ...estilos.itemMas,
+                  background: activo(item) ? color.lateralActivo : "transparent",
+                  color: activo(item) ? "#fff" : color.lateralTexto,
+                }}
+              >
+                <Icono nombre={item.icono} color={activo(item) ? "#fff" : color.lateralTexto} />
+                <span>{item.texto}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {esCelular && (
         <nav style={estilos.barraAbajo}>
-          {items.filter((i) => i.listo).map((item) => (
+          {itemsAbajo.map((item) => (
             <div
               key={item.id}
               onClick={() => irA(item)}
@@ -245,9 +289,21 @@ function Cascaron() {
               }}
             >
               <Icono nombre={item.icono} color={activo(item) ? "#fff" : color.lateralTexto} />
-              <span style={{ fontSize: "0.65rem" }}>{item.texto}</span>
+              <span style={estilos.textoAbajo}>{item.texto}</span>
             </div>
           ))}
+          {hayMas && (
+            <div
+              onClick={() => setMasAbierto((v) => !v)}
+              style={{
+                ...estilos.itemAbajo,
+                color: masActivo || masAbierto ? "#fff" : color.lateralTexto,
+              }}
+            >
+              <Icono nombre="mas" color={masActivo || masAbierto ? "#fff" : color.lateralTexto} />
+              <span style={estilos.textoAbajo}>Más</span>
+            </div>
+          )}
         </nav>
       )}
     </div>
@@ -300,6 +356,7 @@ const ICONOS = {
   grafico: BarChart3,
   catalogos: Boxes,
   descargar: Download,
+  mas: Ellipsis,
 };
 
 function Icono({ nombre, color: c = "currentColor" }) {
@@ -376,14 +433,33 @@ const estilos = {
   barraAbajo: {
     position: "fixed", bottom: 0, left: 0, right: 0,
     background: color.lateral, borderTop: `1px solid ${color.lateral}`,
-    display: "flex", padding: "8px 0 12px", zIndex: 10,
+    display: "flex", zIndex: 10,
+    // Abajo se suma el espacio de la barrita de inicio del iPhone (en los
+    // celulares que no tienen, vale 0).
+    padding: "8px 4px calc(12px + env(safe-area-inset-bottom))",
   },
   itemAbajo: {
-    flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-    gap: 3, cursor: "pointer",
-    // Si el texto se parte en dos renglones (ej. "Calendario MP"), que
+    flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center",
+    gap: 3, cursor: "pointer", padding: "2px 2px",
+    // Si el texto se parte en dos renglones (ej. "Mis solicitudes"), que
     // queden centrados bajo el ícono y no alineados a la izquierda.
     textAlign: "center",
+  },
+  textoAbajo: { fontSize: "0.68rem", lineHeight: 1.15, maxWidth: "100%", overflowWrap: "anywhere" },
+  // Panel de "Más": se abre arriba de la barra de abajo.
+  fondoMas: {
+    position: "fixed", inset: 0, background: "rgba(10, 14, 22, 0.35)", zIndex: 9,
+  },
+  panelMas: {
+    position: "fixed", left: 10, right: 10, zIndex: 11,
+    bottom: "calc(72px + env(safe-area-inset-bottom))",
+    background: color.lateral, borderRadius: 14, padding: 8,
+    boxShadow: "0 -6px 24px rgba(10, 14, 22, 0.35)",
+    display: "flex", flexDirection: "column", gap: 2,
+  },
+  itemMas: {
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "12px 14px", borderRadius: 10, cursor: "pointer", fontSize: "0.92rem",
   },
 };
 
