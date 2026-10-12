@@ -4,10 +4,13 @@
 
 import axios from "axios";
 
-// Dirección de tu backend. En desarrollo es localhost:8000.
-// (Cuando hagan el deploy, se cambia por la dirección pública.)
+// Dirección del backend. Se lee de la variable VITE_API_URL:
+// - En Vercel la cargamos en la configuración del proyecto
+//   (https://synap-backend.vercel.app).
+// - En tu compu esa variable no existe, así que se usa localhost:8000
+//   como siempre y no hay que cambiar nada para trabajar local.
 const cliente = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
 });
 
 // "Interceptor": antes de cada llamada, si hay un token guardado, lo agrega
