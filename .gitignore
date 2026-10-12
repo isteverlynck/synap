@@ -219,3 +219,14 @@ __marimo__/
 
 node_modules/
 .DS_Store
+# LaTeX: archivos que se generan solos al compilar
+latex/*.aux
+latex/*.lof
+latex/*.lot
+latex/*.out
+latex/*.toc
+latex/*.synctex.gz
+latex/*.fls
+latex/*.fdb_latexmk
+latex/*.bbl
+latex/*.blg
