@@ -747,14 +747,8 @@ SYNAP se pensó desde el principio para usarse tanto en una computadora como en 
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \begin{minipage}[c]{0.66\linewidth}\centering
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth]{fotos/Figura_4_10_escanear_enfermeria.png}}
-    \end{minipage}\hfill
-    \begin{minipage}[c]{0.28\linewidth}\centering
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth]{fotos/Figura_4_8b_escanear_celular.png}}
-    \end{minipage}
-    \caption{Pestaña “Escanear” en una computadora (izquierda) y en un celular (derecha).}
+    \includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{fotos/synap_computadora_vs_celular.png}
+    \caption{Pantalla de escaneo de SYNAP en computadora (izquierda) y en celular (derecha).}
     \label{fig:responsive}
 \end{figure}
 
@@ -779,57 +773,49 @@ En el inicio de sesión, si el número no está registrado, la cuenta todavía n
 
 \begin{figure}[!htbp]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{fotos/Figura_4_9a_iniciar_sesion.png}}
-    \caption{Pantalla de inicio de sesión.}
-    \label{fig:inicio-sesion}
+    \newlength{\altofig}\setlength{\altofig}{0.37\linewidth}
+    \begin{minipage}[t]{0.30\linewidth}
+        \centering
+        \includegraphics[height=\altofig]{fotos/Figura_4_9a_iniciar_sesion.png}
+        \caption{Pantalla de inicio de sesión.}
+        \label{fig:inicio-sesion}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.66\linewidth}
+        \centering
+        \includegraphics[height=\altofig]{fotos/Figura_4_9b_mi_cuenta.png}
+        \caption{Pestaña “Mi cuenta” del perfil de coordinación.}
+        \label{fig:mi-cuenta}
+    \end{minipage}
 \end{figure}
 
 En el caso de que el usuario olvide su contraseña, puede recuperarla desde la misma página de inicio de sesión seleccionando el botón “Olvidé mi contraseña”. Si en cambio desea cambiarla, puede hacerlo desde la pestaña “Mi cuenta” (Figura~\ref{fig:mi-cuenta}), a la que se accede en cualquier momento, una vez iniciada la sesión, desde el ícono ubicado en el extremo superior derecho, identificado con las iniciales de su nombre.
-
-\begin{figure}[!htbp]
-    \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=0.8\linewidth,height=0.40\textheight,keepaspectratio]{fotos/Figura_4_9b_mi_cuenta.png}}
-    \caption{Pestaña “Mi cuenta” del perfil de coordinación.}
-    \label{fig:mi-cuenta}
-\end{figure}
 
 \subsubsection{Activos y acceso por QR}
 \label{sec:activos-qr}
 El hospital ya tiene colocada en cada equipo una etiqueta con un código QR, un código de barras y el código de activo (sección~\ref{sec:serv-bioing}). Como el QR hoy no cumple ninguna función, el sistema lo aprovecha: contiene únicamente el código del equipo, con el que la aplicación recupera su información. Así no hizo falta generar ni imprimir etiquetas nuevas, una tarea costosa sobre un parque de varios miles de equipos, y el sistema se incorpora sin modificar lo que el servicio ya tiene instalado.
 
-La pestaña “Escanear” abre la cámara del dispositivo y está disponible para todos los perfiles (Figura~\ref{fig:escanear}). Antes de continuar, el sistema verifica que el equipo exista, por si la etiqueta es antigua o el código está mal. Enfermería llega al formulario de solicitud de servicio con el código ya completado, y técnico, coordinación y jefatura, a la ficha del equipo. Si la cámara no funciona o la etiqueta es ilegible, el código puede ingresarse a mano en la misma pantalla, de modo que ninguna de esas situaciones deje al usuario sin acceso a la información.
-
-\begin{figure}[H]
-    \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_10_escanear_enfermeria.png}}
-    \caption{Pestaña “Escanear” de enfermería.}
-    \label{fig:escanear}
-\end{figure}
+La pestaña “Escanear” abre la cámara del dispositivo y está disponible para todos los perfiles (Figura~\ref{fig:responsive}). Antes de continuar, el sistema verifica que el equipo exista, por si la etiqueta es antigua o el código está mal. Enfermería llega al formulario de solicitud de servicio con el código ya completado, y técnico, coordinación y jefatura, a la ficha del equipo. Si la cámara no funciona o la etiqueta es ilegible, el código puede ingresarse a mano en la misma pantalla, de modo que ninguna de esas situaciones deje al usuario sin acceso a la información.
 
 La pestaña “Equipos”, disponible para todos los perfiles excepto enfermería, lista los equipos de a 50 por página, con su código, ubicación, descripción, marca, modelo y estado (Figura~\ref{fig:equipos}). Permite buscar por código, nombre, marca o número de serie, filtrar por estado, grupo técnico, servicio y tipo de equipo, y registrar un equipo nuevo (técnico, coordinación y jefatura). Al pasar el mouse sobre un código de equipo o de ubicación, un cartel muestra su significado a partir del glosario de siglas y de los catálogos del hospital (por ejemplo, “DESF” se lee como desfibrilador), de modo que los códigos pueden interpretarse sin conocer de memoria todas las siglas.
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_11_equipos_coordinacion.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_11_equipos_coordinacion.png}
     \caption{Pestaña “Equipos” de coordinación.}
     \label{fig:equipos}
 \end{figure}
 
-El botón “Nuevo equipo” abre un formulario (Figura~\ref{fig:nuevo-equipo}) cuyos datos permiten identificar, ubicar y evaluar el equipo, en línea con la sección~\ref{sec:inventario}. Son obligatorios el área, que se escribe a mano, y el tipo de equipo y el servicio, que se eligen de listas cerradas. La ubicación es opcional pero, si se carga, debe elegirse del catálogo de ubicaciones validadas del hospital. También se registran la marca, el modelo, el número de serie, la orden de compra, la fecha de instalación, el estado y, si ya tiene la etiqueta, el código QR. La casilla “Es equipo médico” indica si se le calcula la criticidad y, solo cuando está marcada, aparece “No tiene backup”, que señala que no hay otro equipo que pueda reemplazarlo y aumenta su nivel de riesgo. Opcionalmente puede programarse su mantenimiento preventivo, indicando en qué mes se abre la primera orden y cada cuántos meses se repite, valor que el sistema sugiere a partir del checklist del tipo de equipo.
+El botón “Nuevo equipo” abre un formulario con campos completables, cuyos datos permiten identificar, ubicar y evaluar el equipo, en línea con la sección~\ref{sec:inventario}. Son obligatorios el área, que se escribe a mano, y el tipo de equipo y el servicio, que se eligen de listas cerradas. La ubicación es opcional pero, si se carga, debe elegirse del catálogo de ubicaciones validadas del hospital. También se registran la marca, el modelo, el número de serie, la orden de compra, la fecha de instalación, el estado y, si ya tiene la etiqueta, el código QR. La casilla “Es equipo médico” indica si se le calcula la criticidad y, solo cuando está marcada, aparece “No tiene backup”, que señala que no hay otro equipo que pueda reemplazarlo y aumenta su nivel de riesgo. Opcionalmente puede programarse su mantenimiento preventivo, indicando en qué mes se abre la primera orden y cada cuántos meses se repite, valor que el sistema sugiere a partir del checklist del tipo de equipo.
 
 El código de activo no se escribe, sino que el sistema lo arma con el formato de las etiquetas (sección~\ref{sec:modelo-datos}), por ejemplo B-INTR-DESF-070. El número correlativo es el siguiente disponible para ese tipo en todo el hospital, sin importar el área, que se carga a mano porque, como se observó en el apartado~\ref{sec:analisis-maximo}, no coincide con el servicio del equipo. A partir del tipo elegido, el sistema completa además la descripción y asigna el grupo técnico responsable. Coordinación y jefatura disponen de la pestaña “Catálogos”, donde dan de alta los tipos de equipo, los servicios y las siglas del glosario.
 
-\begin{figure}[H]
-    \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=0.62\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_12_nuevo_equipo.png}}
-    \caption{Formulario “Nuevo equipo” de coordinación.}
-    \label{fig:nuevo-equipo}
-\end{figure}
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.62\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_12_nuevo_equipo.png}
+%     \caption{Formulario “Nuevo equipo” de coordinación.}
+%     \label{fig:nuevo-equipo}
+% \end{figure}
 
 La ficha de un equipo (Figura~\ref{fig:ficha-equipo}) reúne sus datos, su estado actual, la fecha del próximo mantenimiento preventivo, el grupo de bioingeniería responsable y el historial de órdenes y mantenimientos con su estado. Junto a cada integrante del grupo hay un botón “Contactar” que abre un correo, lo que permite el contacto directo con el bioingeniero a cargo, y el botón “Descargar reporte” genera un PDF con los datos del equipo y el historial completo de sus órdenes. Según el perfil se suman dos accesos: “Ver estado de la reparación”, que lleva a la orden abierta del equipo, si la hay (técnico y coordinación), y “Ver plan de mantenimiento”, que lleva al plan de su tipo (coordinación y jefatura). Técnico y coordinación pueden abrir cada orden del historial dentro de los límites de su grupo; jefatura consulta las órdenes desde la pestaña “Órdenes”, en modo lectura.
 
@@ -837,8 +823,7 @@ Técnico, coordinación y jefatura pueden usar además el botón “Editar ficha
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=0.55\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_13_ficha_equipo.png}}
+    \includegraphics[width=0.55\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_13_ficha_equipo.png}
     \caption{Ficha de un equipo, vista de coordinación.}
     \label{fig:ficha-equipo}
 \end{figure}
@@ -847,8 +832,7 @@ La ficha muestra además el estado de vida útil del equipo y, si es médico, su
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=0.55\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_14_riesgo_como_se_calcula.png}}
+    \includegraphics[width=0.55\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_14_riesgo_como_se_calcula.png}
     \caption{Ficha con el nivel de riesgo y la ventana “Cómo se calcula”.}
     \label{fig:riesgo-calculo}
 \end{figure}
@@ -868,8 +852,7 @@ Al enviarla, la solicitud recibe un número correlativo. Si es de un equipo méd
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_15_mis_solicitudes_enfermeria.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_15_mis_solicitudes_enfermeria.png}
     \caption{Pestaña “Mis solicitudes” de enfermería, opción “Crear solicitud”.}
     \label{fig:mis-solicitudes}
 \end{figure}
@@ -886,8 +869,7 @@ La aceptación solo es posible sobre las solicitudes de los grupos que el coordi
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_16_solicitudes_coordinacion.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_16_solicitudes_coordinacion.png}
     \caption{Pestaña “Solicitudes” de coordinación.}
     \label{fig:solicitudes-coord}
 \end{figure}
@@ -907,8 +889,7 @@ En todos los casos el listado se filtra por estado, tipo, prioridad y fecha de n
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_17_mis_ordenes_tecnico.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_17_mis_ordenes_tecnico.png}
     \caption{Pestaña “Mis órdenes” del técnico.}
     \label{fig:mis-ordenes}
 \end{figure}
@@ -925,8 +906,7 @@ En todos los casos el listado se filtra por estado, tipo, prioridad y fecha de n
 \end{itemize}
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_18_detalle_orden_correctiva.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_18_detalle_orden_correctiva.png}
     \caption{Detalle de una orden correctiva, vista del técnico.}
     \label{fig:detalle-orden}
 \end{figure}
@@ -946,8 +926,7 @@ Este módulo incorpora al sistema el circuito completo del mantenimiento prevent
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_19_calendario_mp.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_19_calendario_mp.png}
     \caption{Pestaña “Calendario MP”.}
     \label{fig:calendario-mp}
 \end{figure}
@@ -956,8 +935,7 @@ Este módulo incorpora al sistema el circuito completo del mantenimiento prevent
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.40\textheight,keepaspectratio]{fotos/Figura_4_20_checklist_mantenimiento.png}}
+    \includegraphics[width=\linewidth,height=0.40\textheight,keepaspectratio]{fotos/Figura_4_20_checklist_mantenimiento.png}
     \caption{Sección “Checklist de mantenimiento” de una orden preventiva en curso, con ítems respondidos y pendientes.}
     \label{fig:checklist}
 \end{figure}
@@ -982,8 +960,7 @@ La lista se busca por nombre, código o descripción, se filtra por el tipo de e
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_21_accesorios.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_21_accesorios.png}
     \caption{Pestaña “Accesorios”.}
     \label{fig:accesorios}
 \end{figure}
@@ -1029,8 +1006,7 @@ En la parte superior, los filtros “Grupo técnico” y “Tipo de equipo” re
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_22_panel_indicadores.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_4_22_panel_indicadores.png}
     \caption{Panel de indicadores, vista de jefatura.}
     \label{fig:panel-indicadores}
 \end{figure}
@@ -1113,8 +1089,7 @@ Para validar el sistema en un caso de uso real, tal como plantea el último de l
 
 \begin{figure}[H]
     \centering
-    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.4pt}
-    \fcolorbox{gray!60}{white}{\includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_5_1_equipos_datos_reales.png}}
+    \includegraphics[width=\linewidth,height=0.45\textheight,keepaspectratio]{fotos/Figura_5_1_equipos_datos_reales.png}
     \caption{Pestaña “Equipos” con el inventario del Hospital Alemán incorporado a SYNAP.}
     \label{fig:equipos-datos-reales}
 \end{figure}
@@ -1572,11 +1547,24 @@ Los orígenes de los requerimientos se abrevian como R (relevamiento del proceso
 \section[]{Manuales de uso}
 \label{anexo:manual}
 
+\newlength{\altomanual}
+
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.45\linewidth,height=0.43\textheight,keepaspectratio]{fotos/Manual_A1_primer_ingreso.png}
-    \caption{Guía de primer ingreso al sistema, para todos los perfiles.}
-    \label{fig:manual-a1}
+    \setlength{\altomanual}{0.53\linewidth}
+    \begin{minipage}[t]{0.47\linewidth}
+        \centering
+        \includegraphics[height=\altomanual]{fotos/Manual_A1_primer_ingreso.png}
+        \caption{Guía de primer ingreso al sistema, para todos los perfiles.}
+        \label{fig:manual-a1}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.47\linewidth}
+        \centering
+        \includegraphics[height=\altomanual]{fotos/Manual_A3_tecnico.png}
+        \caption{Guía de uso para el técnico: resolver órdenes y hacer los preventivos.}
+        \label{fig:manual-a3}
+    \end{minipage}
 \end{figure}
 
 \begin{figure}[H]
@@ -1588,23 +1576,20 @@ Los orígenes de los requerimientos se abrevian como R (relevamiento del proceso
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.65\linewidth,height=0.43\textheight,keepaspectratio]{fotos/Manual_A3_tecnico.png}
-    \caption{Guía de uso para el técnico: resolver órdenes y hacer los preventivos.}
-    \label{fig:manual-a3}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.65\linewidth,height=0.43\textheight,keepaspectratio]{fotos/Manual_A4_coordinacion.png}
-    \caption{Guía de uso para coordinación: recibir los pedidos y organizar el trabajo.}
-    \label{fig:manual-a4}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.60\linewidth,height=0.43\textheight,keepaspectratio]{fotos/Manual_A5_jefatura.png}
-    \caption{Guía de uso para jefatura: seguir el estado del servicio.}
-    \label{fig:manual-a5}
+    \setlength{\altomanual}{0.52\linewidth}
+    \begin{minipage}[t]{0.43\linewidth}
+        \centering
+        \includegraphics[height=\altomanual]{fotos/Manual_A4_coordinacion.png}
+        \caption{Guía de uso para coordinación: recibir los pedidos y organizar el trabajo.}
+        \label{fig:manual-a4}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.53\linewidth}
+        \centering
+        \includegraphics[height=\altomanual]{fotos/Manual_A5_jefatura.png}
+        \caption{Guía de uso para jefatura: seguir el estado del servicio.}
+        \label{fig:manual-a5}
+    \end{minipage}
 \end{figure}
 
 \label{LastPage}
