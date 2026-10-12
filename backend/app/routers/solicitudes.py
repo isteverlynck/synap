@@ -464,7 +464,7 @@ from ..models import AdjuntoSolicitud
 from ..schemas import AdjuntoOut
 
 MAX_ADJUNTOS = 5                    # por solicitud
-MAX_BYTES = 10 * 1024 * 1024        # 10 MB por archivo
+MAX_BYTES = 4 * 1024 * 1024        # 10 MB por archivo
 
 # Tipos permitidos, según la extensión del archivo. Guardamos el tipo a partir
 # de la extensión (y no del que manda el navegador) porque con las HEIC del
@@ -489,7 +489,7 @@ def subir_adjuntos(
     """Adjuntar fotos (JPG, PNG, HEIC) o PDFs a una solicitud.
 
     Solo lo puede hacer quien creó la solicitud. Máximo 5 archivos por
-    solicitud y 10 MB cada uno. Si algún archivo no cumple, no se guarda
+    solicitud y 4 MB cada uno. Si algún archivo no cumple, no se guarda
     ninguno: así no queda la mitad subida.
     """
     sol = db.query(SolicitudServicio).filter(SolicitudServicio.id == solicitud_id).first()
@@ -518,7 +518,7 @@ def subir_adjuntos(
         # Leemos un byte de más: si llega a leerlo, el archivo supera el límite.
         contenido = archivo.file.read(MAX_BYTES + 1)
         if len(contenido) > MAX_BYTES:
-            raise HTTPException(status_code=400, detail=f"'{nombre}' pesa más de 10 MB.")
+            raise HTTPException(status_code=400, detail=f"'{nombre}' pesa más de 4 MB.")
         if len(contenido) == 0:
             raise HTTPException(status_code=400, detail=f"'{nombre}' está vacío.")
 

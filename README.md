@@ -1,169 +1,116 @@
 # SYNAP
 
-Sistema web de gestión de equipamiento médico para el servicio de Bioingeniería del
-Hospital Alemán. Proyecto Final de Carrera — Ingeniería Biomédica, ITBA (2026).
+Sistema web de gestión de equipamiento médico para el servicio de Bioingeniería
+del Hospital Alemán. Proyecto Final de Carrera de Bioingeniería, ITBA (2026).
 
 Autoras: Camila Barbagelata · Inés Steverlynck
 
-## Estado del proyecto
+**Aplicación publicada:** https://synap-frontend.vercel.app
 
-En desarrollo. Implementado hasta ahora:
+## Qué hace
 
-**Backend (FastAPI) — funcionando:**
-- Autenticación: activación de cuenta en el primer ingreso, login por número de
-  identificación, tokens JWT. Todos los endpoints (salvo los de auth) protegidos.
-- Activos: listado, ficha por código, ficha con detalle (relaciones).
-- Órdenes de trabajo: listar, ver, crear, cambiar estado y cerrar.
-- Fallas: listar, ver, reportar.
-- Mantenimientos preventivos: consulta.
-- Planes de mantenimiento: crear (por tipo de equipo o genérico), listar, ver
-  detalle con checklists, y buscar el plan que corresponde a un activo.
-- Checklists: ver plantilla, registrar respuestas (PASA/NO_PASA), y generar una
-  OT correctiva a partir de un ítem que no pasa.
-- Stock: insumos, compras (flujo pedida → recibida), consumos con descuento
-  automático vinculado a OT, y alertas de reposición en tres niveles.
-- Dashboard de KPIs (jefatura): cumplimiento de MP, tiempo de inactividad,
-  fallas por equipo y tipo, MTTR y MTBF.
-- Solicitudes de servicio: tabla propia, con ruteo automático a coordinadores
-  según el tipo de equipo.
-- Permisos por rol (enfermería / técnico / jefatura), validados en cada endpoint.
+SYNAP centraliza en una sola plataforma la información de los equipos médicos,
+las órdenes de trabajo correctivas y preventivas, el stock de insumos y
+repuestos, y los indicadores de desempeño del servicio. Se usa desde el
+navegador, en computadoras y celulares, y cada equipo puede consultarse
+escaneando su código QR.
 
-**Frontend (React) — en desarrollo:**
-- Estructura base con Vite.
-- Pantalla de login conectada al backend.
-- Listado de activos (pantalla molde para las demás).
-- Escaneo de QR desde el navegador validado (html5-qrcode).
+Tiene cuatro perfiles de usuario, cada uno con sus propias pantallas y permisos:
 
-**Pendiente:**
-- Frontend: resto de las pantallas (ficha de activo, escaneo integrado, OT,
-  stock, dashboard, reporte de fallas).
-- Migración e integración de los datos reales del Hospital Alemán (objetivo de
-  mínima, en etapa posterior a la validación del prototipo).
+- **Enfermería:** reporta fallas desde el código QR del equipo y sigue el estado
+  de sus solicitudes.
+- **Técnico:** atiende las órdenes asignadas, completa los checklists de
+  mantenimiento preventivo y registra los repuestos utilizados.
+- **Coordinación:** recibe las solicitudes, asigna órdenes y gestiona el stock y
+  los planes de mantenimiento.
+- **Jefatura:** consulta el panel de indicadores y el estado de las órdenes.
 
 ## Tecnologías
 
-- **Backend:** Python + FastAPI + SQLAlchemy (ORM)
-- **Base de datos:** PostgreSQL (alojada en Supabase)
-- **Autenticación:** JWT (tokens) + contraseñas hasheadas con bcrypt
-- **Frontend:** React + Vite, react-router-dom (navegación), axios (llamadas al
-  backend), html5-qrcode (escaneo QR)
+- **Backend:** Python + FastAPI + SQLAlchemy
+- **Base de datos:** PostgreSQL, alojada en Supabase
+- **Autenticación:** tokens JWT y contraseñas hasheadas con bcrypt
+- **Frontend:** React + Vite, react-router-dom, axios, recharts y html5-qrcode
+  (escaneo de QR desde el navegador)
+- **Correos:** SMTP a través de Brevo
+- **Tareas programadas:** APScheduler en desarrollo, Cron de Vercel en la
+  versión publicada
+- **Publicación:** Vercel
 
 ## Estructura del repositorio
 
     synap/
-    ├── backend/
-    │   ├── app/
-    │   │   ├── main.py          # Enciende el backend y conecta los routers
-    │   │   ├── config.py        # Configuración (lee variables del .env)
-    │   │   ├── database.py      # Conexión a la base de datos (Supabase)
-    │   │   ├── models.py        # Tablas traducidas a Python (ORM)
-    │   │   ├── schemas.py       # Contratos de entrada/salida de la API
-    │   │   ├── security.py      # Hasheo de contraseñas y tokens
-    │   │   └── routers/         # Endpoints, agrupados por tema
-    │   │       ├── auth.py
-    │   │       ├── activos.py
-    │   │       ├── ordenes_trabajo.py
-    │   │       ├── fallas.py
-    │   │       ├── mantenimientos.py
-    │   │       ├── planes_mantenimiento.py
-    │   │       ├── checklists.py
-    │   │       ├── stock.py
-    │   │       └── dashboard.py
-    │   ├── .env                 # Variables sensibles (NO se sube a GitHub)
-    │   └── .env.example         # Plantilla del .env
-    ├── synap-frontend/
-    │   └── src/
-    │       ├── api/             # Conexión al backend (cliente, auth)
-    │       ├── pages/           # Cada pantalla (Login, Activos, ...)
-    │       ├── components/      # Piezas reutilizables (escáner QR, etc.)
-    │       └── App.jsx          # Mapa de navegación (rutas → pantallas)
-    ├── bases/                   # Datos de ejemplo (CSV) para desarrollo
-    ├── latex/                   # Informe final de la tesis (fuentes LaTeX)
-    ├── requirements.txt         # Librerías de Python
-    └── README.md
+    ├── backend/            # API (FastAPI)
+    │   ├── app/            # Código: modelos, rutas, permisos, tareas programadas
+    │   ├── requirements.txt
+    │   ├── index.py        # Punto de entrada para Vercel
+    │   ├── vercel.json     # Cron diario de Vercel
+    │   └── .env.example    # Plantilla de variables de entorno
+    ├── synap-frontend/     # Interfaz web (React + Vite)
+    └── latex/              # Fuentes del informe final
 
-## Requisitos previos
+## Cómo correrlo localmente
 
-Instalar una sola vez en cada computadora:
+Hace falta tener instalado **Python 3.11+** y **Node.js 18+**. El sistema tiene
+dos partes que corren a la vez, cada una en su terminal.
 
-- **Python 3.11+** (para el backend)
-- **Node.js 18+** (para el frontend) — incluye `npm`.
-  En Mac con Homebrew: `brew install node`
-
-## Cómo levantar el proyecto localmente
-
-El sistema tiene dos partes que corren a la vez, cada una en su terminal:
-el **backend** (puerto 8000) y el **frontend** (puerto 5173).
-
-### 1. Clonar el repositorio
+**1. Clonar el repositorio**
 
 ```bash
 git clone https://github.com/isteverlynck/synap.git
 cd synap
 ```
 
-### 2. Backend
-
-Crear y activar un entorno virtual de Python:
+**2. Backend**
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate        # en Mac/Linux
-```
-
-Instalar las dependencias:
-
-```bash
-pip install -r requirements.txt
-```
-
-Configurar las variables de entorno:
-
-```bash
+source venv/bin/activate
+pip install -r backend/requirements.txt
 cp backend/.env.example backend/.env
 ```
 
-Después, abrir `backend/.env` y completar:
-- `DATABASE_URL`: la connection string de Supabase (pedírsela a Ine).
-- `SECRET_KEY`: generar una con
-  `python3 -c "import secrets; print(secrets.token_hex(32))"`.
-
-Correr el backend:
+En `backend/.env` completar al menos `DATABASE_URL` (la conexión a Supabase) y
+`SECRET_KEY` (se genera con
+`python3 -c "import secrets; print(secrets.token_hex(32))"`). Si no se cargan
+los datos de SMTP, los correos se muestran en la consola en lugar de enviarse.
 
 ```bash
 cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend en `http://localhost:8000` · documentación en `http://localhost:8000/docs`.
+El backend queda en `http://localhost:8000`, con la documentación de la API en
+`http://localhost:8000/docs`.
 
-### 3. Frontend
-
-En **otra terminal** (dejando el backend corriendo):
+**3. Frontend**, en otra terminal:
 
 ```bash
 cd synap-frontend
-npm install                     # solo la primera vez
+npm install
 npm run dev
 ```
 
-El frontend queda en la dirección que muestre la terminal (normalmente
-`http://localhost:5173`). Abrirla en el navegador.
+Se abre en la dirección que indique la terminal (normalmente
+`http://localhost:5173`) y necesita el backend corriendo.
 
-**Importante:** el frontend necesita el backend corriendo para funcionar (le
-pide los datos). Tener siempre las dos terminales activas al desarrollar.
+## Despliegue
 
-## Informe de tesis
+La aplicación está publicada en Vercel como dos proyectos independientes,
+`synap-backend` y `synap-frontend`, creados a partir de este mismo repositorio.
+Cada `git push` a `main` vuelve a publicar ambos automáticamente.
 
-Las fuentes del informe final viven en `latex/`. Se compilan con cualquier
-distribución de LaTeX (TeX Live, MacTeX) o desde VS Code con la extensión
-LaTeX Workshop. Los archivos intermedios de compilación no se versionan.
+Las variables de entorno se cargan en la configuración de cada proyecto en
+Vercel, no en el repositorio:
+
+- **Backend:** `DATABASE_URL` (Transaction pooler de Supabase), `SECRET_KEY`,
+  las de SMTP, `EMAIL_NOTIFICACIONES`, `URL_FRONTEND`, `CORS_ORIGINS`,
+  `CRON_SECRET` y `DEBUG=false`.
+- **Frontend:** `VITE_API_URL`, con la dirección del backend.
 
 ## Notas
 
-- El archivo `.env` contiene datos sensibles y no se versiona. Cada persona
-  arma el suyo a partir de `.env.example`.
-- Las tablas de la base ya existen en Supabase; el backend se conecta a ellas
-  (no las crea).
-- Los datos de la carpeta `bases/` son ficticios, con la misma estructura que
-  los del Hospital Alemán, para desarrollo y pruebas.
+- El archivo `.env` contiene datos sensibles y no se versiona. Cada persona arma
+  el suyo a partir de `.env.example`.
+- Las tablas ya existen en Supabase; el backend se conecta a ellas pero no las
+  crea.

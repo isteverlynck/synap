@@ -96,7 +96,7 @@ function Solicitudes() {
 
 // Límites de los adjuntos (los mismos que controla el backend).
 const MAX_ADJUNTOS = 5;
-const MAX_BYTES_ADJUNTO = 10 * 1024 * 1024; // 10 MB
+const MAX_BYTES_ADJUNTO = 4 * 1024 * 1024; // 4 MB
 const EXTENSIONES_PERMITIDAS = [".jpg", ".jpeg", ".png", ".heic", ".heif", ".pdf"];
 
 function CrearSolicitud({ onCreada, activoInicial }) {
@@ -218,7 +218,7 @@ function CrearSolicitud({ onCreada, activoInicial }) {
         return;
       }
       if (archivo.size > MAX_BYTES_ADJUNTO) {
-        setError(`"${archivo.name}" pesa más de 10 MB.`);
+        setError(`"${archivo.name}" pesa más de 4 MB.`);
         return;
       }
     }
@@ -282,10 +282,15 @@ function CrearSolicitud({ onCreada, activoInicial }) {
       // falla, la solicitud igual quedó enviada: avisamos solo lo de los archivos.
       if (archivos.length > 0) {
         try {
-          await subirAdjuntos(nueva.id, archivos);
+          // Vercel no acepta envíos de más de 4,5 MB, así que cada archivo
+          // viaja en su propio envío: todos juntos podrían pasarse aunque
+          // cada uno pese menos de 4 MB.
+          for (const archivo of archivos) {
+            await subirAdjuntos(nueva.id, [archivo]);
+          }
         } catch (err) {
           setError(
-            "La solicitud se envió, pero no se pudieron adjuntar los archivos. " +
+            "La solicitud se envió, pero no se pudieron adjuntar todos los archivos. " +
             (err.response?.data?.detail || "")
           );
         }
@@ -431,7 +436,7 @@ function CrearSolicitud({ onCreada, activoInicial }) {
               </label>
             )}
             <p style={estilos.ayudaCampo}>
-              Hasta {MAX_ADJUNTOS} archivos de 10 MB cada uno (JPG, PNG, HEIC o PDF).
+              Hasta {MAX_ADJUNTOS} archivos de 4 MB cada uno (JPG, PNG, HEIC o PDF).
             </p>
             {archivos.map((archivo, i) => (
               <div

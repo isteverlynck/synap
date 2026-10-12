@@ -105,7 +105,7 @@ en el Hospital Alemán} \\[0.2cm] }
 % Author and supervisor
 \textsc{Tutora:}\  Siomara Figueredo\\[0.2cm]
 
-\textsc{Co-tutor:}\  Carlos Lazzarini\\[0.5cm]
+\textsc{Co-tutor:}\  Carlos Lazzarino\\[0.5cm]
 
 \large \textsc{Octubre 2026}\\[0.1cm]
 
@@ -137,7 +137,7 @@ Al Hospital Alemán, por abrirnos las puertas de su servicio de Bioingeniería y
 
 A los coordinadores, bioingenieros y técnicos del servicio, que nos explicaron cómo trabajan, respondieron la encuesta y, al conocer el sistema, compartieron su opinión con generosidad. Sus aportes dieron forma a gran parte de lo que hoy hace SYNAP.
 
-A nuestro co-tutor, Carlos Lazzarini, por su acompañamiento y sus aportes durante el desarrollo del trabajo.
+A nuestro co-tutor, Carlos Lazzarino, por su acompañamiento y sus aportes durante el desarrollo del trabajo.
 
 A la cátedra de Proyecto Final de Carrera, por acompañarnos a lo largo de todo el proyecto.
 
@@ -709,7 +709,7 @@ Verificada la validez del token, el sistema pasa a controlar qué puede hacer es
 
 Cuando un pedido no puede completarse, el sistema responde indicando el motivo en lugar de fallar sin explicación, y para eso utiliza los códigos previstos por el protocolo HTTP. Un token vencido o inválido devuelve 401, un rol insuficiente 403, un recurso inexistente 404, un dato con formato inválido 422 y una acción que no cumple las reglas del sistema 400, lo que permite que el frontend muestre un mensaje comprensible en cada caso.
 
-Por otro lado, las solicitudes admiten archivos adjuntos, como fotografías del equipo, que se guardan en la propia base junto con su nombre y tipo, con un límite de 5 archivos de 10 MB por solicitud. La alternativa habitual es un servicio de archivos separado, pero para pocos archivos de tamaño acotado habría implicado credenciales adicionales y un punto más de falla sin beneficio real. Por último, las fechas con hora se guardan en horario universal y el frontend las muestra en la hora local, para que un cambio de huso horario no altere el orden de dos eventos consecutivos. 
+Por otro lado, las solicitudes admiten archivos adjuntos, como fotografías del equipo, que se guardan en la propia base junto con su nombre y tipo, con un límite de 5 archivos de 4 MB por solicitud. La alternativa habitual es un servicio de archivos separado, pero para pocos archivos de tamaño acotado habría implicado credenciales adicionales y un punto más de falla sin beneficio real. Por último, las fechas con hora se guardan en horario universal y el frontend las muestra en la hora local, para que un cambio de huso horario no altere el orden de dos eventos consecutivos. 
 
 Además, el backend incorpora tres herramientas para las tareas que no responden a un pedido directo del usuario en pantalla: el envío de correos, la generación de informes y la ejecución de tareas programadas.
 
