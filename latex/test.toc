@@ -71,7 +71,7 @@
 \contentsline {subsection}{\numberline {7.2}Funciones previstas en el modelo de datos}{67}{subsection.7.2}%
 \contentsline {subsection}{\numberline {7.3}Ampliaciones funcionales}{68}{subsection.7.3}%
 \contentsline {section}{Bibliografía}{69}{section*.43}%
-\contentsline {section}{\numberline {Anexo A}}{72}{appendix.Alph1}%
-\contentsline {section}{\numberline {Anexo B}}{73}{appendix.Alph2}%
-\contentsline {section}{\numberline {Anexo C}}{75}{appendix.Alph3}%
-\contentsline {section}{\numberline {Anexo D}}{78}{appendix.Alph4}%
+\contentsline {section}{\numberline {Anexo A}}{72}{appendix.A}%
+\contentsline {section}{\numberline {Anexo B}}{73}{appendix.B}%
+\contentsline {section}{\numberline {Anexo C}}{75}{appendix.C}%
+\contentsline {section}{\numberline {Anexo D}}{78}{appendix.D}%

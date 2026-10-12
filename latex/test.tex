@@ -573,7 +573,7 @@ El modelo tiene 28 tablas relacionadas y se organiza alrededor del activo: su c�
 
 \textbf{Activos y catálogos.} El código mantiene el formato del hospital, pero lo construye el sistema: quien da de alta un equipo indica el área y elige su tipo de un catálogo cerrado, y el sistema asigna el siguiente número correlativo de ese tipo y arma el código completo, de modo que no pueden repetirse ni construirse mal los identificadores. Los tipos de equipo y los servicios también son catálogos, y la descripción de cada equipo se completa con el nombre de su tipo. La ubicación se elige de un catálogo cargado a partir del relevamiento de las 3.081 ubicaciones, del que solo se ofrecen las operativas, y un glosario de 778 siglas asocia cada segmento de los códigos de ubicación con su significado. Ese glosario no se cargó a mano: se derivó comparando la descripción de cada ubicación con la de la que la contiene, por ejemplo “E01-1SS-IMAG” con “E01-1SS”. Para el cálculo del nivel de riesgo (sección~\ref{sec:criticidad-riesgo}) se agregaron dos tablas, con los valores del PRIUX de cada tipo de equipo y los datos de soporte de cada modelo.
 
-\textbf{Grupos y usuarios.} La relación entre los grupos de trabajo y los tipos de equipo se modeló en una tabla intermedia, de modo que el grupo responsable de un equipo se deduce de su tipo y, si un tipo pasa a otro grupo, alcanza con modificar esa relación una vez. Cada usuario tiene un perfil y, si es técnico, un grupo. Los coordinadores se vinculan, desde el propio grupo, con los que tienen a cargo, por lo que uno puede coordinar más de uno.
+\textbf{Grupos y usuarios.} El grupo responsable de cada equipo se deduce de su tipo, a través de una tabla que relaciona los grupos con los tipos de equipo, de modo que reasignar un tipo a otro grupo requiere un único cambio. Cada usuario tiene un perfil y, si es técnico, un grupo, y cada grupo registra a su coordinador, por lo que una misma persona puede coordinar varios.
 
 \textbf{Solicitudes y órdenes de trabajo.} Son entidades separadas: la solicitud es un pedido que todavía puede rechazarse o corregirse, y solo al ser aceptada por coordinación da origen a una orden. Ambas tienen un número correlativo legible, además de su identificador interno. La orden registra su tipo (preventiva o correctiva), su estado, el técnico asignado (que puede quedar vacío hasta que alguien la toma), el tiempo que el equipo estuvo fuera de servicio y una referencia a otra orden, que se completa cuando una correctiva se abre a partir de un preventivo. Cada orden tiene además una bitácora con entradas fechadas y firmadas por su autor.
 
@@ -803,7 +803,7 @@ La pestaña “Equipos”, disponible para todos los perfiles excepto enfermerí
 
 El botón “Nuevo equipo” abre un formulario (Figura~\ref{fig:nuevo-equipo}) cuyos datos permiten identificar, ubicar y evaluar el equipo, en línea con la sección~\ref{sec:inventario}. Son obligatorios el área, que se escribe a mano, y el tipo de equipo y el servicio, que se eligen de listas cerradas. La ubicación es opcional pero, si se carga, debe elegirse del catálogo de ubicaciones validadas del hospital. También se registran la marca, el modelo, el número de serie, la orden de compra, la fecha de instalación, el estado y, si ya tiene la etiqueta, el código QR. La casilla “Es equipo médico” indica si se le calcula la criticidad y, solo cuando está marcada, aparece “No tiene backup”, que señala que no hay otro equipo que pueda reemplazarlo y aumenta su nivel de riesgo. Opcionalmente puede programarse su mantenimiento preventivo, indicando en qué mes se abre la primera orden y cada cuántos meses se repite, valor que el sistema sugiere a partir del checklist del tipo de equipo.
 
-El código no se escribe: lo genera el sistema con el formato que ya usan las etiquetas (prefijo, área, tipo de equipo y número correlativo, por ejemplo B-INTR-DESF-070). El número es el siguiente disponible para ese tipo en todo el hospital, sin importar el área, lo que evita los códigos mal construidos detectados en la base actual (sección~\ref{sec:analisis-maximo}). El área se carga a mano porque, como se observó en ese análisis, no coincide con el servicio del equipo. Con el mismo criterio, la descripción se completa con el nombre del tipo y el grupo técnico responsable se asigna según ese tipo, de modo que dos equipos del mismo tipo quedan siempre registrados con la misma denominación. Coordinación y jefatura disponen además de la pestaña “Catálogos”, donde dan de alta los tipos de equipo, los servicios y las siglas del glosario.
+El código de activo no se escribe, sino que el sistema lo arma con el formato de las etiquetas (sección~\ref{sec:modelo-datos}), por ejemplo B-INTR-DESF-070. El número correlativo es el siguiente disponible para ese tipo en todo el hospital, sin importar el área, que se carga a mano porque, como se observó en el apartado~\ref{sec:analisis-maximo}, no coincide con el servicio del equipo. A partir del tipo elegido, el sistema completa además la descripción y asigna el grupo técnico responsable. Coordinación y jefatura disponen de la pestaña “Catálogos”, donde dan de alta los tipos de equipo, los servicios y las siglas del glosario.
 
 \begin{figure}[H]
     \centering
@@ -1038,7 +1038,7 @@ A lo largo de la migración se tomaron tres decisiones:
 \begin{enumerate}
     \item Se dejaron afuera 120 registros que no son equipos. Maximo los usa para canalizar pedidos que no se refieren a un equipo concreto, como los “pedidos a Bioingeniería” de cada servicio. En SYNAP no hacen falta, porque una solicitud puede registrarse sin asociarla a un equipo.
     \item Se armó el catálogo de tipos de equipo a partir de las descripciones de Maximo. Resultaron 358 tipos, y 46 tenían un nombre ambiguo. Ocho se corrigieron consultando la descripción original, y los demás quedaron con el nombre obtenido, que se puede editar desde la aplicación.
-    \item Los usuarios se cargaron sin contraseña. Cada persona crea la suya al activar su cuenta. El perfil se asignó según el cargo: jefatura para la jefa de Bioingeniería, coordinación para los coordinadores y técnico para el resto del personal, incluidos los bioingenieros.
+    \item Las cuentas de usuario replican la estructura del personal del servicio, con el perfil asignado según el cargo, es decir, jefatura para la jefa de Bioingeniería, coordinación para los coordinadores y técnico para el resto del personal, incluidos los bioingenieros. Para resguardar los datos personales, en la base del prototipo se utilizan usuarios ficticios, con nombre, número de usuario y correo inventados, que conservan la misma cantidad de personas y la misma distribución en roles y grupos. Las cuentas se cargan sin contraseña y cada persona crea la suya al activarla.
 \end{enumerate}
 
 \subsubsection{Datos incorporados}
@@ -1057,7 +1057,7 @@ La Tabla~\ref{tab:datos-incorporados} resume lo que quedó cargado. El inventari
         Grupos de trabajo & 6 & G1 a G6; ningún equipo del inventario pertenece al Grupo 7 \\
         Tipos de equipos & 358 & 352 con grupo de trabajo asignado \\
         Equipos & 6.178 & 3.887 activos, 1.862 de baja y 429 inactivos \\
-        Usuarios & 14 & Personal de Bioingeniería, sin contraseña \\
+        Usuarios & 14 & Ficticios, con los roles y grupos del servicio \\
         \bottomrule
     \end{tabular*}
 \end{table}
@@ -1067,12 +1067,12 @@ La Tabla~\ref{tab:datos-incorporados} resume lo que quedó cargado. El inventari
 La base de prueba no permitía anticipar tres situaciones que aparecieron al trabajar con los datos reales:
 
 \begin{itemize}
-    \item Las cuentas no se podían activar. El número de identificación de los usuarios se había cargado solo con el DNI, y el sistema exige el DNI precedido de la letra “u”. Se corrigió en la base de datos.
+    \item Las cuentas no se podían activar. El número de identificación de los usuarios se había cargado sin la letra “u” inicial que exige el sistema. Se corrigió en la base de datos.
     \item La lista de equipos mostraba solo 200. Era el límite por defecto del sistema, que con la base ficticia no se notaba. Con más de 6.000 equipos, la lista pasó a dividirse en páginas de 50 (124 en total), ordenadas del equipo más nuevo al más viejo según su fecha de instalación.
     \item Los equipos no tenían mantenimiento preventivo. Los planes de mantenimiento de Maximo no se migraron, y hasta ese momento el sistema solo permitía asignar un plan al dar de alta un equipo nuevo. Se agregaron dos acciones en la ficha del equipo, disponibles solo para coordinación: asignar un plan y el mes de la primera orden a un equipo que no tiene uno, y reprogramar el mes del próximo preventivo en uno que ya lo tiene (sección~\ref{sec:mantenimiento-preventivo}).
 \end{itemize}
 
-Con esta carga, SYNAP opera con el inventario completo y con los usuarios del servicio. La migración abarcó los equipos, sus catálogos y las cuentas de usuario. Los planes de mantenimiento y sus checklists quedan para definirse con el servicio al momento de la puesta en marcha (capítulo~\ref{sec:futuro}). 
+Con esta carga, SYNAP opera con el inventario completo del hospital y con usuarios ficticios que replican los roles y grupos del servicio. La migración abarcó los equipos, sus catálogos y las cuentas de usuario. Los planes de mantenimiento y sus checklists quedan para definirse con el servicio al momento de la puesta en marcha (capítulo~\ref{sec:futuro}). 
 
 \newpage
 \section{Resultados y limitaciones}
@@ -1090,7 +1090,7 @@ El sistema acompaña el recorrido de un equipo dentro del servicio. Enfermería 
 \subsection{Integración de los datos del hospital}
 \label{sec:integracion-resultados}
 
-Para validar el sistema en un caso de uso real, tal como plantea el último de los objetivos de mínima (sección~\ref{sec:objetivos}), se incorporaron los datos del servicio de Bioingeniería del Hospital Alemán, cuya migración se describe en la sección~\ref{sec:integracion-datos}. SYNAP opera hoy con 6.178 equipos, 358 tipos de equipo, 77 sectores, 6 grupos de trabajo y las cuentas de 14 usuarios del servicio. La prueba con esos datos llevó a tres ajustes, relacionados con la activación de las cuentas, el volumen de la lista de equipos y la asignación de planes de mantenimiento preventivo (sección~\ref{sec:hallazgos-datos-reales}).
+Para validar el sistema en un caso de uso real, tal como plantea el último de los objetivos de mínima (sección~\ref{sec:objetivos}), se incorporaron los datos del servicio de Bioingeniería del Hospital Alemán, cuya migración se describe en la sección~\ref{sec:integracion-datos}. SYNAP opera hoy con 6.178 equipos, 358 tipos de equipo, 77 sectores, 6 grupos de trabajo y 14 cuentas de usuario ficticias que replican los roles y grupos del servicio. La prueba con esos datos llevó a tres ajustes, relacionados con la activación de las cuentas, el volumen de la lista de equipos y la asignación de planes de mantenimiento preventivo (sección~\ref{sec:hallazgos-datos-reales}).
 
 \subsection{Validación con el servicio}
 \label{sec:validacion-servicio}
