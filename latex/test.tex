@@ -244,7 +244,7 @@ Para ordenar este trabajo en las instituciones existen los sistemas de gestión 
 \label{sec:propuesta-justificacion}
 Frente a ese escenario, el presente documento detalla el diseño y desarrollo de SYNAP, un sistema web de gestión de equipamiento médico pensado específicamente para un servicio hospitalario de Bioingeniería, que reúne en una única plataforma la información de cada activo, las órdenes de trabajo preventivas y correctivas, el \textit{stock} de insumos y repuestos y los indicadores de desempeño del área, entre otras funciones. El nombre remite a la sinapsis neuronal, ya que lo que el sistema busca aportar son justamente las conexiones que hoy faltan o funcionan de manera débil entre el equipo registrado, la falla que se le reporta, la orden de trabajo que esa falla genera y el repuesto que se consume para resolverla.
 
-El proyecto aquí presentado está basado en el Hospital Alemán, institución privada de la Ciudad Autónoma de Buenos Aires, que actualmente gestiona su equipamiento médico con IBM Maximo \cite{ibm_maximo}. Tanto el desarrollo como la validación de SYNAP se llevan adelante junto al equipo de Bioingeniería de la institución, que es fuente de los requerimientos que definen la estructura del sistema y, además, su destinatario. Esto permitió incorporar observaciones y necesidades reales a lo largo del proceso y no una vez que el sistema ya estaba cerrado, con el propósito de que el equipo pueda adoptarlo de forma natural en su trabajo cotidiano.
+El proyecto aquí presentado está basado en el Hospital Alemán, institución privada de la Ciudad Autónoma de Buenos Aires, que actualmente gestiona su equipamiento médico con IBM Maximo \cite{ibm_maximo}. El desarrollo de SYNAP se llevó adelante junto al equipo de Bioingeniería de la institución, que es fuente de los requerimientos que definen la estructura del sistema y, además, su destinatario. Esto permitió incorporar observaciones y necesidades reales a lo largo del proceso y no una vez que el sistema ya estaba cerrado, con el propósito de que el equipo pueda adoptarlo de forma natural en su trabajo cotidiano.
 
 Se trata de un prototipo, desarrollado con una base de prueba y validado luego con la información real del hospital (sección~\ref{sec:integracion-datos}). Su puesta en funcionamiento como reemplazo del sistema actual implicaría, además, un despliegue en la infraestructura del hospital, la capacitación del personal y una revisión de los recaudos de seguridad sobre la información confidencial de la institución, tareas que exceden el alcance de este trabajo.
 
@@ -285,7 +285,7 @@ parque tecnológico.
 \end{itemize}
 
 \subsection{Estructura del documento}
-El informe continúa con el estado del arte y el marco teórico, que reúnen los antecedentes en sistemas de gestión de equipamiento médico y los conceptos que fundamentan las decisiones de diseño. El capítulo~\ref{sec:diseno-desarrollo} describe el diseño y desarrollo del sistema, desde el relevamiento realizado en el servicio de Bioingeniería y los requerimientos que surgieron de él hasta el modelo de datos, la arquitectura y las tecnologías, el desarrollo de cada módulo y la integración de los datos del hospital. Los resultados se presentan en el capítulo~\ref{sec:resultados}, que incluye la validación con el servicio, y el capítulo~\ref{sec:discusion} los discute frente a los antecedentes y analiza sus limitaciones. El capítulo~\ref{sec:futuro} plantea las perspectivas futuras y el capítulo~\ref{sec:conclusiones} reúne las conclusiones del trabajo. Los anexos reúnen la encuesta, los casos de uso detallados, los requerimientos del sistema y los manuales de uso.
+El informe continúa con el estado del arte y el marco teórico, que reúnen los antecedentes en sistemas de gestión de equipamiento médico y los conceptos que fundamentan las decisiones de diseño. El capítulo~\ref{sec:diseno-desarrollo} describe el diseño y desarrollo del sistema, desde el relevamiento realizado en el servicio de Bioingeniería y los requerimientos que surgieron de él hasta el modelo de datos, la arquitectura y las tecnologías, el desarrollo de cada módulo y la integración de los datos del hospital. Los resultados se presentan en el capítulo~\ref{sec:resultados}, que incluye la opinión del servicio, y el capítulo~\ref{sec:discusion} los discute frente a los antecedentes y analiza sus limitaciones. El capítulo~\ref{sec:futuro} plantea las perspectivas futuras y el capítulo~\ref{sec:conclusiones} reúne las conclusiones del trabajo. Los anexos reúnen la encuesta, los casos de uso detallados, los requerimientos del sistema y los manuales de uso.
 
 %=======================================================================================================
 \newpage
@@ -569,7 +569,7 @@ A esa base se sumaron los datos que hoy no se registran en ningún lado y que re
 
 \subsubsection{Modelo de datos de SYNAP}
 \label{sec:modelo-datos}
-El modelo tiene 28 tablas relacionadas y se organiza alrededor del activo: su código identifica a cada equipo en todo el sistema, y cada solicitud, orden de trabajo, mantenimiento o consumo de accesorios queda asociado a él. Esto responde a la trazabilidad que exige la Ley 26.906 \cite{ley_26906}: cada equipo tiene un identificador único y su historia completa puede recuperarse desde un único registro.
+El modelo tiene 28 tablas relacionadas y se organiza alrededor del activo, cuyo código identifica a cada equipo en todo el sistema. Las solicitudes, órdenes de trabajo, mantenimientos y consumos de accesorios referidos a un equipo quedan asociados a él, mientras que los pedidos que no corresponden a un equipo médico se registran sin un activo vinculado. Esto responde a la trazabilidad que exige la Ley 26.906 \cite{ley_26906}: cada equipo tiene un identificador único y su historia completa puede recuperarse desde un único registro.
 
 \textbf{Activos y catálogos.} El código mantiene el formato del hospital, pero lo construye el sistema: quien da de alta un equipo indica el área y elige su tipo de un catálogo cerrado, y el sistema asigna el siguiente número correlativo de ese tipo y arma el código completo, de modo que no pueden repetirse ni construirse mal los identificadores. Los tipos de equipo y los servicios también son catálogos, y la descripción de cada equipo se completa con el nombre de su tipo. La ubicación se elige de un catálogo cargado a partir del relevamiento de las 3.081 ubicaciones, del que solo se ofrecen las operativas, y un glosario de 778 siglas asocia cada segmento de los códigos de ubicación con su significado. Ese glosario no se cargó a mano: se derivó comparando la descripción de cada ubicación con la de la que la contiene, por ejemplo “E01-1SS-IMAG” con “E01-1SS”. Para el cálculo del nivel de riesgo (sección~\ref{sec:criticidad-riesgo}) se agregaron dos tablas, con los valores del PRIUX de cada tipo de equipo y los datos de soporte de cada modelo.
 
@@ -617,13 +617,21 @@ R = \alpha_0 \cdot \text{Criticidad} + \alpha_1 \cdot \text{Tipo de mantenimient
 \label{eq:riesgo}
 \end{equation}
 
-En la Ecuación~\eqref{eq:riesgo}, los pesos ($\alpha$) parten de 1 y aumentan cuando se da alguna situación que agrava las consecuencias de una falla: que el equipo no tenga reemplazo, que haya superado su vida útil, que no cuente con soporte de repuestos o de mano de obra, que no tenga proveedor local o que se haya dejado de fabricar. Así, dos equipos con la misma criticidad pueden tener niveles de riesgo muy distintos. El puntaje va de 4 a 75 y se traduce en un nivel alto, medio o bajo.
+En la Ecuación~\eqref{eq:riesgo}, los pesos ($\alpha$) parten de 1 y aumentan cuando se da alguna situación que agrava las consecuencias de una falla, según las Ecuaciones~\eqref{eq:alfa0} a~\eqref{eq:alfa2}.
+
+\begin{align}
+\alpha_0 &= 1 + U + VU \label{eq:alfa0}\\
+\alpha_1 &= 1 + VU + FSR + FSMO + P \label{eq:alfa1}\\
+\alpha_2 &= 1 + VU + FF + FSR + FSMO + P \label{eq:alfa2}
+\end{align}
+
+En ellas, $U$ vale 1 si el equipo no tiene reemplazo, $VU$ vale 1 si superó su vida útil, $P$ vale 1 si no tiene proveedor local y $FF$ vale 1 si se dejó de fabricar, mientras que $FSR$ y $FSMO$ valen 0,5 si no cuenta con soporte de repuestos o de mano de obra, respectivamente. En todos los casos valen 0 si la condición no se cumple. La criticidad toma valores de 2 a 10, y el tipo de mantenimiento y la antigüedad, de 1 a 5, de modo que $\alpha_0$ varía entre 1 y 3, $\alpha_1$ entre 1 y 4 y $\alpha_2$ entre 1 y 5, y el puntaje resultante va de 4 a 75, que se traduce en un nivel alto, medio o bajo. Así, dos equipos con la misma criticidad pueden tener niveles de riesgo muy distintos. Las escalas de cada variable y las condiciones que modifican los pesos se detallan en el \ref{anexo:riesgo}.
 
 Como no todos estos datos dependen de lo mismo, cada uno se registra una sola vez, en el nivel que le corresponde. La función, el riesgo clínico, el tipo de mantenimiento y el límite de vida útil son propios del tipo de equipo, de modo que todas las bombas de infusión del hospital comparten esos valores. El soporte, el proveedor local y la continuidad de fabricación dependen de la marca y el modelo; si un modelo no está cargado, se asume que tiene soporte y proveedor y que se sigue fabricando. La disponibilidad de reemplazo es propia de cada equipo, y la antigüedad se calcula desde su fecha de instalación. Así, para evaluar todos los equipos alcanza con completar los valores de cada tipo y de cada modelo, lo que facilita la migración de los datos del hospital.
 
 El puntaje no se almacena: el sistema lo calcula cada vez que se consulta un equipo, por lo que aumenta solo a medida que envejece. Se aplica únicamente a los equipos que el hospital identifica como médicos, y cuando falta la fecha de instalación se muestra la criticidad pero no el puntaje. El nivel de riesgo se muestra en la ficha del equipo y, al aceptar una solicitud, el sistema sugiere la prioridad de la orden correctiva según ese nivel (alta, media o baja), que coordinación puede modificar.
 
-Al implementar las tablas se ajustó el sentido de las preguntas sobre soporte, proveedor y fabricación, de modo que sea la falta de soporte, de proveedor local o de fabricación la que aumenta el riesgo del equipo. Además, como el documento no define a partir de qué puntaje el riesgo es alto, medio o bajo, se adoptaron de manera provisoria los cortes que el hospital usa internamente para sus suministros críticos, 50 y 25 sobre 100, llevados en proporción al puntaje máximo de 75 (37,5 y 18,75). Por ahora el límite de vida útil es el mismo para todos los tipos, 10 años, a la espera de los valores de cada fabricante. Ambos parámetros quedan sujetos a validación con el servicio.
+Al implementar las tablas se ajustó el sentido de las preguntas sobre soporte, proveedor y fabricación, de modo que sea la falta de soporte, de proveedor local o de fabricación la que aumenta el riesgo del equipo. Además, como el documento no define a partir de qué puntaje el riesgo es alto, medio o bajo, se adoptaron de manera provisoria los cortes que el hospital usa internamente para sus suministros críticos, 50 y 25 sobre 100, llevados en proporción al puntaje máximo de 75 (37,5 y 18,75). Por ahora el límite de vida útil es el mismo para todos los tipos, 10 años, a la espera de los valores de cada fabricante. Ambos parámetros quedan sujetos a revisión con el servicio.
 
 Aparte del cálculo de riesgo, el sistema clasifica cada equipo según su vida útil, con el criterio del hospital, que depende solo de la antigüedad: moderno (menos de 5 años), aceptable (de 5 a menos de 10), medianamente aceptable (de 10 a menos de 15) y obsoleto (15 años o más). Esta clasificación se aplica a cualquier equipo que tenga fecha de instalación, sea médico o no, y se muestra en su ficha y en el panel de indicadores. Es independiente del límite de vida útil del cálculo de riesgo: la clasificación describe el estado general del parque, mientras que el límite agrava el puntaje de cada equipo que lo supera.
 
@@ -767,7 +775,7 @@ Como complemento, el \ref{anexo:manual} reúne un manual de uso con los pasos de
 \subsubsection{Autenticación y control de accesos}
 Para ingresar, la persona completa en la pantalla de inicio de sesión (Figura~\ref{fig:inicio-sesion}) su número de identificación y su contraseña. El número tiene la forma u + DNI (por ejemplo, u12345678) y se eligió como nombre de usuario porque es el que el Hospital Alemán ya utiliza para identificar a su personal.
 
-Como las cuentas se cargan sin contraseña, la primera vez que alguien usa el sistema debe activar su usuario desde el botón “¿Primera vez? Activar mi usuario”. La activación tiene dos pasos. Primero se ingresa el número de identificación y el sistema verifica que exista y que todavía no haya sido activado; si no es así, le indica a la persona cómo continuar. Después se elige la contraseña, escribiéndola dos veces para evitar errores de tipeo, con un mínimo de 8 caracteres y sin otras restricciones. De este modo no hace falta distribuir contraseñas iniciales entre el personal, algo poco práctico y menos seguro, y cada persona elige la suya en su primer acceso. 
+Como las cuentas se cargan sin contraseña, la primera vez que alguien usa el sistema debe activar su usuario desde el botón “¿Primera vez? Activar mi usuario”. La activación tiene dos pasos. Primero se ingresa el número de identificación y el sistema verifica que exista y que todavía no haya sido activado; si no es así, le indica a la persona cómo continuar. Después se elige la contraseña, escribiéndola dos veces para evitar errores de tipeo, con un mínimo de 8 caracteres y sin otras restricciones. De este modo no hace falta distribuir contraseñas iniciales entre el personal, algo poco práctico y menos seguro, y cada persona elige la suya en su primer acceso. En el prototipo, la activación no verifica la identidad de quien la realiza más allá del número de identificación, por lo que en un uso real debería confirmarse mediante un enlace enviado al correo institucional del titular (capítulo~\ref{sec:futuro}). 
 
 En el inicio de sesión, si el número no está registrado, la cuenta todavía no fue activada o la contraseña es incorrecta, se muestra el mismo mensaje, “Número o contraseña incorrectos”, y no se permite el acceso. 
 
@@ -988,20 +996,20 @@ Los avisos son únicamente por correo, ya que el sistema no cuenta con notificac
 \label{sec:panel-indicadores}
 El panel de indicadores responde a la dificultad para obtener informes del sistema actual, el tema más repetido en la encuesta (sección~\ref{sec:encuesta}), y materializa los indicadores de la sección~\ref{sec:indicadores-gestion}. Se accede desde la pestaña “\textit{Dashboard}” (Figura~\ref{fig:panel-indicadores}), disponible solo para jefatura, y todos los valores se calculan en el momento de abrir la pantalla con los datos registrados, sin necesidad de armar informes por fuera del sistema.
 
-Dos criterios rigen el panel. El primero es que un porcentaje o un promedio sin datos suficientes muestra “Sin datos” y nunca un cero: un cumplimiento del 0 % y la ausencia de preventivos cargados significan cosas opuestas, y confundirlos podría llevar a decisiones equivocadas sobre el parque. El segundo es que los indicadores de falla (tiempo fuera de servicio, cantidad de fallas, tiempo medio de reparación y tiempo medio entre fallas) miden la confiabilidad de los equipos, por lo que no incluyen las fallas de usuario ni las órdenes sin un equipo asociado, como las de instrumental, que no pueden atribuirse a ninguno. Todas ellas sí cuentan como trabajo del servicio en las órdenes totales y en la carga por grupo (sección~\ref{sec:estados}); solo las órdenes sin equipo quedan fuera cuando se filtra por grupo o por tipo, porque el filtro opera sobre equipos. 
+Dos criterios rigen el panel. El primero es que un porcentaje o un promedio sin datos suficientes muestra “Sin datos” y nunca un cero: un cumplimiento del 0~\% y la ausencia de preventivos cargados significan cosas opuestas, y confundirlos podría llevar a decisiones equivocadas sobre el parque. El segundo es que los indicadores de falla (tiempo fuera de servicio, cantidad de fallas, tiempo medio de reparación y tiempo medio entre fallas) miden la confiabilidad de los equipos, por lo que no incluyen las fallas de usuario ni las órdenes sin un equipo asociado, como las de instrumental, que no pueden atribuirse a ninguno. Todas ellas sí cuentan como trabajo del servicio en las órdenes totales y en la carga por grupo (sección~\ref{sec:estados}); solo las órdenes sin equipo quedan fuera cuando se filtra por grupo o por tipo, porque el filtro opera sobre equipos. 
 
 En la parte superior, los filtros “Grupo técnico” y “Tipo de equipo” recalculan los indicadores solo sobre los equipos que coinciden. Funcionan en cascada: al elegir un grupo, la lista de tipos muestra solo los que ese grupo atiende. El gráfico de mantenimientos planeados respeta únicamente el filtro de grupo. Los indicadores se organizan en los siguientes bloques:
 
 \begin{itemize}
     \item \textbf{Alertas y pendientes.} Las órdenes abiertas sin técnico asignado y los preventivos vencidos, es decir, aquellos cuyo mes programado ya pasó sin que se realizaran.
     \item \textbf{Estado del parque hoy.} Los equipos registrados, las órdenes abiertas sobre el total y el cumplimiento de los preventivos, que es el porcentaje de los mantenimientos generados que se realizaron dentro del mes programado (sección~\ref{sec:estados}) y puede consultarse para un mes puntual.
-    \item \textbf{Tiempos y desempeño.} El tiempo fuera de servicio, promedio por correctiva cerrada a partir de las paradas medidas; el tiempo medio de reparación (MTTR), desde la apertura hasta el cierre de las correctivas; y la cantidad de fallas registradas.
+    \item \textbf{Tiempos y desempeño.} El tiempo fuera de servicio, promedio por correctiva cerrada a partir de las paradas medidas; el tiempo medio de reparación (MTTR), que promedia los días transcurridos entre la apertura de cada correctiva, es decir, la aceptación de su solicitud, y su cierre, por lo que incluye también el tiempo administrativo hasta el cierre; y la cantidad de fallas registradas.
     \item \textbf{Estado y carga de trabajo.} Tres gráficos: la distribución de las órdenes por estado, las órdenes abiertas por grupo técnico, que muestra cómo se reparte la carga del servicio, y la distribución de los equipos según su vida útil (sección~\ref{sec:criticidad-riesgo}).
     \item \textbf{Mantenimientos planeados.} La cantidad de mantenimientos del mes actual y de los cinco siguientes, contando los ya generados y los pronosticados.
     \item \textbf{Fallas por trimestre.} La evolución de las fallas en los últimos cuatro trimestres, incluido el actual.
     \item \textbf{Equipos con más fallas.} Los diez equipos que más fallaron, candidatos a revisar o reemplazar. Al seleccionar uno, se accede a su ficha.
     \item \textbf{Fallas por urgencia.} La distribución de las fallas según la prioridad de su orden correctiva: baja, media, alta, crítica o sin prioridad.
-    \item \textbf{Equipos menos confiables.} Los equipos ordenados por tiempo medio entre fallas (MTBF), de modo que los que fallan más seguido aparecen primero. En línea con la sección~\ref{sec:indicadores-gestion}, solo se calcula para equipos con al menos dos fallas registradas. Al seleccionar uno, se accede a su ficha.
+    \item \textbf{Equipos menos confiables.} Los equipos ordenados por tiempo medio entre fallas (MTBF), de modo que los que fallan más seguido aparecen primero. El MTBF de cada equipo se calcula como el promedio, en días, de los intervalos entre las fechas de notificación de sus fallas técnicas consecutivas. En línea con la sección~\ref{sec:indicadores-gestion}, solo se calcula para equipos con al menos dos fallas registradas. Al seleccionar uno, se accede a su ficha.
 \end{itemize}
 
 \begin{figure}[H]
@@ -1067,7 +1075,7 @@ La base de prueba no permitía anticipar tres situaciones que aparecieron al tra
     \item Los equipos no tenían mantenimiento preventivo. Los planes de mantenimiento de Maximo no se migraron, y hasta ese momento el sistema solo permitía asignar un plan al dar de alta un equipo nuevo. Se agregaron dos acciones en la ficha del equipo, disponibles solo para coordinación: asignar un plan y el mes de la primera orden a un equipo que no tiene uno, y reprogramar el mes del próximo preventivo en uno que ya lo tiene (sección~\ref{sec:mantenimiento-preventivo}).
 \end{itemize}
 
-Con esta carga, SYNAP opera con el inventario completo del hospital y con usuarios ficticios que replican los roles y grupos del servicio. La migración abarcó los equipos, sus catálogos y las cuentas de usuario. Los planes de mantenimiento y sus \textit{checklists} quedan para definirse con el servicio al momento de la puesta en marcha (capítulo~\ref{sec:futuro}). 
+Con esta carga, SYNAP opera con el inventario del hospital, 6.178 de los 6.182 equipos exportados, y con usuarios ficticios que replican los roles y grupos del servicio. La migración abarcó los equipos, sus catálogos y las cuentas de usuario. Los planes de mantenimiento y sus \textit{checklists} quedan para definirse con el servicio al momento de la puesta en marcha (capítulo~\ref{sec:futuro}). 
 
 \newpage
 \section{Resultados}
@@ -1094,10 +1102,10 @@ Para validar el sistema en un caso de uso real, tal como plantea el último de l
     \label{fig:equipos-datos-reales}
 \end{figure}
 
-\subsection{Validación con el servicio}
+\subsection{Opinión del servicio de Bioingeniería}
 \label{sec:validacion-servicio}
 
-Además de describir el sistema y probarlo con los datos del hospital, interesaba conocer la opinión del propio servicio de Bioingeniería, para el que se desarrolló. Por eso, SYNAP se mostró a la jefa del servicio y a varios técnicos y bioingenieros del equipo. Quienes lo conocieron consideraron que cumple con los requisitos relevados y que resulta adecuado para las tareas del servicio.
+Además de describir el sistema y probarlo con los datos del hospital, interesaba conocer la opinión del propio servicio de Bioingeniería, para el que se desarrolló. Por eso, SYNAP se presentó a la jefa del servicio y a varios técnicos y bioingenieros del equipo mediante una demostración de sus funciones. Quienes lo conocieron consideraron que cumple con los requisitos relevados y que resulta adecuado para las tareas del servicio.
 
 Esta valoración es relevante porque los requisitos del sistema se relevaron con el propio servicio (sección~\ref{sec:relevamiento}). Que el servicio los considere cumplidos indica que el prototipo responde a lo que se pidió. Se trata de una valoración cualitativa, cuyos alcances se analizan en la sección~\ref{sec:alcance-limitaciones}.
 
@@ -1134,9 +1142,9 @@ Al mismo tiempo, los resultados corresponden a un prototipo desarrollado para un
 
 SYNAP es un prototipo, y su continuidad puede ordenarse en tres líneas.
 
-La primera es su puesta en uso. Además del despliegue en la infraestructura del hospital y la capacitación del personal (sección~\ref{sec:propuesta-justificacion}), requiere decidir si la base de datos, hoy alojada en Supabase, debe pasar a la infraestructura del hospital, y definir una política de gobernanza que establezca quién accede a cada información y cómo se protege, ya que, aunque SYNAP no almacena datos de pacientes, sí guarda información del equipamiento y del personal. También es necesario definir con el servicio los planes de mantenimiento y los \textit{checklists} de cada tipo de equipo, que no se migraron, e incorporar el histórico de 57.065 órdenes de Maximo, con el que el panel podría analizar más de diez años de fallas desde el primer día. Con el sistema en uso, convendría además evaluar su usabilidad con cada perfil, en particular con enfermería.
+La primera es su puesta en uso. Además del despliegue en la infraestructura del hospital y la capacitación del personal (sección~\ref{sec:propuesta-justificacion}), requiere decidir si la base de datos, hoy alojada en Supabase, debe pasar a la infraestructura del hospital, y definir una política de gobernanza que establezca quién accede a cada información y cómo se protege, ya que, aunque SYNAP no almacena datos de pacientes, sí guarda información del equipamiento y del personal. También es necesario definir con el servicio los planes de mantenimiento y los \textit{checklists} de cada tipo de equipo, que no se migraron, e incorporar el histórico de 57.065 órdenes de Maximo, con el que el panel podría analizar más de diez años de fallas desde el primer día. También habría que reforzar la activación de las cuentas, que hoy no verifica la identidad del titular, con un enlace enviado a su correo institucional. Con el sistema en uso, convendría además evaluar su usabilidad con cada perfil, en particular con enfermería.
 
-La segunda es completar lo que el modelo de datos ya prevé. Las tablas de auditoría y de movimientos de equipos permitirían registrar quién modificó cada dato y dónde estuvo cada equipo. Las notificaciones, que hoy llegan a una única casilla del servicio, podrían dirigirse al grupo o al técnico responsable y mostrarse dentro de la aplicación, lo que completaría el objetivo de máxima de centralizar las correctivas en bandejas de entrada específicas. También convendría admitir que un técnico integre más de un grupo de trabajo.
+La segunda es completar lo que el modelo de datos ya prevé. Las tablas de auditoría y de movimientos de equipos permitirían registrar quién modificó cada dato y dónde estuvo cada equipo. Las notificaciones, que hoy llegan a una única casilla del servicio, podrían dirigirse al grupo o al técnico responsable y mostrarse dentro de la aplicación. También convendría admitir que un técnico integre más de un grupo de trabajo.
 
 La tercera es ampliar el alcance con funciones que el servicio pidió y que quedaron fuera de este trabajo, como la tecnovigilancia, que ya ofrecen soluciones como Neovero \cite{neovero}, y la integración con el circuito de compras de la institución (sección~\ref{sec:encuesta}). A más largo plazo, un \emph{data warehouse} permitiría cruzar esta información con la de otros sistemas del hospital sin recargar la base operativa. Además, el nivel de riesgo, la antigüedad y el historial de fallas de cada equipo podrían usarse para sugerir acciones, como revisar su plan de mantenimiento o evaluar su baja, siempre como apoyo a una decisión que la ley asigna al servicio \cite{ley_26906}.
 
@@ -1146,7 +1154,7 @@ La tercera es ampliar el alcance con funciones que el servicio pidió y que qued
 
 Este trabajo tuvo como objetivo desarrollar un prototipo funcional de sistema web para la gestión de equipos médicos que centralice su información y sirva de soporte al servicio de Bioingeniería del Hospital Alemán. El resultado es SYNAP, que reúne en una única plataforma el inventario de equipos con acceso por código QR, el reporte de fallas, las órdenes de trabajo, el \textit{stock} de accesorios y repuestos y un panel de indicadores para la jefatura.
 
-Los cinco objetivos de mínima se cumplieron. El sistema ofrece una interfaz web \textit{responsive} que permite consultar la información de cada activo y registrar y clasificar las fallas (secciones~\ref{sec:activos-qr} y~\ref{sec:solicitudes}), un entorno para abrir, seguir y cerrar órdenes de trabajo y consultar los preventivos programados (secciones~\ref{sec:ordenes-trabajo} y~\ref{sec:mantenimiento-preventivo}), un módulo de \textit{stock} vinculado a esas órdenes (sección~\ref{sec:stock}) y un panel de indicadores para jefatura (sección~\ref{sec:panel-indicadores}). Además, se migró la información del hospital y se validó el funcionamiento del sistema con más de 6.000 equipos reales (sección~\ref{sec:integracion-datos}). Los tres objetivos de máxima se cumplieron en una versión inicial. La ficha de cada equipo permite contactar al bioingeniero responsable, los avisos automáticos por correo centralizan las correctivas en una casilla del servicio y el panel analiza las fallas y los tiempos de resolución, un análisis que ganará valor a medida que se acumule el historial.
+Los cinco objetivos de mínima se cumplieron. El sistema ofrece una interfaz web \textit{responsive} que permite consultar la información de cada activo y registrar y clasificar las fallas (secciones~\ref{sec:activos-qr} y~\ref{sec:solicitudes}), un entorno para abrir, seguir y cerrar órdenes de trabajo y consultar los preventivos programados (secciones~\ref{sec:ordenes-trabajo} y~\ref{sec:mantenimiento-preventivo}), un módulo de \textit{stock} vinculado a esas órdenes (sección~\ref{sec:stock}) y un panel de indicadores para jefatura (sección~\ref{sec:panel-indicadores}). Además, se migró la información del hospital y se validó el funcionamiento del sistema con más de 6.000 equipos reales (sección~\ref{sec:integracion-datos}). En cuanto a los objetivos de máxima, la ficha de cada equipo permite contactar al bioingeniero responsable, los avisos automáticos por correo reúnen las órdenes correctivas en una casilla del servicio y el panel analiza las fallas y los tiempos de resolución, un análisis que ganará valor a medida que se acumule el historial.
 
 Entre los hallazgos del trabajo se destacan tres. El primero es que las dificultades del servicio no se deben a la falta de un sistema, sino a que el sistema disponible no captura los datos necesarios para evaluar la gestión. Aun con más de 57.000 órdenes registradas en once años, no fue posible calcular de manera confiable el tiempo de inactividad ni el tiempo medio de reparación (sección~\ref{sec:analisis-maximo}). El segundo es que diseñar a partir de los procesos y los datos del propio servicio permitió atender esos problemas desde el origen, con códigos generados por el sistema, listas cerradas en lugar de texto libre, la medición del tiempo fuera de servicio en cada orden y una prioridad sugerida a partir de las tablas de riesgo que el hospital ya utilizaba. El tercero es que la prueba con datos reales resultó indispensable, ya que reveló situaciones que la base de prueba no mostraba. Quienes conocieron el sistema en el servicio consideraron que cumple con los requisitos relevados (sección~\ref{sec:validacion-servicio}).
 
@@ -1528,7 +1536,7 @@ Los orígenes de los requerimientos se abrevian como R (relevamiento del proceso
     \hline
         RNF-04 & Legibilidad visual & Los estados de las órdenes, las solicitudes y el \textit{stock} deben identificarse visualmente mediante colores, de manera que la situación de cada elemento pueda reconocerse sin leer el detalle. & E \\
     \hline
-        RNF-05 & Rendimiento & Las consultas habituales deben responder en pocos segundos aun con el inventario completo del hospital, para lo cual los listados extensos deben paginarse y filtrarse en el servidor en lugar de cargarse completos en el navegador. La lentitud fue una de las principales dificultades señaladas sobre el sistema actual. & E \\
+        RNF-05 & Rendimiento & Las consultas habituales deben responder en pocos segundos aun con el inventario del hospital, para lo cual los listados extensos deben paginarse y filtrarse en el servidor en lugar de cargarse completos en el navegador. La lentitud fue una de las principales dificultades señaladas sobre el sistema actual. & E \\
     \hline
         RNF-06 & Seguridad & Las contraseñas deben almacenarse de forma irreversible, cada pedido debe validarse según la identidad y el perfil de quien lo realiza, el acceso a la base de datos debe ser posible únicamente a través del \textit{backend} y las credenciales deben mantenerse fuera del código fuente. & T \\
     \hline
@@ -1591,6 +1599,107 @@ Los orígenes de los requerimientos se abrevian como R (relevamiento del proceso
         \label{fig:manual-a5}
     \end{minipage}
 \end{figure}
+
+\section[]{Tablas de riesgo}
+\label{anexo:riesgo}
+
+Las tablas de este anexo están adaptadas de las tablas de riesgo PRIUX del Hospital Alemán y son las que utiliza SYNAP para calcular el puntaje de riesgo de cada equipo médico (sección~\ref{sec:criticidad-riesgo}). La criticidad resulta de sumar los valores de la Tabla~\ref{tab:riesgo-funcion} y la Tabla~\ref{tab:riesgo-clinico}, y el tipo de mantenimiento y la antigüedad se valoran según la Tabla~\ref{tab:riesgo-mantenimiento} y la Tabla~\ref{tab:riesgo-antiguedad}. Las condiciones de la Tabla~\ref{tab:riesgo-pesos} valen 0 cuando no se cumplen, y en ellas el sentido de las preguntas sobre soporte, proveedor y fabricación se ajustó de modo que sea su ausencia la que aumenta el riesgo.
+
+\begin{table}[H]
+    \caption{Función del equipo.}
+    \label{tab:riesgo-funcion}
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c l}
+        \toprule
+        \textbf{Descripción} & \textbf{Valor} & \textbf{Grado} \\
+        \midrule
+        Equipo de apoyo de vida. Equipo e instrumento para la cirugía y los cuidados intensivos & 5 & Muy alto \\
+        Equipo para el tratamiento y la fisioterapia. Equipos para el monitoreo de variables fisiológicas y el diagnóstico & 4 & Alto \\
+        Análisis de laboratorio & 3 & Medio \\
+        Accesorios de laboratorio. Computadoras y otros equipos asociados & 2 & Bajo \\
+        Otros equipos menores relacionados con el paciente & 1 & Muy bajo \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \caption{Riesgo en la aplicación clínica.}
+    \label{tab:riesgo-clinico}
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c l}
+        \toprule
+        \textbf{Descripción} & \textbf{Valor} & \textbf{Grado} \\
+        \midrule
+        Puede producir la muerte del paciente & 5 & Muy alto \\
+        Puede producir daño al paciente o al operador & 4 & Alto \\
+        Terapia inapropiada o falso diagnóstico & 3 & Medio \\
+        Daño del equipo & 2 & Bajo \\
+        Sin daño identificado & 1 & Muy bajo \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \caption{Tipo de mantenimiento.}
+    \label{tab:riesgo-mantenimiento}
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c l}
+        \toprule
+        \textbf{Descripción} & \textbf{Valor} & \textbf{Grado} \\
+        \midrule
+        Reemplazo de piezas, verificación de funcionamiento y ajuste, prueba de seguridad y otras pruebas adicionales & 5 & Muy alto \\
+        Reemplazo de piezas, verificación de funcionamiento y ajuste y prueba de seguridad & 4 & Alto \\
+        Verificación de funcionamiento y ajuste y prueba de seguridad & 3 & Medio \\
+        Verificación de funcionamiento & 2 & Bajo \\
+        Inspección visual & 1 & Muy bajo \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \caption{Antigüedad del equipo.}
+    \label{tab:riesgo-antiguedad}
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c l}
+        \toprule
+        \textbf{Descripción} & \textbf{Valor} & \textbf{Grado} \\
+        \midrule
+        Más de 15 años & 5 & Muy alto \\
+        Entre 10 y 15 años & 4 & Alto \\
+        Entre 5 y 10 años & 3 & Medio \\
+        Entre 1 y 5 años & 2 & Bajo \\
+        Menos de 1 año & 1 & Muy bajo \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \caption{Condiciones que aumentan los pesos del cálculo de riesgo.}
+    \label{tab:riesgo-pesos}
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{l >{\raggedright\arraybackslash}X c l}
+        \toprule
+        \textbf{Variable} & \textbf{Condición} & \textbf{Valor} & \textbf{Pesos} \\
+        \midrule
+        $U$ & El equipo no tiene reemplazo, es único o tiene una tasa de uso alta & 1 & $\alpha_0$ \\
+        $VU$ & Superó su vida útil & 1 & $\alpha_0$, $\alpha_1$, $\alpha_2$ \\
+        $FSR$ & No tiene soporte de repuestos & 0,5 & $\alpha_1$, $\alpha_2$ \\
+        $FSMO$ & No tiene soporte de mano de obra & 0,5 & $\alpha_1$, $\alpha_2$ \\
+        $P$ & No tiene proveedor local & 1 & $\alpha_1$, $\alpha_2$ \\
+        $FF$ & Se dejó de fabricar & 1 & $\alpha_2$ \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
 \label{LastPage}
 
